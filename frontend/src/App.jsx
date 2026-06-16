@@ -3,6 +3,7 @@ import './styles/main.css'
 import Leaderboard from './components/Leaderboard'
 import BattleField from './components/BattleField'
 import { TournamentBar, WinnerBanner, TournamentEndOverlay } from './components/battleChrome'
+import { BadgeToastStack } from './components/battleShared'
 import BattleReplay from './components/BattleReplay'
 import ModelStats from './components/ModelStats'
 import GlobalStats from './components/GlobalStats'
@@ -26,7 +27,9 @@ function App() {
   const [replayOrigin, setReplayOrigin]       = useState('home')
   const {
     events, isConnected, p1State, p2State, battleInfo, battleResult,
-    thinking, coachThinking, tournament, season, draft, showdownRoom, reset, clearTournament, clearSeason,
+    thinking, coachThinking, tournament, season, draft, showdownRoom,
+    newBadges, dismissBadge,
+    reset, clearTournament, clearSeason,
   } = useBattleStream()
 
   const result = dismissed ? null : battleResult
@@ -310,6 +313,9 @@ function App() {
           />
         )}
       </main>
+
+      {/* Global badge toast stack — visible on any view */}
+      <BadgeToastStack badges={newBadges} onDismiss={dismissBadge} />
     </div>
   )
 }

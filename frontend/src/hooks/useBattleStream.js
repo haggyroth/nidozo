@@ -17,6 +17,7 @@ export function useBattleStream() {
   const [season, setSeason]             = useState(null)   // season progress state
   const [draft, setDraft]               = useState(null)   // draft phase state
   const [showdownRoom, setShowdownRoom] = useState(null)   // OP-02: Showdown battle room id for spectating
+  const [newBadges, setNewBadges]       = useState([])     // badge_earned events for live toast
   const wsRef         = useRef(null)
   const shouldConnect = useRef(false)
   const retryDelay    = useRef(1000)
@@ -338,6 +339,11 @@ export function useBattleStream() {
           return
         }
 
+        if (event.type === 'badge_earned') {
+          setNewBadges(prev => [...prev, event])
+          return
+        }
+
         setEvents(prev => {
           const next = [...prev, event]
           return next.length > MAX_EVENTS ? next.slice(-MAX_EVENTS) : next
@@ -387,10 +393,12 @@ export function useBattleStream() {
     setCoachThinking(null)
     setDraft(null)
     setShowdownRoom(null)
+    setNewBadges([])
   }, [])
 
   const clearTournament = useCallback(() => setTournament(null), [])
   const clearSeason     = useCallback(() => setSeason(null), [])
+  const dismissBadge    = useCallback(idx => setNewBadges(prev => prev.filter((_, i) => i !== idx)), [])
 
   useEffect(() => {
     connect()
@@ -399,6 +407,8 @@ export function useBattleStream() {
 
   return {
     events, isConnected, p1State, p2State, battleInfo, battleResult,
-    thinking, coachThinking, tournament, season, draft, showdownRoom, reset, clearTournament, clearSeason,
+    thinking, coachThinking, tournament, season, draft, showdownRoom,
+    newBadges, dismissBadge,
+    reset, clearTournament, clearSeason,
   }
 }
