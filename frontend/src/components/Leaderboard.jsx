@@ -132,7 +132,6 @@ const TIERS = [
   { id: 'ou',         label: 'OverUsed (OU)' },
   { id: 'ubers',      label: 'Ubers' },
   { id: 'uu',         label: 'UnderUsed (UU)' },
-  { id: 'nu',         label: 'NeverUsed (NU)' },
   { id: 'lc',         label: 'Little Cup (LC)' },
   { id: 'freeforall', label: 'Free-for-All' },
 ]
