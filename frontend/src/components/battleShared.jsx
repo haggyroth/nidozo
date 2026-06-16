@@ -59,7 +59,13 @@ export function WinProbBar({ p1State, p2State, p1Label, p2Label }) {
 /** Collapsible heuristic advisory drawer — move scores, type badges, PP. */
 export function HeuristicDrawer({ heuristics, moves, label = 'HEURISTIC ADVISORY' }) {
   const [open, setOpen] = useState(false)
-  if (!heuristics?.move_scores?.length) return null
+  // Render nothing only before any advisory exists (e.g. pre-first-turn). Once a
+  // player has had move scores, keep the drawer mounted even on turns where it
+  // momentarily has none (a forced switch yields an empty move_scores). Vanishing
+  // mid-battle made an opened drawer flicker out and the cockpit grid reflow (#157).
+  if (!heuristics) return null
+
+  const moveScores = heuristics.move_scores ?? []
 
   const moveInfo = {}
   ;(moves ?? []).forEach(m => {
@@ -72,9 +78,14 @@ export function HeuristicDrawer({ heuristics, moves, label = 'HEURISTIC ADVISORY
         <span>⚙ {label}</span>
         <span className={`drawer-chevron ${open ? 'open' : ''}`}>▼</span>
       </button>
-      {open && (
+      {open && moveScores.length === 0 && (
+        <div className="heuristic-content heuristic-content--empty">
+          No move advisory this turn (forced switch).
+        </div>
+      )}
+      {open && moveScores.length > 0 && (
         <div className="heuristic-content">
-          {heuristics.move_scores.map((ms, i) => {
+          {moveScores.map((ms, i) => {
             const isSuper  = ms.effectiveness_label?.includes('super')
             const isImmune = ms.effectiveness_label?.includes('immune')
             const info = moveInfo[ms.move_id] ?? {}

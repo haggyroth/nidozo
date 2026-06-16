@@ -910,6 +910,14 @@ body::after {
   gap: 0.5rem;
 }
 
+/* Shown on a forced-switch turn when a player has no move advisory — keeps the
+   drawer stable instead of letting it vanish mid-battle (#157). */
+.heuristic-content--empty {
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+  font-style: italic;
+}
+
 .heuristic-move {
   display: grid;
   grid-template-columns: 130px 110px 1fr;
