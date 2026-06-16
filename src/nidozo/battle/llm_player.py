@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
+import os
 from collections.abc import Callable, Coroutine
 from typing import TYPE_CHECKING, Any
 
@@ -31,6 +33,12 @@ _COACH_BLOCK = "\n\n--- COACH ANALYSIS ---\n{advice}\n---\n\nWith this analysis 
 
 _MAX_RECENT_EVENTS = 3  # turns of history to surface in the prompt
 
+# Per-turn deadline for the LLM decision call. Without it, a hung or very slow
+# backend (a stuck local model, a network stall) blocks the turn for up to the
+# SDK default (~10 min). Override with NIDOZO_TURN_TIMEOUT (seconds); set to 0
+# to disable. Kept generous so slow-but-working local models aren't cut off.
+_DEFAULT_TURN_TIMEOUT: float = float(os.environ.get("NIDOZO_TURN_TIMEOUT", "90"))
+
 
 class LLMPlayer(Player):
     """A Pokémon Showdown player whose moves are chosen by an LLM.
@@ -56,10 +64,13 @@ class LLMPlayer(Player):
         on_thinking: ThinkingCallback = None,
         lessons: list[str] | None = None,
         coach: CoachAgent | None = None,
+        turn_timeout: float | None = _DEFAULT_TURN_TIMEOUT,
         **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
         self._backend = backend
+        # Per-turn LLM deadline (seconds); None or <=0 disables it.
+        self._turn_timeout = turn_timeout if turn_timeout and turn_timeout > 0 else None
         self._prompt_builder = PromptBuilder(version=prompt_version)
         self._store = store
         self._battle_id = battle_id
@@ -120,15 +131,33 @@ class LLMPlayer(Player):
         )
         response: str | None = None
 
-        # Call LLM with one retry on empty response
+        # Call the LLM with one retry. Each attempt is bounded by a per-turn
+        # timeout so a hung backend can't stall the battle. The fallback reason
+        # records *why* we fell back (backend_timeout / backend_error /
+        # empty_response / parse_failure) so analysis can tell them apart.
         for attempt in range(2):
             try:
-                response = await self._backend.complete(messages)
+                if self._turn_timeout is not None:
+                    response = await asyncio.wait_for(
+                        self._backend.complete(messages), timeout=self._turn_timeout
+                    )
+                else:
+                    response = await self._backend.complete(messages)
+            except TimeoutError:
+                logger.error(
+                    "LLM backend timed out on turn %d (attempt %d, %.0fs)",
+                    battle.turn, attempt + 1, self._turn_timeout,
+                )
+                if attempt == 1:
+                    self._log_turn(battle.turn, None, False, None, state_json, coach_advice,
+                                   fallback_reason="backend_timeout")
+                    return self.choose_random_move(battle)
+                continue
             except Exception as exc:
                 logger.error("LLM backend error on turn %d (attempt %d): %s", battle.turn, attempt + 1, exc)
                 if attempt == 1:
                     self._log_turn(battle.turn, None, False, None, state_json, coach_advice,
-                                   fallback_reason="parse_failure")
+                                   fallback_reason="backend_error")
                     return self.choose_random_move(battle)
                 continue
 
@@ -146,7 +175,7 @@ class LLMPlayer(Player):
                 battle.turn,
             )
             self._log_turn(battle.turn, None, False, "", state_json, coach_advice,
-                           fallback_reason="parse_failure")
+                           fallback_reason="empty_response")
             return self.choose_random_move(battle)
 
         order = parse_action(response, battle, self)
