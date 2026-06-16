@@ -88,7 +88,7 @@ CREATE TABLE IF NOT EXISTS turns (
     prompt_version TEXT   NOT NULL,
     action_chosen TEXT,               -- e.g. "move 2" or "switch pikachu"
     parse_success INTEGER NOT NULL DEFAULT 1,  -- 0=fell back to random
-    fallback_reason TEXT,                      -- why the turn fell back: 'parse_failure' | 'no_legal_move' | NULL
+    fallback_reason TEXT,                      -- why the turn fell back: 'backend_timeout' | 'backend_error' | 'empty_response' | 'parse_failure' | 'no_legal_move' | NULL
     llm_response  TEXT,                        -- full raw response (may be large)
     state_json    TEXT,                        -- serialized battle state at decision time (v2+)
     coach_advice  TEXT                         -- free-form advice from the coach model (NULL if no coach)
@@ -365,9 +365,10 @@ def migrate(conn: sqlite3.Connection) -> None:
         conn.commit()
 
     if version < 12:
-        # Add fallback_reason column to turns to distinguish parse failures from
-        # forced fallbacks (no legal move available).
-        # Values: 'parse_failure' | 'no_legal_move' | NULL (success)
+        # Add fallback_reason column to turns to distinguish why a turn fell back
+        # to a random move. Values: 'backend_timeout' | 'backend_error' |
+        # 'empty_response' | 'parse_failure' | 'no_legal_move' | NULL (success).
+        # (Column is plain TEXT, so newer reason strings need no migration.)
         try:
             conn.execute("ALTER TABLE turns ADD COLUMN fallback_reason TEXT")
         except sqlite3.OperationalError:

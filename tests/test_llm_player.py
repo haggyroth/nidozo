@@ -8,6 +8,7 @@ All tests run without a live Showdown server:
 
 from __future__ import annotations
 
+import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -286,6 +287,95 @@ async def test_choose_move_parse_failure_logged(mock_backend, mock_battle, tmp_p
     turns = store.get_turns_with_state(bid)
     assert len(turns) == 1
     assert turns[0]["parse_success"] == 0
+
+
+# ---------------------------------------------------------------------------
+# choose_move — per-turn timeout (#160) + distinct fallback reasons (#161)
+# ---------------------------------------------------------------------------
+
+def _store_player(backend, tmp_path, **kwargs):
+    """A player wired to a real store so we can read back the logged turn."""
+    from nidozo.db.store import BattleStore
+
+    store = BattleStore(tmp_path / "fr.db")
+    m_id = store.get_or_create_model("random", "random", "v2")
+    bid = store.create_battle("fr", "gen3randombattle", m_id, m_id)
+    player = _make_player(backend, store=store, battle_id=bid, player_role="p1", **kwargs)
+    player.choose_random_move.return_value = MagicMock()
+    return player, store, bid
+
+
+_UNSET = object()
+
+
+async def _reason_after_choose(player, store, bid, battle, *, parse=_UNSET) -> str | None:
+    with patch("nidozo.battle.llm_player.serialize_battle", return_value={}):
+        if parse is _UNSET:
+            await player.choose_move(battle)
+        else:
+            with patch("nidozo.battle.llm_player.parse_action", return_value=parse):
+                await player.choose_move(battle)
+    row = store.get_turns_with_state(bid)[0]
+    assert row["parse_success"] == 0
+    return row["fallback_reason"]
+
+
+@pytest.mark.asyncio
+async def test_choose_move_timeout_falls_back_with_reason(mock_battle, tmp_path) -> None:
+    """A backend that exceeds the per-turn timeout falls back as 'backend_timeout'."""
+    backend = AsyncMock()
+
+    async def _slow(_messages):
+        await asyncio.sleep(5)
+        return "{}"
+
+    backend.complete = _slow
+    player, store, bid = _store_player(backend, tmp_path, turn_timeout=0.01)
+    reason = await _reason_after_choose(player, store, bid, mock_battle)
+    assert reason == "backend_timeout"
+    player.choose_random_move.assert_called_once_with(mock_battle)
+    store.close()
+
+
+@pytest.mark.asyncio
+async def test_choose_move_backend_error_reason(mock_battle, tmp_path) -> None:
+    backend = AsyncMock()
+    backend.complete = AsyncMock(side_effect=RuntimeError("down"))
+    player, store, bid = _store_player(backend, tmp_path)
+    assert await _reason_after_choose(player, store, bid, mock_battle) == "backend_error"
+    store.close()
+
+
+@pytest.mark.asyncio
+async def test_choose_move_empty_response_reason(mock_battle, tmp_path) -> None:
+    backend = AsyncMock()
+    backend.complete = AsyncMock(return_value="")
+    player, store, bid = _store_player(backend, tmp_path)
+    assert await _reason_after_choose(player, store, bid, mock_battle) == "empty_response"
+    store.close()
+
+
+@pytest.mark.asyncio
+async def test_choose_move_parse_failure_reason(mock_backend, mock_battle, tmp_path) -> None:
+    player, store, bid = _store_player(mock_backend, tmp_path)
+    reason = await _reason_after_choose(player, store, bid, mock_battle, parse=None)
+    assert reason == "parse_failure"
+    store.close()
+
+
+@pytest.mark.asyncio
+async def test_turn_timeout_can_be_disabled(mock_battle, fake_order) -> None:
+    """turn_timeout=0 disables the deadline — complete is awaited without wait_for."""
+    backend = AsyncMock()
+    backend.complete = AsyncMock(
+        return_value='{"action_type":"move","identifier":"surf","reasoning":"ok"}'
+    )
+    player = _make_player(backend, turn_timeout=0)
+    assert player._turn_timeout is None
+    with patch("nidozo.battle.llm_player.serialize_battle", return_value={}), \
+         patch("nidozo.battle.llm_player.parse_action", return_value=fake_order):
+        result = await player.choose_move(mock_battle)
+    assert result is fake_order
 
 
 # ---------------------------------------------------------------------------
