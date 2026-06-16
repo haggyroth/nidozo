@@ -194,40 +194,27 @@
 - Formats: `gen9randombattle` (random), `gen9nationaldexag` (AG / free-for-all), `gen9nationaldex` (OU rules), `gen9nationaldexlc` (Little Cup) — Showdown validates teams; no ad-hoc legality checking
 - Full-national-dex competitive sets in `data/natdex_movesets.json` (built by `scripts/build_natdex_sets.py`); heuristics/analyzer use the authoritative Gen 9 type chart via `GenData.from_gen(9)` (Fairy included); serializer/prompts are generation-agnostic
 
+### v0.28 — Player Experience & Tera Awareness (#172–#175)
+- **Personality profiles** (#172): named play-style personas (Aggressive, Defensive, Balanced, Trickster, Momentum) selectable per player; persona injected into system prompt to shape reasoning style; stored per model
+- **Stats page expansion** (#172): global KPIs, battles-by-tier chart, top Pokémon and move usage, recent battles feed; per-model expanded with Pokémon/move usage lists, action distribution bar, win-rate-by-tier panel
+- **Achievements & badges** (#173): per-model milestone badges (first win, win streak ≥5, perfect game, upset win vs higher ELO); badge gallery on stats page; live toast notifications via WebSocket `badge_earned` event; schema v14
+- **Party presets — trainer themes** (#174): 10 curated 6-mon teams (Ash's Kanto, Dragon's Lair, Ghost Gang, Inferno Squad, etc.); `GET /api/presets`; `PresetSelector` in battle form with flavour text + team preview; `PresetBadge` chip in both battle views; always forces `gen9nationaldexag`; draft auto-bypassed
+- **Terastallization awareness** (#175): `can_tera` at state level; `is_terastallized` + `tera_type` on own and opponent mons (opponent only revealed post-Tera); `tera_note` in heuristic battle context; `action_type: "tera_move"` in parser; prompt v6 with full Tera rules + `tera_move` action + example; `◈ TERA TYPE` badge on Pokémon card
+
 ---
 
 ## Upcoming
 
 ### Player Experience
 
-**Personality Profiles**
-- Named play-style personas (Aggressive, Defensive, Balanced, Trickster, etc.) selectable per player
-- Persona injected into the system prompt to shape reasoning style and risk appetite
-- Profiles stored per model; switchable per battle or tournament
-
-**Party Presets — Trainer Themes**
-- Curated 6-mon teams inspired by trainer archetypes and notable in-game characters (Gym Leaders, Elite Four, rivals)
-- Selectable alongside random and draft modes in the battle form
-- Preset metadata: trainer name, flavour text, Gen-legal moveset validation
-
 **Human Player Mode**
 - Allow a human to take one side of a battle via the browser
 - Move/switch selection UI replaces the model selector for the human slot
 - Useful for testing heuristics and experiencing battles directly
 
-**Achievements & Badges**
-- Per-model milestone badges: first win, win streak ≥5, perfect game (no KO taken), upset win (vs higher ELO)
-- Badge gallery on the per-model stats page
-- Badge events emitted via WebSocket so they appear live in the UI
-
 ---
 
 ### UI & Visualisation
-
-**Stats Page Expansion**
-- Global stats: damage-per-turn distribution, average battle length by tier, type usage heatmap
-- Per-model: H2H matrix inline on the stats page; matchup efficiency (win rate vs type disadvantage)
-- Export stats to CSV/JSON for offline analysis
 
 **UI/UX Overhaul**
 - Visual design pass across all pages: typography hierarchy, spacing system, animation polish
@@ -239,9 +226,6 @@
 ### Platform Expansion
 
 > Gen 9 National Dex is now the canonical ruleset — see **OP-03** under Completed.
-
-**Terastallization awareness**
-- Surface Tera type to the model and heuristics (secondary type when Terastallized); currently ignored
 
 **3v3 / 6v6 Team Size Config**
 - Expose team size as a configurable battle option alongside tier and format
