@@ -182,6 +182,18 @@
 - **Lifecycle chrome shared** (`battleChrome.jsx`): cancel control, winner banner, tournament progress bar, tournament-end overlay, and tier/draft badges lifted out of `BattleField` to wrap *both* stages — App.jsx owns the overlays; each stage renders the inline controls
 - **Showdown is now the default view**; Classic remains available behind the toggle as a zero-cost fallback (`nidozo-battle-view` localStorage default flipped to `showdown`)
 
+### v0.27 — Reliability, Validation & Cockpit Polish
+- **Cancel actually stops the sim** (#159): cancelling a battle now tears down the poke-env players (closes their websockets) so the Showdown simulation halts instead of playing on after the DB row is marked cancelled; teardown wraps every runner's `battle_against` in a `finally`
+- **Per-turn LLM timeout** (#164): `choose_move` bounds each `backend.complete()` with `asyncio.wait_for` (default 90s, `NIDOZO_TURN_TIMEOUT`) so a hung backend can't stall a battle
+- **Distinct fallback reasons** (#164): `fallback_reason` now distinguishes `backend_timeout` / `backend_error` / `empty_response` / `parse_failure` instead of conflating them
+- **Request-enum validation** (#165): `provider` / `coach_provider` / `prompt_version` / `tier` / `tournament_format` are Pydantic `Literal`s — invalid input is rejected at the boundary (422) instead of silently degrading; redundant manual route checks and dead `EventBus.publish_sync` removed
+- **Cockpit polish**: heuristic drawer stays mounted on forced-switch turns instead of vanishing (#166); per-player heuristic drawers (#156); win-probability sparkline over time in the shared `WinProbBar`, shown in both views (#167)
+
+### OP-03 — Gen 9 National Dex (single canonical ruleset, #85)
+- Adopted **Gen 9 National Dex** as the one canonical ruleset, retiring hand-maintained per-generation legality (the root cause of the Signal Beam / Iron Head / Hidden Power IV failures)
+- Formats: `gen9randombattle` (random), `gen9nationaldexag` (AG / free-for-all), `gen9nationaldex` (OU rules), `gen9nationaldexlc` (Little Cup) — Showdown validates teams; no ad-hoc legality checking
+- Full-national-dex competitive sets in `data/natdex_movesets.json` (built by `scripts/build_natdex_sets.py`); heuristics/analyzer use the authoritative Gen 9 type chart via `GenData.from_gen(9)` (Fairy included); serializer/prompts are generation-agnostic
+
 ---
 
 ## Upcoming
@@ -212,11 +224,6 @@
 
 ### UI & Visualisation
 
-**Showdown Scene Expansion**
-- Overlay heuristic scores and move type badges on the Showdown battle view (currently Classic-tab-only)
-- Win-probability sparkline and live HP ratio in the Showdown tab
-- Player name / model labels displayed above each side in the Showdown view (currently unlabelled)
-
 **Stats Page Expansion**
 - Global stats: damage-per-turn distribution, average battle length by tier, type usage heatmap
 - Per-model: H2H matrix inline on the stats page; matchup efficiency (win rate vs type disadvantage)
@@ -226,54 +233,15 @@
 - Visual design pass across all pages: typography hierarchy, spacing system, animation polish
 - Mobile-responsive layout (currently desktop-only)
 - Dark/light theme toggle persisted to `localStorage`
-- Onboarding empty states for leaderboard, battles list, and stats when no data exists yet
 
 ---
 
 ### Platform Expansion
 
-**OP-03 — Gen 9 NatDex: One Format, Full Pokédex** *(#85 — revised scope)*
+> Gen 9 National Dex is now the canonical ruleset — see **OP-03** under Completed.
 
-*Revised direction:* instead of maintaining per-generation rule sets (Gen 1/2/3 each needing their own type-chart, stat-model, and legality data), adopt **Gen 9 National Dex** as the single canonical ruleset. Any Pokémon from the full national Pokédex, any move it can legally learn in the current generation, no cross-gen legality juggling.
-
-**Why this is better than the original OP-03 plan:**
-- The root cause of the Signal Beam / Iron Head / Hidden Power IV failures was maintaining Gen 3 legality by hand — an unbounded maintenance surface
-- Gen 9 moves and forms are a superset of all earlier gens; moves that were move-tutor-only in Gen 3 are straightforwardly legal
-- Showdown validates Gen 9 teams automatically; we stop being an ad-hoc legality checker
-- The `gen9nationaldexag` format (NatDex Anything Goes) is already live on our local Showdown server
-
-**Showdown formats to use:**
-- `gen9randombattle` — random tier (Showdown auto-generates teams, zero moveset data needed, immediate drop-in)
-- `gen9nationaldexag` — drafted / freeforall tiers (full national dex, no ban list beyond true illegality)
-- `gen9nationaldex` — competitive drafted tiers (NatDex OU bans apply)
-- `gen9nationaldexlc` — Little Cup equivalent
-
-**Implementation phases:**
-
-*Phase 1 — Random battles (minimal change, no data needed):*
-- Change `"gen3randombattle"` → `"gen9randombattle"` in `routes.py` (3 occurrences) and `tiers.py`
-- Immediate payoff: Showdown generates legal Gen 9 teams automatically; zero moveset JSON involved
-
-*Phase 2 — Moveset data overhaul:*
-- Replace/extend `gen3_movesets.json` with a `movesets.json` covering the full national dex
-- Sets source: Smogon Gen 9 NatDex competitive analyses or a script that pulls from poke-env `GenData.from_gen(9)`
-- Each species entry: same schema (species, item, ability, nature, evs, ivs, moves) but Gen 9 legal
-- IVs field already exists (added in v0.25); Hidden Power is gone in Gen 9 so the IV complexity disappears
-- Script approach: query Showdown's own NatDex random-sets data (`data/random-battles/gen9/sets.json`)
-
-*Phase 3 — Tier definitions:*
-- Replace Gen 3 ADV tier sets in `tiers.py` with Gen 9 NatDex tier classifications (ND OU, ND UU, ND Ubers, etc.)
-- Or simplify to fewer tiers: `freeforall` (NatDex AG), `ou` (NatDex OU), `ubers` (NatDex Ubers), `lc` (NatDex LC)
-- TIER_TO_FORMAT updated to `gen9nationaldexag`, `gen9nationaldex`, etc.
-
-*Phase 4 — Heuristics:*
-- Remove Gen 3 specific comments; most mechanics (paralysis, burn, weather) are identical in Gen 9
-- Add Fairy type to damage modifier lookups (18-type chart)
-- Optionally: Terastal awareness (secondary type during Tera); safe to ignore in v1
-
-*Phase 5 — Serializer + prompts:*
-- Serializer already uses SpA/SpD (correct for Gen 9); minor audit for Gen 9-specific fields (Tera type)
-- Prompt templates: remove "Gen 3" references, no functional change needed initially
+**Terastallization awareness**
+- Surface Tera type to the model and heuristics (secondary type when Terastallized); currently ignored
 
 **3v3 / 6v6 Team Size Config**
 - Expose team size as a configurable battle option alongside tier and format
@@ -291,11 +259,6 @@
 ---
 
 ### Technical Debt & Housekeeping
-
-**Fallback Move Investigation**
-- Audit when and why `LLMPlayer` falls back to a random move (parse failure, timeout, invalid action)
-- Log fallback events explicitly with reason; surface fallback rate in per-model stats
-- Reduce fallback rate: improve parser robustness, tighten output schema enforcement
 
 **File Logging**
 - Structured file-based log output (JSON lines) alongside the current console logs
