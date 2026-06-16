@@ -10,7 +10,7 @@
 A Nimzo-style arena where **two LLMs compete in Pokémon battles** through Pokémon Showdown via poke-env. Sibling project to **Nimzo** (the LLM chess arena), reusing the same core loop: two models play, a rules engine owns game state, models reason and choose actions, ELO tracks skill over time, a live visualizer renders the match, and post-game analysis explains what happened.
 
 **The system includes:**
-- A battle + tournament system for Pokémon Generations 1–3
+- A battle + tournament system on **Gen 9 National Dex** (random + drafted teams)
 - An ELO ranking system
 - Post-battle analysis
 - A leaderboard
@@ -56,8 +56,8 @@ This is where the project's value lives. It should be the most fleshed-out part 
 
 | Dimension | Now | Future |
 |---|---|---|
-| **Generation** | Gen 1–3 (RSE) | Beyond Gen 3 |
-| **Teams** | Random Battles | Drafted teams |
+| **Generation** | Gen 9 National Dex (single canonical ruleset) | — |
+| **Teams** | Random + LLM-drafted teams; tiers (OU/UU/LC/Ubers/FFA) | Party presets, configurable team size |
 | **Mode** | Singles | Doubles |
 
 ---
@@ -103,14 +103,15 @@ Apply Kyle's git-workflow standard automatically on all repo work, without being
 
 ---
 
-## Roadmap (future features)
+## Roadmap
 
-- **Drafted teams** — including an LLM-drafted team mode
-- **Doubles** battles (adds target-selection complexity)
-- **Expanded generation support** beyond Gen 3
-- **Richer post-game analysis** — annotate RNG swings, key decision points, and blunders
-- **Tournament structures** — brackets, scheduled round-robins
-- **Final project name** — **Nidozo** (Nido- from the Nido Pokémon family + -zo from Nimzo). GitHub repo: `haggyroth/nidozo`.
+`ROADMAP.md` is the source of truth for both shipped work and planned features — keep it current.
+
+**Already shipped** (don't re-propose as new): LLM-drafted teams, Smogon-style tiers, round-robin + single/double-elim brackets, seasons, cross-battle lessons, multi-agent coach mode, full post-game analysis (RNG inference, blunders, turning points, narrative), the Showdown cockpit view (now primary), and the migration to **Gen 9 National Dex** as the single canonical ruleset (OP-03).
+
+**Genuinely future** (see ROADMAP.md for detail): personality profiles, party presets, human-player mode, achievements/badges, doubles battles, configurable team size, stats-page expansion, mobile/responsive + theme toggle, containerisation.
+
+The project name is **Nidozo** (Nido- from the Nido family + -zo from Nimzo); repo `haggyroth/nidozo`.
 
 ---
 
