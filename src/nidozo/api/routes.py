@@ -307,11 +307,10 @@ def create_router(
         req: StartBattleRequest,
         background_tasks: BackgroundTasks,
     ) -> StartBattleResponse:
-        from nidozo.battle.tiers import TIER_TO_FORMAT, is_valid_tier
+        from nidozo.battle.tiers import TIER_TO_FORMAT
 
-        if not is_valid_tier(req.tier) and req.tier != "random":
-            raise HTTPException(status_code=400, detail=f"Unknown tier: {req.tier!r}")
-
+        # tier / prompt_version / providers are validated by the Pydantic model
+        # (Literal types → 422 on bad input), so no manual checks are needed here.
         showdown_format = (
             "gen9randombattle" if req.tier == "random"
             else TIER_TO_FORMAT.get(req.tier, "gen9nationaldexag")
@@ -357,19 +356,11 @@ def create_router(
     ) -> StartTournamentResponse:
         import itertools
 
-        from nidozo.battle.tiers import TIER_TO_FORMAT, is_valid_tier
+        from nidozo.battle.tiers import TIER_TO_FORMAT
 
-        if len(req.players) < 2:
-            raise HTTPException(status_code=400, detail="Need at least 2 players")
-        if not is_valid_tier(req.tier) and req.tier != "random":
-            raise HTTPException(status_code=400, detail=f"Unknown tier: {req.tier!r}")
-        valid_formats = {"round_robin", "single_elim", "double_elim"}
-        if req.tournament_format not in valid_formats:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Unknown tournament format: {req.tournament_format!r}",
-            )
-
+        # players (min_length=2), tier, tournament_format, prompt_version and
+        # providers are all validated by the Pydantic model (Literal / Field
+        # constraints → 422 on bad input), so no manual checks are needed here.
         showdown_format = (
             "gen9randombattle" if req.tier == "random"
             else TIER_TO_FORMAT.get(req.tier, "gen9nationaldexag")
@@ -471,13 +462,11 @@ def create_router(
     ) -> StartSeasonResponse:
         import itertools
 
-        from nidozo.battle.tiers import TIER_TO_FORMAT, is_valid_tier
+        from nidozo.battle.tiers import TIER_TO_FORMAT
 
-        if len(req.players) < 2:
-            raise HTTPException(status_code=400, detail="Need at least 2 players")
-        if not is_valid_tier(req.tier) and req.tier != "random":
-            raise HTTPException(status_code=400, detail=f"Unknown tier: {req.tier!r}")
-
+        # players (min_length=2), tier, prompt_version and providers are validated
+        # by the Pydantic model (Literal / Field constraints → 422), so no manual
+        # checks are needed here.
         showdown_format = (
             "gen9randombattle" if req.tier == "random"
             else TIER_TO_FORMAT.get(req.tier, "gen9nationaldexag")

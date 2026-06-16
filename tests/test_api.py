@@ -718,7 +718,8 @@ async def test_start_tournament_invalid_tier(client: AsyncClient, no_battle_runn
             "tier": "nonexistent_tier",
         },
     )
-    assert resp.status_code == 400
+    # Rejected by the Pydantic Tier literal at the boundary.
+    assert resp.status_code == 422
 
 
 # --- start_tournament — invalid format ---
@@ -732,7 +733,8 @@ async def test_start_tournament_invalid_format(client: AsyncClient, no_battle_ru
             "tournament_format": "swiss",
         },
     )
-    assert resp.status_code == 400
+    # Rejected by the Pydantic TournamentFormat literal at the boundary.
+    assert resp.status_code == 422
 
 
 # --- start_tournament — single_elim bracket format ---
@@ -1009,14 +1011,45 @@ async def test_get_battle_teams_endpoint(app, client: AsyncClient, no_battle_run
 
 
 @pytest.mark.asyncio
-async def test_start_battle_unknown_tier_returns_400(client: AsyncClient, no_battle_runner) -> None:
-    """Line 290: unknown tier in start_battle returns 400."""
+async def test_start_battle_unknown_tier_returns_422(client: AsyncClient, no_battle_runner) -> None:
+    """Unknown tier is rejected by the Pydantic Tier literal (422)."""
     resp = await client.post(
         "/api/battles/start",
         json={"p1_provider": "random", "p2_provider": "random", "tier": "unknowntier999"},
     )
-    assert resp.status_code == 400
-    assert "Unknown tier" in resp.json()["detail"]
+    assert resp.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_start_battle_unknown_provider_returns_422(client: AsyncClient, no_battle_runner) -> None:
+    """An unknown provider is rejected at the boundary instead of silently
+    falling through to LM Studio."""
+    resp = await client.post(
+        "/api/battles/start",
+        json={"p1_provider": "gpt5enterprise", "p2_provider": "random"},
+    )
+    assert resp.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_start_battle_unknown_prompt_version_returns_422(client: AsyncClient, no_battle_runner) -> None:
+    """An unknown prompt_version is rejected at the boundary instead of failing
+    deep in the background task when the prompt builder is constructed."""
+    resp = await client.post(
+        "/api/battles/start",
+        json={"p1_provider": "random", "p2_provider": "random", "prompt_version": "v99"},
+    )
+    assert resp.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_start_battle_random_coach_provider_returns_422(client: AsyncClient, no_battle_runner) -> None:
+    """'random' is not a valid coach provider — coaches need a real LLM backend."""
+    resp = await client.post(
+        "/api/battles/start",
+        json={"p1_provider": "random", "p2_provider": "random", "p1_coach_provider": "random"},
+    )
+    assert resp.status_code == 422
 
 
 @pytest.mark.asyncio
@@ -1083,7 +1116,7 @@ async def test_start_season_one_player_returns_422(client: AsyncClient, no_battl
 
 
 @pytest.mark.asyncio
-async def test_start_season_unknown_tier_returns_400(client: AsyncClient, no_battle_runner) -> None:
+async def test_start_season_unknown_tier_returns_422(client: AsyncClient, no_battle_runner) -> None:
     resp = await client.post(
         "/api/seasons/start",
         json={
@@ -1092,8 +1125,7 @@ async def test_start_season_unknown_tier_returns_400(client: AsyncClient, no_bat
             "tier": "notarealthing",
         },
     )
-    assert resp.status_code == 400
-    assert "Unknown tier" in resp.json()["detail"]
+    assert resp.status_code == 422
 
 
 @pytest.mark.asyncio

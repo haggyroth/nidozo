@@ -103,11 +103,3 @@ class EventBus:
                 q.put_nowait(event)
             except asyncio.QueueFull:
                 pass  # race between full-check and put; give up rather than block
-
-    def publish_sync(self, event: dict[str, Any]) -> None:
-        """Fire-and-forget from sync context (creates a task on the running loop)."""
-        try:
-            loop = asyncio.get_running_loop()
-            loop.create_task(self.publish(event))
-        except RuntimeError:
-            pass

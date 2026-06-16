@@ -1,4 +1,4 @@
-"""Tests for EventBus — subscribe, publish, unsubscribe, overflow, and publish_sync."""
+"""Tests for EventBus — subscribe, publish, unsubscribe, and overflow."""
 
 from __future__ import annotations
 
@@ -136,29 +136,3 @@ async def test_publish_queue_full_race_silently_ignored() -> None:
 
     # Should not raise even though put_nowait will hit QueueFull
     await bus.publish({"type": "race"})
-
-
-# ---------------------------------------------------------------------------
-# publish_sync
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.asyncio
-async def test_publish_sync_schedules_task_on_running_loop() -> None:
-    """publish_sync() creates a task that delivers the event via publish()."""
-    bus = EventBus()
-    q = bus.subscribe()
-
-    bus.publish_sync({"type": "sync_event"})
-    # Allow the scheduled task to run
-    await asyncio.sleep(0)
-
-    assert not q.empty()
-    assert q.get_nowait() == {"type": "sync_event"}
-
-
-def test_publish_sync_no_running_loop_no_error() -> None:
-    """publish_sync() is silent when there is no running event loop."""
-    bus = EventBus()
-    # Called outside any async context — RuntimeError is swallowed
-    bus.publish_sync({"type": "orphan"})  # should not raise
