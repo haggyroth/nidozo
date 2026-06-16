@@ -33,6 +33,31 @@ _COACH_BLOCK = "\n\n--- COACH ANALYSIS ---\n{advice}\n---\n\nWith this analysis 
 
 _MAX_RECENT_EVENTS = 3  # turns of history to surface in the prompt
 
+_STATUS_VERB: dict[str, str] = {
+    "BRN": "burned",
+    "PAR": "paralyzed",
+    "SLP": "put to sleep",
+    "PSN": "poisoned",
+    "TOX": "badly poisoned",
+    "FRZ": "frozen",
+}
+_STATUS_LABEL: dict[str, str] = {
+    "BRN": "burn",
+    "PAR": "paralysis",
+    "SLP": "sleep",
+    "PSN": "poison",
+    "TOX": "toxic poison",
+    "FRZ": "freeze",
+}
+
+
+def _status_verb(status: str) -> str:
+    return _STATUS_VERB.get(status.upper(), f"inflicted with {status}")
+
+
+def _status_label(status: str) -> str:
+    return _STATUS_LABEL.get(status.upper(), status.lower())
+
 # Per-turn deadline for the LLM decision call. Without it, a hung or very slow
 # backend (a stuck local model, a network stall) blocks the turn for up to the
 # SDK default (~10 min). Override with NIDOZO_TURN_TIMEOUT (seconds); set to 0
@@ -80,8 +105,10 @@ class LLMPlayer(Player):
         self._lessons = lessons or []
         self._coach = coach
         self._personality = personality
-        # Battle-history tracking (for prompt v4 recent_events)
+        # Battle-history tracking (for prompt v4+ recent_events)
         self._prev_hp: dict[str, float] = {}       # species_key → hp_fraction
+        # Richer snapshot for competitive event annotation (item/status/ability)
+        self._prev_snapshot: dict[str, dict[str, Any]] = {}
         self._recent_events: list[dict[str, Any]] = []  # rolling event log
         self._last_action_display: str | None = None    # human-readable last action
 
@@ -233,44 +260,86 @@ class LLMPlayer(Player):
 
         lines: list[str] = []
 
+        prev_snap: dict[str, dict[str, Any]] = getattr(self, "_prev_snapshot", {})
+
         # What did I play last turn?
         last_action = getattr(self, "_last_action_display", None)
         if last_action:
             lines.append(f"Your action: {last_action}")
 
-        # HP changes for my active Pokémon
+        # HP changes + state events for my active Pokémon
         my_active = state.get("my_active")
         if my_active:
             key = my_active["species"]
-            prev = prev_hp.get(key)
+            prev_hp_val = prev_hp.get(key)
             curr = my_active["hp_fraction"]
-            if prev is not None and abs(curr - prev) > 0.01:
-                delta_pct = (curr - prev) * 100
+            if prev_hp_val is not None and abs(curr - prev_hp_val) > 0.01:
+                delta_pct = (curr - prev_hp_val) * 100
                 direction = f"took ~{abs(delta_pct):.0f}% damage" if delta_pct < 0 else f"recovered ~{delta_pct:.0f}% HP"
-                lines.append(
-                    f"Your {key.title()} {direction} (now {curr * 100:.0f}%)"
-                )
+                lines.append(f"Your {key.title()} {direction} (now {curr * 100:.0f}%)")
+            # Status applied / cured
+            if battle.active_pokemon and key in prev_snap:
+                prev_s = prev_snap[key]
+                mon = battle.active_pokemon
+                curr_status = mon.status.name if mon.status else None
+                if curr_status and not prev_s.get("status"):
+                    lines.append(f"Your {key.title()} was {_status_verb(curr_status)}")
+                elif not curr_status and prev_s.get("status"):
+                    lines.append(f"Your {key.title()}'s {_status_label(prev_s['status'])} was cured")
+                # Item consumed (had item, now None or changed)
+                prev_item = prev_s.get("item")
+                if prev_item and mon.item is None:
+                    lines.append(
+                        f"Your {key.title()}'s {prev_item.replace('_', ' ').title()} was consumed"
+                    )
 
-        # What move did the opponent use last turn?
+        # What move did the opponent use last turn? (with priority note)
         opp_pokemon = battle.opponent_active_pokemon
         if opp_pokemon is not None:
             opp_last = opp_pokemon.last_move
             if opp_last is not None:
                 move_name = opp_last.id.replace("_", " ").title()
-                lines.append(f"Opponent used: {move_name}")
+                prio = getattr(opp_last, "priority", 0) or 0
+                prio_note = (
+                    f" [priority {'+' if prio > 0 else ''}{prio}]" if prio != 0 else ""
+                )
+                lines.append(f"Opponent used: {move_name}{prio_note}")
 
-        # HP changes for opponent's active Pokémon
+        # HP changes + state events for opponent's active Pokémon
         opp_active = state.get("opponent_active")
         if opp_active:
-            key = f"opp_{opp_active['species']}"
-            prev = prev_hp.get(key)
+            opp_species = opp_active["species"]
+            key = f"opp_{opp_species}"
+            prev_hp_val = prev_hp.get(key)
             curr = opp_active["hp_fraction"]
-            if prev is not None and abs(curr - prev) > 0.01:
-                delta_pct = (curr - prev) * 100
+            if prev_hp_val is not None and abs(curr - prev_hp_val) > 0.01:
+                delta_pct = (curr - prev_hp_val) * 100
                 direction = f"took ~{abs(delta_pct):.0f}% damage" if delta_pct < 0 else f"recovered ~{delta_pct:.0f}% HP"
                 lines.append(
-                    f"Opponent's {opp_active['species'].title()} {direction} (now {curr * 100:.0f}%)"
+                    f"Opponent's {opp_species.title()} {direction} (now {curr * 100:.0f}%)"
                 )
+            # Opponent status applied / cured; item / ability revealed
+            if opp_pokemon is not None and key in prev_snap:
+                prev_s = prev_snap[key]
+                curr_status = opp_pokemon.status.name if opp_pokemon.status else None
+                if curr_status and not prev_s.get("status"):
+                    lines.append(
+                        f"Opponent's {opp_species.title()} was {_status_verb(curr_status)}"
+                    )
+                elif not curr_status and prev_s.get("status"):
+                    lines.append(
+                        f"Opponent's {opp_species.title()}'s {_status_label(prev_s['status'])} was cured"
+                    )
+                # Item revealed (opponent couldn't see before, now can)
+                if not prev_s.get("item") and opp_pokemon.item:
+                    lines.append(
+                        f"Opponent's item revealed: {opp_pokemon.item.replace('_', ' ').title()}"
+                    )
+                # Ability revealed
+                if not prev_s.get("ability") and opp_pokemon.ability:
+                    lines.append(
+                        f"Opponent's ability revealed: {opp_pokemon.ability.replace('_', ' ').title()}"
+                    )
 
         if lines:
             recent_events.append({"turn": battle.turn - 1, "lines": lines})
@@ -281,26 +350,50 @@ class LLMPlayer(Player):
         return list(recent_events)
 
     def _update_hp_snapshot(self, battle: AbstractBattle) -> None:
-        """Snapshot current HP fractions for all visible mons."""
-        snap: dict[str, float] = {}
+        """Snapshot current HP fractions and state (status/item/ability) for all visible mons."""
+        hp_snap: dict[str, float] = {}
+        state_snap: dict[str, dict[str, Any]] = {}
         try:
             if battle.active_pokemon:
-                snap[battle.active_pokemon.species] = (
-                    battle.active_pokemon.current_hp_fraction
-                )
+                mon = battle.active_pokemon
+                key = mon.species
+                hp_snap[key] = mon.current_hp_fraction
+                state_snap[key] = {
+                    "status": mon.status.name if mon.status else None,
+                    "item": mon.item,
+                    "ability": mon.ability,
+                }
             for mon in battle.team.values():
                 if not mon.active:
-                    snap[mon.species] = mon.current_hp_fraction
+                    key = mon.species
+                    hp_snap[key] = mon.current_hp_fraction
+                    state_snap[key] = {
+                        "status": mon.status.name if mon.status else None,
+                        "item": mon.item,
+                        "ability": mon.ability,
+                    }
             if battle.opponent_active_pokemon:
-                snap[f"opp_{battle.opponent_active_pokemon.species}"] = (
-                    battle.opponent_active_pokemon.current_hp_fraction
-                )
+                mon = battle.opponent_active_pokemon
+                key = f"opp_{mon.species}"
+                hp_snap[key] = mon.current_hp_fraction
+                state_snap[key] = {
+                    "status": mon.status.name if mon.status else None,
+                    "item": mon.item,
+                    "ability": mon.ability,
+                }
             for mon in battle.opponent_team.values():
                 if not mon.active:
-                    snap[f"opp_{mon.species}"] = mon.current_hp_fraction
+                    key = f"opp_{mon.species}"
+                    hp_snap[key] = mon.current_hp_fraction
+                    state_snap[key] = {
+                        "status": mon.status.name if mon.status else None,
+                        "item": mon.item,
+                        "ability": mon.ability,
+                    }
         except Exception:  # noqa: BLE001
             pass
-        self._prev_hp = snap
+        self._prev_hp = hp_snap
+        self._prev_snapshot = state_snap
 
     async def _notify_thinking(self, is_coach: bool, turn: int) -> None:
         """Fire a thinking event to any registered callback."""
