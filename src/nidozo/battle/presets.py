@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Any
 
 _PRESETS_PATH = Path(__file__).parent.parent.parent.parent / "data" / "party_presets.json"
-_PRESET_CACHE: dict[str, "Preset"] | None = None
+_PRESET_CACHE: dict[str, Preset] | None = None
 
 PRESET_FORMAT = "gen9nationaldexag"
 
@@ -28,7 +28,7 @@ class Preset:
     pokemon: list[str]  # ordered list of 6 species IDs
 
 
-def _load() -> dict[str, "Preset"]:
+def _load() -> dict[str, Preset]:
     global _PRESET_CACHE
     if _PRESET_CACHE is None:
         raw: list[dict[str, Any]] = json.loads(_PRESETS_PATH.read_text(encoding="utf-8"))
@@ -61,7 +61,7 @@ def list_presets() -> list[dict[str, Any]]:
     ]
 
 
-def get_preset(slug: str) -> "Preset | None":
+def get_preset(slug: str) -> Preset | None:
     return _load().get(slug)
 
 
