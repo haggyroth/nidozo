@@ -336,6 +336,8 @@ def create_router(
                 showdown_format,
                 p1_id,
                 p2_id,
+                p1_personality=req.p1_personality,
+                p2_personality=req.p2_personality,
             )
             battle_ids.append(bid)
 
@@ -373,6 +375,7 @@ def create_router(
                 "model_name":     _model_name(p.provider, p.model),
                 "coach_provider": p.coach_provider,
                 "coach_model":    p.coach_model,
+                "personality":    p.personality,
             }
             for p in req.players
         ]
@@ -433,6 +436,8 @@ def create_router(
                         showdown_format,
                         a_id, b_id,
                         tournament_id=tournament_id,
+                        p1_personality=a.get("personality"),
+                        p2_personality=b.get("personality"),
                     )
                     battle_ids.append(bid)
                     battle_num += 1
@@ -479,6 +484,7 @@ def create_router(
                 "model_name":     _model_name(p.provider, p.model),
                 "coach_provider": p.coach_provider,
                 "coach_model":    p.coach_model,
+                "personality":    p.personality,
             }
             for p in req.players
         ]
@@ -510,6 +516,8 @@ def create_router(
                         showdown_format,
                         a_id, b_id,
                         season_id=season_id,
+                        p1_personality=a.get("personality"),
+                        p2_personality=b.get("personality"),
                     )
                     battle_ids.append(bid)
                     battle_num += 1

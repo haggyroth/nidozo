@@ -189,6 +189,27 @@ export function ThinkingBadge({ role, isCoach }) {
   )
 }
 
+const PERSONALITY_META = {
+  aggressive: { emoji: '⚔️', label: 'All-out Attacker' },
+  defensive:  { emoji: '🛡️', label: 'Bulwark' },
+  balanced:   { emoji: '⚖️', label: 'Adaptive' },
+  trickster:  { emoji: '🎭', label: 'Mindgame Specialist' },
+  momentum:   { emoji: '💨', label: 'Tempo Player' },
+}
+
+/** Small chip showing the active play-style persona. */
+export function PersonalityChip({ personality }) {
+  if (!personality) return null
+  const meta = PERSONALITY_META[personality]
+  if (!meta) return null
+  return (
+    <div className="personality-chip" title={meta.label}>
+      <span className="personality-chip-emoji">{meta.emoji}</span>
+      <span className="personality-chip-label">{meta.label}</span>
+    </div>
+  )
+}
+
 /** Provider + model name label for one side. */
 export function PlayerLabel({ label, side }) {
   if (!label) return null

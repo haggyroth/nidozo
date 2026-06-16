@@ -218,6 +218,7 @@ async def test_player_calls_coach_before_acting(mock_battle: MagicMock, player_b
         player._lessons = []
         player._coach = coach
         player._turn_timeout = None
+        player._personality = None
 
         await player.choose_move(mock_battle)
 
@@ -253,6 +254,7 @@ async def test_player_injects_coach_advice_into_prompt(mock_battle: MagicMock, p
         player._lessons = []
         player._coach = coach
         player._turn_timeout = None
+        player._personality = None
 
         await player.choose_move(mock_battle)
 
@@ -286,6 +288,7 @@ async def test_player_acts_normally_when_no_coach(mock_battle: MagicMock, player
         player._lessons = []
         player._coach = None
         player._turn_timeout = None
+        player._personality = None
 
         await player.choose_move(mock_battle)
 
@@ -324,6 +327,7 @@ async def test_thinking_events_include_agent_field(mock_battle: MagicMock, playe
         player._lessons = []
         player._coach = coach
         player._turn_timeout = None
+        player._personality = None
 
         await player.choose_move(mock_battle)
 
@@ -362,6 +366,7 @@ async def test_player_acts_even_if_coach_fails(mock_battle: MagicMock, player_ba
         player._lessons = []
         player._coach = coach
         player._turn_timeout = None
+        player._personality = None
 
         await player.choose_move(mock_battle)
 
@@ -398,6 +403,7 @@ async def test_coach_advice_stored_in_db(mock_battle: MagicMock, player_backend:
         player._lessons = []
         player._coach = coach
         player._turn_timeout = None
+        player._personality = None
 
         await player.choose_move(mock_battle)
 

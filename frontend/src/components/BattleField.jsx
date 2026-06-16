@@ -1,6 +1,6 @@
 import PokemonCard from './PokemonCard'
 import BattleLog from './BattleLog'
-import { WinProbBar, PlayerLabel, HeuristicDrawer, ThinkingBadge } from './battleShared'
+import { WinProbBar, PlayerLabel, HeuristicDrawer, ThinkingBadge, PersonalityChip } from './battleShared'
 import { BattleBadges, CancelBattleButton } from './battleChrome'
 
 /**
@@ -64,6 +64,7 @@ export default function BattleField({
       <div className="arena">
         <div className="arena-player-col">
           <PlayerLabel label={battleInfo?.p1} side="p1" />
+          <PersonalityChip personality={battleInfo?.p1_personality} />
           <PokemonCard
             mon={p1Mon}
             side="p1"
@@ -75,6 +76,7 @@ export default function BattleField({
         <div className="vs-divider">VS</div>
         <div className="arena-player-col">
           <PlayerLabel label={battleInfo?.p2} side="p2" />
+          <PersonalityChip personality={battleInfo?.p2_personality} />
           <PokemonCard
             mon={p2Mon ?? oppOfP1}
             side="p2"

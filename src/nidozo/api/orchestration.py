@@ -173,6 +173,7 @@ async def run_battles(
                 team=p1_team,
                 coach_provider=req.p1_coach_provider,
                 coach_model=req.p1_coach_model,
+                personality=req.p1_personality,
             )
             p2 = _build_streaming_player(
                 req.p2_provider, p2_model, "p2",
@@ -181,6 +182,7 @@ async def run_battles(
                 team=p2_team,
                 coach_provider=req.p2_coach_provider,
                 coach_model=req.p2_coach_model,
+                personality=req.p2_personality,
             )
 
             store.set_battle_status(battle_id, "running")
@@ -192,6 +194,8 @@ async def run_battles(
                 "format": showdown_format,
                 "tier": req.tier,
                 "drafted": do_draft,
+                "p1_personality": req.p1_personality,
+                "p2_personality": req.p2_personality,
             })
 
             await _battle_and_teardown(p1, p2)
@@ -283,11 +287,15 @@ async def run_tournament(
         "tier": req.tier,
     })
 
-    # Build a lookup so each battle's p1/p2 can find their coach config.
+    # Build lookups so each battle's p1/p2 can find their coach and personality config.
     coach_lookup: dict[tuple[str, str], tuple[str | None, str | None]] = {
         (ps["provider"], ps["model_name"]): (
             ps.get("coach_provider"), ps.get("coach_model")
         )
+        for ps in player_specs
+    }
+    personality_lookup: dict[tuple[str, str], str | None] = {
+        (ps["provider"], ps["model_name"]): ps.get("personality")
         for ps in player_specs
     }
 
@@ -397,6 +405,8 @@ async def run_tournament(
             t_p2_coach_prov, t_p2_coach_model = coach_lookup.get(
                 (t_p2_prov, battle_info["p2_model"]), (None, None)
             )
+            t_p1_personality = personality_lookup.get((t_p1_prov, battle_info["p1_model"]))
+            t_p2_personality = personality_lookup.get((t_p2_prov, battle_info["p2_model"]))
 
             p1 = _build_streaming_player(
                 t_p1_prov, battle_info["p1_model"], "p1",
@@ -405,6 +415,7 @@ async def run_tournament(
                 team=t_p1_team,
                 coach_provider=t_p1_coach_prov,
                 coach_model=t_p1_coach_model,
+                personality=t_p1_personality,
             )
             p2 = _build_streaming_player(
                 t_p2_prov, battle_info["p2_model"], "p2",
@@ -413,6 +424,7 @@ async def run_tournament(
                 team=t_p2_team,
                 coach_provider=t_p2_coach_prov,
                 coach_model=t_p2_coach_model,
+                personality=t_p2_personality,
             )
 
             store.set_battle_status(battle_id, "running")
@@ -425,6 +437,8 @@ async def run_tournament(
                 "format": showdown_format,
                 "tier": req.tier,
                 "drafted": do_draft,
+                "p1_personality": t_p1_personality,
+                "p2_personality": t_p2_personality,
             })
 
             await _battle_and_teardown(p1, p2)
@@ -693,6 +707,11 @@ async def run_bracket_tournament(
     bracket_state = build_bracket(player_specs, req.tournament_format)
     store.update_bracket_state(tournament_id, bracket_state)
 
+    personality_lookup: dict[tuple[str, str], str | None] = {
+        (ps["provider"], ps["model_name"]): ps.get("personality")
+        for ps in player_specs
+    }
+
     # Estimate total battles: SE = n-1, DE = 2n-2 or 2n-1 (approx)
     n = len(player_specs)
     if req.tournament_format == "single_elim":
@@ -807,11 +826,13 @@ async def run_bracket_tournament(
                         p1_prov, p1_model, "p1",
                         effective_prompt, store, battle_id, bus, cfg, showdown_format,
                         lessons=t_p1_lessons,
+                        personality=personality_lookup.get((p1_prov, p1_model)),
                     )
                     p2 = _build_streaming_player(
                         p2_prov, p2_model, "p2",
                         effective_prompt, store, battle_id, bus, cfg, showdown_format,
                         lessons=t_p2_lessons,
+                        personality=personality_lookup.get((p2_prov, p2_model)),
                     )
 
                     store.set_battle_status(battle_id, "running")
@@ -825,6 +846,8 @@ async def run_bracket_tournament(
                         "tier": req.tier,
                         "drafted": do_draft,
                         "match_id": match_id,
+                        "p1_personality": personality_lookup.get((p1_prov, p1_model)),
+                        "p2_personality": personality_lookup.get((p2_prov, p2_model)),
                     })
 
                     await _battle_and_teardown(p1, p2)
@@ -1001,6 +1024,10 @@ async def run_season(
         )
         for ps in player_specs
     }
+    personality_lookup: dict[tuple[str, str], str | None] = {
+        (ps["provider"], ps["model_name"]): ps.get("personality")
+        for ps in player_specs
+    }
 
     for battle_num, battle_id in enumerate(battle_ids, start=1):
         # A cancel via the API only flips the DB status row; the runner must
@@ -1107,6 +1134,8 @@ async def run_season(
             s_p2_coach_prov, s_p2_coach_model = coach_lookup.get(
                 (s_p2_prov, battle_info["p2_model"]), (None, None)
             )
+            s_p1_personality = personality_lookup.get((s_p1_prov, battle_info["p1_model"]))
+            s_p2_personality = personality_lookup.get((s_p2_prov, battle_info["p2_model"]))
 
             p1 = _build_streaming_player(
                 s_p1_prov, battle_info["p1_model"], "p1",
@@ -1115,6 +1144,7 @@ async def run_season(
                 team=s_p1_team,
                 coach_provider=s_p1_coach_prov,
                 coach_model=s_p1_coach_model,
+                personality=s_p1_personality,
             )
             p2 = _build_streaming_player(
                 s_p2_prov, battle_info["p2_model"], "p2",
@@ -1123,6 +1153,7 @@ async def run_season(
                 team=s_p2_team,
                 coach_provider=s_p2_coach_prov,
                 coach_model=s_p2_coach_model,
+                personality=s_p2_personality,
             )
 
             store.set_battle_status(battle_id, "running")
@@ -1135,6 +1166,8 @@ async def run_season(
                 "format": showdown_format,
                 "tier": req.tier,
                 "drafted": do_draft,
+                "p1_personality": s_p1_personality,
+                "p2_personality": s_p2_personality,
             })
 
             await _battle_and_teardown(p1, p2)

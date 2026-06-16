@@ -65,6 +65,7 @@ class LLMPlayer(Player):
         lessons: list[str] | None = None,
         coach: CoachAgent | None = None,
         turn_timeout: float | None = _DEFAULT_TURN_TIMEOUT,
+        personality: str | None = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
@@ -78,6 +79,7 @@ class LLMPlayer(Player):
         self._on_thinking = on_thinking
         self._lessons = lessons or []
         self._coach = coach
+        self._personality = personality
         # Battle-history tracking (for prompt v4 recent_events)
         self._prev_hp: dict[str, float] = {}       # species_key → hp_fraction
         self._recent_events: list[dict[str, Any]] = []  # rolling event log
@@ -128,6 +130,7 @@ class LLMPlayer(Player):
             state,
             lessons=self._lessons or None,
             coach_advice=coach_advice,
+            personality=self._personality,
         )
         response: str | None = None
 

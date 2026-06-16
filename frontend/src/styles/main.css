@@ -1617,6 +1617,30 @@ body::after {
   text-transform: uppercase;
 }
 
+/* ---- Personality selector (in start form) ---- */
+.personality-selector {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.55rem 0.65rem;
+  background: rgba(255, 200, 80, 0.04);
+  border: 1px solid rgba(255, 200, 80, 0.15);
+  border-radius: var(--radius-sm);
+  margin-top: 0.15rem;
+}
+
+.personality-selector-label {
+  font-family: var(--font-pixel);
+  font-size: 0.42rem;
+  letter-spacing: 0.08em;
+  color: rgba(255, 200, 80, 0.75);
+  text-transform: uppercase;
+}
+
+.personality-select {
+  width: 100%;
+}
+
 /* ============================================================
    FORM TABS (battle / tournament toggle)
    ============================================================ */
@@ -4669,6 +4693,24 @@ body::after {
 
 .player-label--p1 .player-label-name { color: var(--accent-cyan); }
 .player-label--p2 .player-label-name { color: var(--accent-amber); }
+
+/* ---- Personality chip ---- */
+.personality-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.1rem 0.4rem;
+  border-radius: 3px;
+  background: rgba(255, 200, 80, 0.07);
+  border: 1px solid rgba(255, 200, 80, 0.2);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.5rem;
+  letter-spacing: 0.06em;
+  color: rgba(255, 200, 80, 0.75);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.personality-chip-emoji { font-size: 0.65rem; }
 
 /* ---- Own Pokémon moves on card ---- */
 .own-moves {

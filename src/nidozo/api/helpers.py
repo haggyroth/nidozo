@@ -73,6 +73,7 @@ def _build_streaming_player(
     team: str | None = None,
     coach_provider: str | None = None,
     coach_model: str | None = None,
+    personality: str | None = None,
 ) -> Any:
     from nidozo.battle.streaming_player import StreamingLLMPlayer, StreamingRandomBot
 
@@ -99,6 +100,7 @@ def _build_streaming_player(
         "server_configuration": cfg,
         "lessons": lessons,
         "coach": coach,
+        "personality": personality,
     }
     if team is not None:
         kwargs["team"] = team

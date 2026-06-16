@@ -16,6 +16,8 @@ PromptVersion = Literal["v1", "v2", "v3", "v4", "v5"]
 # Exactly the tiers the backend supports (is_valid_tier / _TIER_POOLS + random).
 Tier = Literal["random", "ou", "ubers", "uu", "lc", "freeforall"]
 TournamentFormat = Literal["round_robin", "single_elim", "double_elim"]
+# Named play-style personas injected into the system prompt (None = no persona).
+Personality = Literal["aggressive", "defensive", "balanced", "trickster", "momentum"]
 
 
 class StartBattleRequest(BaseModel):
@@ -33,6 +35,9 @@ class StartBattleRequest(BaseModel):
     p1_coach_model: str | None = None
     p2_coach_provider: CoachProvider | None = None
     p2_coach_model: str | None = None
+    # Optional play-style persona injected into the system prompt (None = no persona)
+    p1_personality: Personality | None = None
+    p2_personality: Personality | None = None
 
 
 class StartBattleResponse(BaseModel):
@@ -46,6 +51,8 @@ class PlayerSpec(BaseModel):
     # Optional coach — None means this player acts without advisory
     coach_provider: CoachProvider | None = None
     coach_model: str | None = None
+    # Optional play-style persona injected into the system prompt
+    personality: Personality | None = None
 
 
 class StartTournamentRequest(BaseModel):
