@@ -208,6 +208,11 @@ def create_router(
         """Head-to-head record for this model against each opponent it has faced."""
         return store.get_model_matchups(model_id)
 
+    @router.get("/api/models/{model_id}/badges")
+    def get_model_badges(model_id: int) -> list[dict[str, Any]]:
+        """All badges earned by this model, oldest first."""
+        return store.get_model_badges(model_id)
+
     # -------------------------------------------------------------------
     # Tournaments
     # -------------------------------------------------------------------

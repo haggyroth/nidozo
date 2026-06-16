@@ -206,7 +206,7 @@ async def run_battles(
             total_turns = battle_obj.turn if battle_obj else 0
 
             store.update_battle_tag(battle_id, real_tag)
-            store.finish_battle(battle_id, winner, total_turns)
+            new_badges = store.finish_battle(battle_id, winner, total_turns)
 
             await bus.publish({
                 "type": "battle_end",
@@ -215,6 +215,8 @@ async def run_battles(
                 "winner": winner,
                 "total_turns": total_turns,
             })
+            for badge in new_badges:
+                await bus.publish({"type": "badge_earned", "battle_id": battle_id, **badge})
 
             turns = store.get_turns_basic(battle_id)
             p2_label = f"{req.p2_provider}/{_model_name(req.p2_provider, p2_model)}"
@@ -449,7 +451,7 @@ async def run_tournament(
             total_turns = battle_obj.turn if battle_obj else 0
 
             store.update_battle_tag(battle_id, real_tag)
-            store.finish_battle(battle_id, winner, total_turns)
+            new_badges = store.finish_battle(battle_id, winner, total_turns)
 
             await bus.publish({
                 "type": "battle_end",
@@ -458,6 +460,8 @@ async def run_tournament(
                 "winner": winner,
                 "total_turns": total_turns,
             })
+            for badge in new_badges:
+                await bus.publish({"type": "badge_earned", "battle_id": battle_id, **badge})
 
             standings = store.get_tournament_standings(tournament_id)
             await bus.publish({
@@ -861,7 +865,7 @@ async def run_bracket_tournament(
                     total_turns = battle_obj.turn if battle_obj else 0
 
                     store.update_battle_tag(battle_id, real_tag)
-                    store.finish_battle(battle_id, winner, total_turns)
+                    new_badges = store.finish_battle(battle_id, winner, total_turns)
 
                     await bus.publish({
                         "type": "battle_end",
@@ -871,6 +875,8 @@ async def run_bracket_tournament(
                         "total_turns": total_turns,
                         "match_id": match_id,
                     })
+                    for badge in new_badges:
+                        await bus.publish({"type": "badge_earned", "battle_id": battle_id, **badge})
 
                     # A bracket must advance someone even on a tie; this stays
                     # honest in the recorded result above and only governs routing.
@@ -1178,7 +1184,7 @@ async def run_season(
             total_turns = battle_obj.turn if battle_obj else 0
 
             store.update_battle_tag(battle_id, real_tag)
-            store.finish_battle(battle_id, winner, total_turns)
+            new_badges = store.finish_battle(battle_id, winner, total_turns)
 
             await bus.publish({
                 "type": "battle_end",
@@ -1187,6 +1193,8 @@ async def run_season(
                 "winner": winner,
                 "total_turns": total_turns,
             })
+            for badge in new_badges:
+                await bus.publish({"type": "badge_earned", "battle_id": battle_id, **badge})
 
             standings = store.get_season_standings(season_id)
             await bus.publish({

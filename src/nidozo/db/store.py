@@ -8,6 +8,7 @@ import threading
 from pathlib import Path
 from typing import Any
 
+from nidozo.battle.achievements import BADGES, evaluate_badges
 from nidozo.db.elo import DEFAULT_RATING, updated_ratings
 from nidozo.db.schema import migrate
 
@@ -374,11 +375,12 @@ class BattleStore:
         battle_id: int,
         winner: int | None,
         total_turns: int,
-    ) -> None:
-        """Mark battle as finished (status='completed'), record winner, and update ELO atomically.
+    ) -> list[dict[str, Any]]:
+        """Mark battle finished, update ELO, and award any newly-earned badges.
 
-        Idempotent: if the battle already has a finished_at timestamp the UPDATE
-        matches zero rows and ELO is not re-applied, so calling this twice is safe.
+        Returns a list of badge dicts (model_id, slug, name, emoji) for every
+        badge newly awarded in this battle.  Empty list on duplicate call
+        (idempotent guard) or when no badges are earned.
         """
         with self._conn:
             cur = self._conn.execute(
@@ -390,8 +392,9 @@ class BattleStore:
             )
             if cur.rowcount == 0:
                 # Already finished — skip ELO to prevent double-apply.
-                return
+                return []
             self._update_elo(battle_id, winner)
+            return self._award_badges(battle_id, winner)
 
     def _update_elo(self, battle_id: int, winner: int | None) -> None:
         """Compute and persist ELO deltas. Must be called inside a transaction."""
@@ -425,6 +428,58 @@ class BattleStore:
                 (battle_id, model_id, before, after, after - before),
             )
         # No commit here — the `with self._conn:` block in finish_battle handles it.
+
+    # ------------------------------------------------------------------
+    # Badges
+    # ------------------------------------------------------------------
+
+    def _award_badges(self, battle_id: int, winner: int | None) -> list[dict[str, Any]]:
+        """Evaluate and persist badges for both players.  Must be called inside a transaction."""
+        row = self._conn.execute(
+            "SELECT p1_model_id, p2_model_id FROM battles WHERE id=?", (battle_id,)
+        ).fetchone()
+        p1_id, p2_id = row["p1_model_id"], row["p2_model_id"]
+        winner_mid = p1_id if winner == 1 else (p2_id if winner == 2 else None)
+
+        new_badges: list[dict[str, Any]] = []
+        for model_id, opp_id in ((p1_id, p2_id), (p2_id, p1_id)):
+            for slug in evaluate_badges(self._conn, battle_id, model_id, winner_mid, opp_id):
+                cur = self._conn.execute(
+                    "INSERT OR IGNORE INTO badges (model_id, battle_id, slug) VALUES (?,?,?)",
+                    (model_id, battle_id, slug),
+                )
+                if cur.rowcount:  # was genuinely new (not a duplicate)
+                    badge = BADGES[slug]
+                    new_badges.append({
+                        "model_id": model_id,
+                        "battle_id": battle_id,
+                        "slug": slug,
+                        "name": badge.name,
+                        "emoji": badge.emoji,
+                        "description": badge.description,
+                    })
+        return new_badges
+
+    def get_model_badges(self, model_id: int) -> list[dict[str, Any]]:
+        rows = self._conn.execute(
+            """SELECT b.slug, b.battle_id, b.earned_at
+               FROM badges b
+               WHERE b.model_id=?
+               ORDER BY b.earned_at ASC""",
+            (model_id,),
+        ).fetchall()
+        result = []
+        for r in rows:
+            badge = BADGES.get(r["slug"])
+            result.append({
+                "slug": r["slug"],
+                "name": badge.name if badge else r["slug"],
+                "emoji": badge.emoji if badge else "🏅",
+                "description": badge.description if badge else "",
+                "battle_id": r["battle_id"],
+                "earned_at": r["earned_at"],
+            })
+        return result
 
     # ------------------------------------------------------------------
     # Turns

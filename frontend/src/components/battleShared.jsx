@@ -210,6 +210,26 @@ export function PersonalityChip({ personality }) {
   )
 }
 
+/** Live badge notification stack — shown when a badge_earned WS event fires. */
+export function BadgeToastStack({ badges, onDismiss }) {
+  if (!badges?.length) return null
+  return (
+    <div className="badge-toast-stack">
+      {badges.map((b, i) => (
+        <div key={i} className="badge-toast" onClick={() => onDismiss(i)}>
+          <span className="badge-toast-emoji">{b.emoji}</span>
+          <div className="badge-toast-body">
+            <div className="badge-toast-title">Badge unlocked!</div>
+            <div className="badge-toast-name">{b.name}</div>
+            <div className="badge-toast-desc">{b.description}</div>
+          </div>
+          <button className="badge-toast-close" onClick={e => { e.stopPropagation(); onDismiss(i) }}>✕</button>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 /** Provider + model name label for one side. */
 export function PlayerLabel({ label, side }) {
   if (!label) return null

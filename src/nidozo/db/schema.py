@@ -2,7 +2,7 @@
 
 import sqlite3
 
-SCHEMA_VERSION = 13
+SCHEMA_VERSION = 14
 
 # Table definitions only — safe to run against any DB version via IF NOT EXISTS.
 # Indexes are kept separate because they may reference columns (e.g. tournament_id)
@@ -132,6 +132,16 @@ CREATE TABLE IF NOT EXISTS seasons (
     finished_at     TEXT
 );
 
+-- Per-model achievement badges earned after each battle
+CREATE TABLE IF NOT EXISTS badges (
+    id         INTEGER PRIMARY KEY,
+    model_id   INTEGER NOT NULL REFERENCES models(id),
+    battle_id  INTEGER NOT NULL REFERENCES battles(id),
+    slug       TEXT    NOT NULL,
+    earned_at  TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+    UNIQUE(model_id, slug)   -- one lifetime award per badge per model
+);
+
 -- Draft session log: one row per pick sequence (for analysis)
 CREATE TABLE IF NOT EXISTS draft_sessions (
     id              INTEGER PRIMARY KEY,
@@ -156,6 +166,7 @@ CREATE INDEX IF NOT EXISTS idx_battles_p2         ON battles(p2_model_id);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_elohist_battle ON elo_history(battle_id, model_id);
 CREATE INDEX IF NOT EXISTS idx_lessons_model      ON lessons(model_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_battles_season     ON battles(season_id);
+CREATE INDEX IF NOT EXISTS idx_badges_model       ON badges(model_id, earned_at);
 """
 
 
@@ -387,4 +398,20 @@ def migrate(conn: sqlite3.Connection) -> None:
             except sqlite3.OperationalError:
                 pass  # column already exists
         conn.execute("UPDATE schema_version SET version=13")
+        conn.commit()
+
+    if version < 14:
+        # Add badges table for per-model achievement tracking.
+        conn.executescript("""
+            CREATE TABLE IF NOT EXISTS badges (
+                id         INTEGER PRIMARY KEY,
+                model_id   INTEGER NOT NULL REFERENCES models(id),
+                battle_id  INTEGER NOT NULL REFERENCES battles(id),
+                slug       TEXT    NOT NULL,
+                earned_at  TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+                UNIQUE(model_id, slug)
+            );
+            CREATE INDEX IF NOT EXISTS idx_badges_model ON badges(model_id, earned_at);
+        """)
+        conn.execute("UPDATE schema_version SET version=14")
         conn.commit()

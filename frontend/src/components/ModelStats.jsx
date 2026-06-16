@@ -1,4 +1,5 @@
 import { useState, useReducer, useEffect, useCallback } from 'react'
+import EmptyState from './EmptyState'
 
 // ---------------------------------------------------------------------------
 // ELO Sparkline — pure SVG, no external deps
@@ -485,6 +486,43 @@ function ModelH2H({ modelId }) {
 }
 
 // ---------------------------------------------------------------------------
+// Badge gallery
+// ---------------------------------------------------------------------------
+
+function BadgeGallery({ modelId }) {
+  const [badges, setBadges] = useState(null)
+
+  useEffect(() => {
+    if (modelId == null) return
+    fetch(`/api/models/${modelId}/badges`)
+      .then(r => r.json())
+      .then(setBadges)
+      .catch(() => setBadges([]))
+  }, [modelId])
+
+  if (badges === null) return null
+  if (!badges.length) return (
+    <EmptyState compact icon="🏅" title="No badges yet"
+      hint="Earn badges by winning battles, going on streaks, and hitting milestones." />
+  )
+
+  return (
+    <div className="badge-gallery">
+      {badges.map(b => (
+        <div key={b.slug} className="badge-card" title={b.description}>
+          <div className="badge-emoji">{b.emoji}</div>
+          <div className="badge-name">{b.name}</div>
+          <div className="badge-desc">{b.description}</div>
+          <div className="badge-date">
+            {b.earned_at ? new Date(b.earned_at).toLocaleDateString() : ''}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Export helpers
 // ---------------------------------------------------------------------------
 
@@ -681,6 +719,12 @@ export default function ModelStats({ modelId, onClose, onReplaySelected }) {
       {/* Head-to-head record */}
       <div className="panel stats-panel">
         <ModelH2H modelId={modelId} />
+      </div>
+
+      {/* Badges */}
+      <div className="panel stats-panel">
+        <div className="panel-title">BADGES</div>
+        <BadgeGallery modelId={modelId} />
       </div>
 
       {/* Lessons */}
