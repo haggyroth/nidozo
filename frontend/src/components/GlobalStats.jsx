@@ -60,7 +60,7 @@ function SummaryKpis({ summary }) {
 }
 
 // ---------------------------------------------------------------------------
-// Battles by tier — horizontal bar chart
+// Battles by tier — horizontal bar chart + avg turns column
 // ---------------------------------------------------------------------------
 
 function TierBreakdown({ battles_by_tier }) {
@@ -78,6 +78,55 @@ function TierBreakdown({ battles_by_tier }) {
               <div className="gs-tier-bar" style={{ width: `${pct}%`, background: color }} />
             </div>
             <span className="gs-tier-count">{r.cnt}</span>
+            <span className="gs-tier-avg" title="avg turns">{r.avg_turns != null ? `${r.avg_turns}t` : '—'}</span>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Type usage heatmap — 18 coloured cells, intensity by count
+// ---------------------------------------------------------------------------
+
+const TYPE_COLORS = {
+  normal: '#A8A878', fire: '#F08030', water: '#6890F0', electric: '#F8D030',
+  grass: '#78C850', ice: '#98D8D8', fighting: '#C03028', poison: '#A040A0',
+  ground: '#E0C068', flying: '#A890F0', psychic: '#F85888', bug: '#A8B820',
+  rock: '#B8A038', ghost: '#705898', dragon: '#7038F8', dark: '#705848',
+  steel: '#B8B8D0', fairy: '#EE99AC',
+}
+
+const ALL_TYPES = Object.keys(TYPE_COLORS)
+
+function TypeHeatmap({ type_usage }) {
+  if (!type_usage?.length) return (
+    <EmptyState compact icon="🎨" title="No type data yet" hint="Type usage appears once battles are played." />
+  )
+  const byType = Object.fromEntries(type_usage.map(r => [r.type, r.cnt]))
+  const max = Math.max(...type_usage.map(r => r.cnt), 1)
+  return (
+    <div className="gs-type-grid">
+      {ALL_TYPES.map(t => {
+        const cnt = byType[t] ?? 0
+        const alpha = cnt > 0 ? 0.2 + (cnt / max) * 0.75 : 0.08
+        const color = TYPE_COLORS[t]
+        return (
+          <div
+            key={t}
+            className="gs-type-cell"
+            style={{ background: `${color}${cnt > 0 ? '' : '22'}`, opacity: cnt > 0 ? 1 : 0.4 }}
+            title={`${t}: ${cnt} turns`}
+          >
+            <span className="gs-type-name">{t.toUpperCase()}</span>
+            <span className="gs-type-cnt">{cnt > 0 ? cnt : '—'}</span>
+            {cnt > 0 && (
+              <div
+                className="gs-type-intensity"
+                style={{ height: `${Math.round(alpha * 100)}%`, background: color }}
+              />
+            )}
           </div>
         )
       })}
@@ -230,7 +279,7 @@ export default function GlobalStats({ onClose, onReplaySelected }) {
     </div>
   )
 
-  const { summary, battles_by_tier, top_pokemon, top_moves, recent_battles } = data
+  const { summary, battles_by_tier, type_usage, top_pokemon, top_moves, recent_battles } = data
 
   return (
     <div className="stats-page">
@@ -259,6 +308,15 @@ export default function GlobalStats({ onClose, onReplaySelected }) {
           <div className="panel-title">RECENT BATTLES</div>
           <RecentBattles recent_battles={recent_battles} onReplaySelected={onReplaySelected} />
         </div>
+      </div>
+
+      {/* Type heatmap */}
+      <div className="panel stats-panel">
+        <div className="panel-title">
+          TYPE USAGE
+          <span className="panel-subtitle">how often each type appears as the active Pokémon's type</span>
+        </div>
+        <TypeHeatmap type_usage={type_usage} />
       </div>
 
       {/* Top Pokémon */}

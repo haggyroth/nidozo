@@ -2436,6 +2436,68 @@ body::after {
   padding: 1rem 1.25rem;
 }
 
+/* Export buttons in ModelStats header */
+.ms-export-buttons {
+  display: flex;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.ms-export-btn {
+  font-family: var(--font-pixel);
+  font-size: 0.45rem;
+  letter-spacing: 0.08em;
+  padding: 0.35rem 0.65rem;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+.ms-export-btn:hover {
+  border-color: var(--accent-cyan);
+  color: var(--accent-cyan);
+}
+
+/* H2H table inside ModelStats */
+.ms-h2h { padding: 0; }
+.ms-h2h-loading,
+.ms-h2h-empty {
+  padding: 0.75rem 0.5rem;
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.ms-h2h-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.62rem;
+  margin-top: 0.5rem;
+}
+.ms-h2h-table th {
+  text-align: left;
+  padding: 0.3rem 0.5rem;
+  font-size: 0.5rem;
+  letter-spacing: 0.07em;
+  color: var(--text-dim);
+  border-bottom: 1px solid var(--border);
+}
+.ms-h2h-table td {
+  padding: 0.35rem 0.5rem;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  font-family: var(--font-mono);
+}
+.ms-h2h-table tr:last-child td { border-bottom: none; }
+.ms-h2h-table tr:hover td { background: rgba(255,255,255,0.02); }
+.ms-h2h-opp { color: var(--text-secondary); max-width: 20ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ms-h2h-w  { color: var(--accent-green); text-align: center; }
+.ms-h2h-l  { color: var(--accent-red);   text-align: center; }
+.ms-h2h-t  { color: var(--text-muted);   text-align: center; }
+.ms-h2h-g  { color: var(--text-muted);   text-align: center; }
+.ms-h2h-pct { text-align: center; font-weight: 600; }
+
 .panel-subtitle {
   font-family: var(--font-mono);
   font-size: 0.65rem;
@@ -5013,7 +5075,7 @@ body::after {
 
 .gs-tier-row {
   display: grid;
-  grid-template-columns: 3.5rem 1fr 2rem;
+  grid-template-columns: 3.5rem 1fr 2.5rem 3rem;
   align-items: center;
   gap: 0.5rem;
 }
@@ -5042,6 +5104,68 @@ body::after {
   font-size: 0.62rem;
   color: var(--text-muted);
   text-align: right;
+}
+
+.gs-tier-avg {
+  font-size: 0.55rem;
+  color: var(--text-muted);
+  opacity: 0.7;
+  text-align: right;
+  white-space: nowrap;
+}
+
+/* Type usage heatmap */
+.gs-type-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 0.4rem;
+}
+
+@media (max-width: 600px) {
+  .gs-type-grid { grid-template-columns: repeat(3, 1fr); }
+}
+
+.gs-type-cell {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem 0.25rem 0.35rem;
+  border-radius: 5px;
+  border: 1px solid rgba(255,255,255,0.08);
+  overflow: hidden;
+  min-height: 3.2rem;
+  cursor: default;
+}
+
+.gs-type-name {
+  position: relative;
+  z-index: 1;
+  font-size: 0.45rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: rgba(255,255,255,0.9);
+  text-shadow: 0 1px 2px rgba(0,0,0,0.6);
+}
+
+.gs-type-cnt {
+  position: relative;
+  z-index: 1;
+  font-size: 0.55rem;
+  color: rgba(255,255,255,0.75);
+  margin-top: 0.1rem;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.6);
+}
+
+.gs-type-intensity {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  opacity: 0.35;
+  border-radius: 0 0 4px 4px;
+  transition: height 0.3s ease;
 }
 
 /* Top Pokémon grid */

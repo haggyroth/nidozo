@@ -699,6 +699,44 @@ class BattleStore:
         )
         return [dict(r) for r in cur.fetchall()]
 
+    def get_model_matchups(self, model_id: int) -> list[dict[str, Any]]:
+        """Return this model's head-to-head record against every distinct opponent.
+
+        Each row is one opponent, with the win/loss/tie counts from this model's
+        perspective. Results are sorted by games played descending.
+        """
+        cur = self._conn.execute(
+            """WITH ag AS (
+                   SELECT mc.provider AS opp_provider, mc.model_name AS opp_model,
+                          CASE WHEN b.winner = 1 THEN 1 ELSE 0 END AS is_win,
+                          CASE WHEN b.winner = 2 THEN 1 ELSE 0 END AS is_loss,
+                          CASE WHEN b.winner IS NULL THEN 1 ELSE 0 END  AS is_tie
+                   FROM battles b
+                   JOIN models mc ON mc.id = b.p2_model_id
+                   WHERE b.p1_model_id = :mid
+                     AND b.finished_at IS NOT NULL AND b.status = 'completed'
+                   UNION ALL
+                   SELECT mc.provider, mc.model_name,
+                          CASE WHEN b.winner = 2 THEN 1 ELSE 0 END,
+                          CASE WHEN b.winner = 1 THEN 1 ELSE 0 END,
+                          CASE WHEN b.winner IS NULL THEN 1 ELSE 0 END
+                   FROM battles b
+                   JOIN models mc ON mc.id = b.p1_model_id
+                   WHERE b.p2_model_id = :mid
+                     AND b.finished_at IS NOT NULL AND b.status = 'completed'
+               )
+               SELECT opp_provider, opp_model,
+                      SUM(is_win)  AS wins,
+                      SUM(is_loss) AS losses,
+                      SUM(is_tie)  AS ties,
+                      COUNT(*)     AS games
+               FROM ag
+               GROUP BY opp_provider, opp_model
+               ORDER BY games DESC, wins DESC""",
+            {"mid": model_id},
+        )
+        return [dict(r) for r in cur.fetchall()]
+
     def recent_battles(self, limit: int = 10) -> list[dict[str, Any]]:
         cur = self._conn.execute(
             """SELECT b.id, b.battle_tag, b.format, b.total_turns, b.winner, b.finished_at,
@@ -946,11 +984,30 @@ class BattleStore:
             "SELECT COUNT(*) AS cnt FROM models"
         ).fetchone()
 
-        # Battles by tier.
+        # Battles by tier with avg turns per tier.
         tier_rows = self._conn.execute(
-            """SELECT COALESCE(tier, 'random') AS tier, COUNT(*) AS cnt
+            """SELECT COALESCE(tier, 'random') AS tier,
+                      COUNT(*) AS cnt,
+                      ROUND(AVG(total_turns), 1) AS avg_turns
                FROM battles WHERE finished_at IS NOT NULL AND status='completed'
                GROUP BY tier ORDER BY cnt DESC"""
+        ).fetchall()
+
+        # Type usage: count how often each type appears in the active Pokémon's
+        # type slot(s) across all turns. Union both slots so dual-types contribute
+        # to both counts. Lower() normalises the strings from the serialiser.
+        type_rows = self._conn.execute(
+            """SELECT LOWER(type) AS type, COUNT(*) AS cnt
+               FROM (
+                   SELECT json_extract(t.state_json, '$.my_active.types[0]') AS type
+                   FROM turns t WHERE t.state_json IS NOT NULL
+                     AND json_extract(t.state_json, '$.my_active.types[0]') IS NOT NULL
+                   UNION ALL
+                   SELECT json_extract(t.state_json, '$.my_active.types[1]')
+                   FROM turns t WHERE t.state_json IS NOT NULL
+                     AND json_extract(t.state_json, '$.my_active.types[1]') IS NOT NULL
+               )
+               GROUP BY type ORDER BY cnt DESC"""
         ).fetchall()
 
         # Top Pokémon globally (all models, all turns).
@@ -995,6 +1052,7 @@ class BattleStore:
                 "total_models": model_count["cnt"] if model_count else 0,
             },
             "battles_by_tier": [dict(r) for r in tier_rows],
+            "type_usage": [dict(r) for r in type_rows],
             "top_pokemon": [dict(r) for r in species_rows],
             "top_moves": [dict(r) for r in move_rows],
             "recent_battles": [dict(r) for r in recent_rows],
