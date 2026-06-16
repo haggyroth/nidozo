@@ -19,15 +19,56 @@ function teamHpScore(state) {
   return active ? Math.max(0, active.hp_fraction ?? 0.5) : null
 }
 
-/** Win-probability bar from the two players' team-HP ratio. */
+/** P1 win-probability over time, drawn as an inline SVG sparkline.
+ *  y is P1's share (top = P1 ahead, bottom = P2 ahead); a dashed 50% line marks
+ *  parity. viewBox is stretched to the element box, so strokes use
+ *  non-scaling-stroke (set in CSS) to stay crisp. */
+function WinProbSparkline({ history }) {
+  const W = 100
+  const H = 100
+  const n = history.length
+  const points = history
+    .map((p1, i) => {
+      const x = n === 1 ? 0 : (i / (n - 1)) * W
+      const y = (1 - p1) * H
+      return `${x.toFixed(1)},${y.toFixed(1)}`
+    })
+    .join(' ')
+  return (
+    <svg
+      className="win-prob-spark"
+      viewBox={`0 0 ${W} ${H}`}
+      preserveAspectRatio="none"
+      aria-hidden="true"
+    >
+      <line className="wps-mid" x1="0" y1={H / 2} x2={W} y2={H / 2} />
+      <polyline className="wps-line" points={points} />
+    </svg>
+  )
+}
+
+/** Win-probability bar from the two players' team-HP ratio, with a sparkline of
+ *  P1's win-probability across the battle's turns. */
 export function WinProbBar({ p1State, p2State, p1Label, p2Label }) {
   const s1 = teamHpScore(p1State?.state)
   const s2 = teamHpScore(p2State?.state)
+  const turn = Math.max(p1State?.turn ?? 0, p2State?.turn ?? 0)
+  const haveData = s1 !== null && s2 !== null
+  const p1Prob = !haveData ? null : (s1 + s2 === 0 ? 0.5 : s1 / (s1 + s2))
 
-  if (s1 === null || s2 === null) return null
+  // Accumulate one P1-probability sample per turn for the sparkline. We adjust
+  // state during render when the turn advances (React's documented
+  // "adjust state on prop change" pattern — converges immediately, no effect).
+  // A turn going backwards means a new battle started, so the history resets.
+  const [history, setHistory] = useState([])      // [{ turn, p1 }]
+  const [sampledTurn, setSampledTurn] = useState(-1)
+  if (p1Prob !== null && turn !== sampledTurn) {
+    setSampledTurn(turn)
+    setHistory(h => (turn < sampledTurn ? [] : h).concat({ turn, p1: p1Prob }))
+  }
 
-  const total = s1 + s2
-  const p1Prob = total === 0 ? 0.5 : s1 / total
+  if (!haveData) return null
+
   const p1Pct  = Math.round(p1Prob * 100)
   const p2Pct  = 100 - p1Pct
 
@@ -52,6 +93,7 @@ export function WinProbBar({ p1State, p2State, p1Label, p2Label }) {
         <div className="win-prob-fill win-prob-fill--p2" style={{ width: `${p2Pct}%` }} />
         <div className="win-prob-midline" />
       </div>
+      {history.length >= 2 && <WinProbSparkline history={history.map(d => d.p1)} />}
     </div>
   )
 }

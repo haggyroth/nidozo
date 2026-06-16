@@ -524,6 +524,29 @@ body::after {
   pointer-events: none;
 }
 
+/* Win-probability sparkline — P1's share over the battle's turns. viewBox is
+   stretched to the box (preserveAspectRatio=none), so strokes opt out of scaling
+   to stay 1px crisp. */
+.win-prob-spark {
+  display: block;
+  width: 100%;
+  height: 26px;
+  margin-top: var(--space-2xs);
+}
+.win-prob-spark .wps-line {
+  fill: none;
+  stroke: var(--border-glow);
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+.win-prob-spark .wps-mid {
+  stroke: rgba(255, 255, 255, 0.15);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+  vector-effect: non-scaling-stroke;
+}
+
 /* Arena */
 .arena {
   display: grid;
