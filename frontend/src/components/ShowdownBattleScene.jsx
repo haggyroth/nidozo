@@ -21,7 +21,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useShowdownBundle } from '../hooks/useShowdownBundle'
-import { WinProbBar, PlayerLabel, HeuristicDrawer, ThinkingBadge, PersonalityChip } from './battleShared'
+import { WinProbBar, PlayerLabel, HeuristicDrawer, ThinkingBadge, PersonalityChip, PresetBadge } from './battleShared'
 import { BattleBadges, CancelBattleButton } from './battleChrome'
 
 /** Strip the room-prefix line and proxy keepalive; return bare |...| lines. */
@@ -137,6 +137,7 @@ export default function ShowdownBattleScene({ room, p1State, p2State, battleInfo
         <div className={`sbs-header-side${p1Won ? ' sbs-header-side--won' : ''}`}>
           <PlayerLabel label={battleInfo?.p1} side="p1" />
           <PersonalityChip personality={battleInfo?.p1_personality} />
+          <PresetBadge presetSlug={battleInfo?.p1_preset} />
           {p1Won && <span className="sbs-won-tag">WIN</span>}
         </div>
         <div className="sbs-header-center">
@@ -147,6 +148,7 @@ export default function ShowdownBattleScene({ room, p1State, p2State, battleInfo
         </div>
         <div className={`sbs-header-side sbs-header-side--right${p2Won ? ' sbs-header-side--won' : ''}`}>
           {p2Won && <span className="sbs-won-tag">WIN</span>}
+          <PresetBadge presetSlug={battleInfo?.p2_preset} />
           <PersonalityChip personality={battleInfo?.p2_personality} />
           <PlayerLabel label={battleInfo?.p2} side="p2" />
         </div>

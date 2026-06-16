@@ -210,6 +210,33 @@ export function PersonalityChip({ personality }) {
   )
 }
 
+// Lightweight slug → display map so we don't need a fetch in the battle view.
+const PRESET_META = {
+  ash_kanto:      { emoji: '⚡', name: "Ash's Kanto" },
+  rival_gauntlet: { emoji: '🏆', name: 'The Rivals' },
+  dragons_lair:   { emoji: '🐉', name: "Dragon's Lair" },
+  ghost_gang:     { emoji: '👻', name: 'Ghost Gang' },
+  inferno_squad:  { emoji: '🔥', name: 'Inferno Squad' },
+  aqua_armada:    { emoji: '🌊', name: 'Aqua Armada' },
+  eevee_squad:    { emoji: '🌟', name: 'Team Eeveelution' },
+  steel_titans:   { emoji: '⚙️', name: 'Steel Titans' },
+  electric_storm: { emoji: '⚡', name: 'Electric Storm' },
+  champion_finest:{ emoji: '👑', name: "Champion's Finest" },
+}
+
+/** Small chip showing the active party preset (trainer name). */
+export function PresetBadge({ presetSlug }) {
+  if (!presetSlug) return null
+  const meta = PRESET_META[presetSlug]
+  if (!meta) return null
+  return (
+    <div className="preset-badge" title={`Preset: ${meta.name}`}>
+      <span className="preset-badge-emoji">{meta.emoji}</span>
+      <span className="preset-badge-name">{meta.name}</span>
+    </div>
+  )
+}
+
 /** Live badge notification stack — shown when a badge_earned WS event fires. */
 export function BadgeToastStack({ badges, onDismiss }) {
   if (!badges?.length) return null

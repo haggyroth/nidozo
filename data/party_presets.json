@@ -1,0 +1,82 @@
+[
+  {
+    "slug": "ash_kanto",
+    "name": "Ash's Kanto Dream Team",
+    "trainer_class": "Pokémon Master",
+    "flavour": "The team of legends carried by an eternal optimist.",
+    "emoji": "⚡",
+    "pokemon": ["pikachu", "charizard", "snorlax", "gengar", "dragonite", "lapras"]
+  },
+  {
+    "slug": "rival_gauntlet",
+    "name": "The Rivals",
+    "trainer_class": "Pokémon Trainer",
+    "flavour": "The classic Kanto showdown. Starter wars, no mercy.",
+    "emoji": "🏆",
+    "pokemon": ["blastoise", "charizard", "venusaur", "snorlax", "gengar", "gyarados"]
+  },
+  {
+    "slug": "dragons_lair",
+    "name": "The Dragon's Lair",
+    "trainer_class": "Dragon Tamer",
+    "flavour": "Ancient power, modern fury. This team does not apologise.",
+    "emoji": "🐉",
+    "pokemon": ["dragonite", "salamence", "garchomp", "hydreigon", "altaria", "kingdra"]
+  },
+  {
+    "slug": "ghost_gang",
+    "name": "The Ghost Gang",
+    "trainer_class": "Hex Maniac",
+    "flavour": "They don't lose battles. They haunt them.",
+    "emoji": "👻",
+    "pokemon": ["gengar", "mismagius", "dusknoir", "sableye", "banette", "chandelure"]
+  },
+  {
+    "slug": "inferno_squad",
+    "name": "Inferno Squad",
+    "trainer_class": "Fire-type Expert",
+    "flavour": "Where there's smoke, there's pain.",
+    "emoji": "🔥",
+    "pokemon": ["charizard", "arcanine", "houndoom", "magmortar", "ninetales", "torkoal"]
+  },
+  {
+    "slug": "aqua_armada",
+    "name": "Aqua Armada",
+    "trainer_class": "Swimmer",
+    "flavour": "The tide waits for no one.",
+    "emoji": "🌊",
+    "pokemon": ["gyarados", "lapras", "vaporeon", "cloyster", "kingdra", "slowbro"]
+  },
+  {
+    "slug": "eevee_squad",
+    "name": "Team Eeveelution",
+    "trainer_class": "Pokémon Breeder",
+    "flavour": "Eight paths, six chosen. Elegance through evolution.",
+    "emoji": "🌟",
+    "pokemon": ["vaporeon", "jolteon", "flareon", "espeon", "umbreon", "leafeon"]
+  },
+  {
+    "slug": "steel_titans",
+    "name": "Steel Titans",
+    "trainer_class": "Steel-type Trainer",
+    "flavour": "Unyielding. Calculating. Merciless.",
+    "emoji": "⚙️",
+    "pokemon": ["metagross", "scizor", "skarmory", "lucario", "excadrill", "magnezone"]
+  },
+  {
+    "slug": "electric_storm",
+    "name": "Electric Storm",
+    "trainer_class": "Lightning Trainer",
+    "flavour": "One in a million volts. Every single turn.",
+    "emoji": "⚡",
+    "pokemon": ["raichu", "ampharos", "magnezone", "electivire", "jolteon", "lanturn"]
+  },
+  {
+    "slug": "champion_finest",
+    "name": "Champion's Finest",
+    "trainer_class": "Champion",
+    "flavour": "A team so refined, every member is a threat. Just like Cynthia.",
+    "emoji": "👑",
+    "pokemon": ["garchomp", "lucario", "milotic", "spiritomb", "metagross", "gengar"]
+  }
+]

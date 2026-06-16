@@ -262,6 +262,16 @@ def create_router(
         return {"tournament_id": tournament_id, "cancelled": cancelled, "status": status}
 
     # -------------------------------------------------------------------
+    # Party presets
+    # -------------------------------------------------------------------
+
+    @router.get("/api/presets")
+    def list_presets() -> list[dict[str, Any]]:
+        """All trainer-archetype party presets with metadata and Pokémon list."""
+        from nidozo.battle.presets import list_presets as _list_presets
+        return _list_presets()
+
+    # -------------------------------------------------------------------
     # Tiers & teams
     # -------------------------------------------------------------------
 
@@ -386,6 +396,7 @@ def create_router(
                 "coach_provider": p.coach_provider,
                 "coach_model":    p.coach_model,
                 "personality":    p.personality,
+                "preset":         p.preset,
             }
             for p in req.players
         ]
@@ -495,6 +506,7 @@ def create_router(
                 "coach_provider": p.coach_provider,
                 "coach_model":    p.coach_model,
                 "personality":    p.personality,
+                "preset":         p.preset,
             }
             for p in req.players
         ]
