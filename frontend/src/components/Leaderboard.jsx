@@ -126,6 +126,14 @@ function MatchupMatrix({ lbTier }) {
 
 const PROVIDERS = ['random', 'anthropic', 'openai', 'lmstudio']
 const COACH_PROVIDERS = ['none', 'anthropic', 'openai', 'lmstudio']
+const PERSONALITIES = [
+  { id: 'none',        label: '— none —',              emoji: '' },
+  { id: 'aggressive',  label: 'All-out Attacker',       emoji: '⚔️' },
+  { id: 'defensive',   label: 'Bulwark',                emoji: '🛡️' },
+  { id: 'balanced',    label: 'Adaptive',               emoji: '⚖️' },
+  { id: 'trickster',   label: 'Mindgame Specialist',    emoji: '🎭' },
+  { id: 'momentum',    label: 'Tempo Player',           emoji: '💨' },
+]
 
 const TIERS = [
   { id: 'random',     label: 'Random Battle' },
@@ -307,6 +315,29 @@ function CoachSelector({ label, provider, model, onProviderChange, onModelChange
 }
 
 // ---------------------------------------------------------------------------
+// Personality selector (compact — shown below each player)
+// ---------------------------------------------------------------------------
+
+function PersonalitySelector({ value, onChange }) {
+  return (
+    <div className="personality-selector">
+      <label className="personality-selector-label">🎭 PLAY STYLE</label>
+      <select
+        className="form-select personality-select"
+        value={value}
+        onChange={e => onChange(e.target.value === 'none' ? null : e.target.value)}
+      >
+        {PERSONALITIES.map(p => (
+          <option key={p.id} value={p.id}>
+            {p.emoji ? `${p.emoji} ${p.label}` : p.label}
+          </option>
+        ))}
+      </select>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Single-battle form
 // ---------------------------------------------------------------------------
 
@@ -318,6 +349,7 @@ function BattleForm({ onBattleStarted, lmModels, lmLoading }) {
     p1_model: '', p2_model: '',
     p1_coach_provider: 'none', p1_coach_model: '',
     p2_coach_provider: 'none', p2_coach_model: '',
+    p1_personality: null, p2_personality: null,
     n_battles: 1,
     tier: 'random',
     draft: false,
@@ -350,6 +382,9 @@ function BattleForm({ onBattleStarted, lmModels, lmLoading }) {
       if (body.p2_coach_provider === 'none') { delete body.p2_coach_provider; delete body.p2_coach_model }
       if (!body.p1_coach_model) delete body.p1_coach_model
       if (!body.p2_coach_model) delete body.p2_coach_model
+      // Personality — omit if none selected
+      if (!body.p1_personality) delete body.p1_personality
+      if (!body.p2_personality) delete body.p2_personality
       const res = await fetch('/api/battles/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -383,6 +418,10 @@ function BattleForm({ onBattleStarted, lmModels, lmLoading }) {
         onModelChange={v => setForm(f => ({ ...f, p1_coach_model: v }))}
         lmModels={lmModels}
       />
+      <PersonalitySelector
+        value={form.p1_personality ?? 'none'}
+        onChange={v => setForm(f => ({ ...f, p1_personality: v }))}
+      />
       <ModelSelector
         label="PLAYER 2"
         provider={form.p2_provider} model={form.p2_model}
@@ -396,6 +435,10 @@ function BattleForm({ onBattleStarted, lmModels, lmLoading }) {
         onProviderChange={v => setForm(f => ({ ...f, p2_coach_provider: v }))}
         onModelChange={v => setForm(f => ({ ...f, p2_coach_model: v }))}
         lmModels={lmModels}
+      />
+      <PersonalitySelector
+        value={form.p2_personality ?? 'none'}
+        onChange={v => setForm(f => ({ ...f, p2_personality: v }))}
       />
       <div className="form-group">
         <label className="form-label">Tier</label>

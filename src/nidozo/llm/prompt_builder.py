@@ -42,9 +42,19 @@ class PromptBuilder:
         )
         self._turn_template = self._jinja_env.get_template("turn.txt.jinja")
 
-    def build_system(self, lessons: list[str] | None = None) -> Message:
-        """Return the system message, optionally appending the model's memory."""
+    def build_system(
+        self,
+        lessons: list[str] | None = None,
+        personality: str | None = None,
+    ) -> Message:
+        """Return the system message, optionally appending memory and/or a persona."""
+        from nidozo.battle.personalities import get_personality
+
         content = self._system_text
+        if personality:
+            persona = get_personality(personality)
+            if persona:
+                content = f"{content}\n\n{persona.prompt_block}"
         if lessons:
             memory_lines = "\n".join(f"{i}. {lesson}" for i, lesson in enumerate(lessons, 1))
             content = (
@@ -65,6 +75,7 @@ class PromptBuilder:
         battle_state: dict[str, Any],
         lessons: list[str] | None = None,
         coach_advice: str | None = None,
+        personality: str | None = None,
     ) -> list[Message]:
         """Return [system, turn] ready to pass to a ModelBackend.
 
@@ -75,6 +86,8 @@ class PromptBuilder:
             coach_advice:  Optional free-form text from a CoachAgent.  When
                            provided it is appended to the turn message so the
                            player can weigh it alongside the heuristic scores.
+            personality:   Optional play-style persona slug to inject into the
+                           system prompt (see nidozo.battle.personalities).
         """
         turn = self.build_turn(battle_state)
         if coach_advice:
@@ -86,4 +99,4 @@ class PromptBuilder:
                     "\n\nWith this analysis in mind, what is your chosen action?"
                 ),
             )
-        return [self.build_system(lessons=lessons), turn]
+        return [self.build_system(lessons=lessons, personality=personality), turn]

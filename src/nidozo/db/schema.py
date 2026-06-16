@@ -2,7 +2,7 @@
 
 import sqlite3
 
-SCHEMA_VERSION = 12
+SCHEMA_VERSION = 13
 
 # Table definitions only — safe to run against any DB version via IF NOT EXISTS.
 # Indexes are kept separate because they may reference columns (e.g. tournament_id)
@@ -65,7 +65,9 @@ CREATE TABLE IF NOT EXISTS battles (
     status          TEXT    NOT NULL DEFAULT 'pending',   -- pending|running|completed|cancelled|failed
     started_at      TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
     finished_at     TEXT,
-    narrative       TEXT    -- LLM-generated post-battle story (NULL until generated)
+    narrative       TEXT,   -- LLM-generated post-battle story (NULL until generated)
+    p1_personality  TEXT,   -- play-style persona slug for p1 (NULL = no persona)
+    p2_personality  TEXT    -- play-style persona slug for p2 (NULL = no persona)
 );
 
 -- ELO delta per model per battle (for history / audit)
@@ -374,4 +376,15 @@ def migrate(conn: sqlite3.Connection) -> None:
         except sqlite3.OperationalError:
             pass  # column already exists
         conn.execute("UPDATE schema_version SET version=12")
+        conn.commit()
+
+    if version < 13:
+        # Add play-style persona columns so personality is stored per battle and
+        # can be correlated with ELO outcomes during analysis.
+        for col in ("p1_personality TEXT", "p2_personality TEXT"):
+            try:
+                conn.execute(f"ALTER TABLE battles ADD COLUMN {col}")
+            except sqlite3.OperationalError:
+                pass  # column already exists
+        conn.execute("UPDATE schema_version SET version=13")
         conn.commit()
