@@ -203,6 +203,11 @@ def create_router(
             raise HTTPException(status_code=404, detail="Model not found")
         return stats
 
+    @router.get("/api/models/{model_id}/matchups")
+    def get_model_matchups(model_id: int) -> list[dict[str, Any]]:
+        """Head-to-head record for this model against each opponent it has faced."""
+        return store.get_model_matchups(model_id)
+
     # -------------------------------------------------------------------
     # Tournaments
     # -------------------------------------------------------------------

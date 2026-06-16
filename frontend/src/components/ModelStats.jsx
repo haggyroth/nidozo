@@ -1,4 +1,4 @@
-import { useState, useReducer, useEffect } from 'react'
+import { useState, useReducer, useEffect, useCallback } from 'react'
 
 // ---------------------------------------------------------------------------
 // ELO Sparkline — pure SVG, no external deps
@@ -416,6 +416,103 @@ function WinRateByTier({ rows }) {
 }
 
 // ---------------------------------------------------------------------------
+// Head-to-head table (inline on per-model page)
+// ---------------------------------------------------------------------------
+
+function ModelH2H({ modelId }) {
+  const [open, setOpen] = useState(false)
+  const [rows, setRows] = useState(null)
+  const [loading, setLoading] = useState(false)
+
+  const load = useCallback(() => {
+    if (rows !== null) return  // already fetched
+    setLoading(true)
+    fetch(`/api/models/${modelId}/matchups`)
+      .then(r => r.json())
+      .then(data => { setRows(data); setLoading(false) })
+      .catch(() => { setRows([]); setLoading(false) })
+  }, [modelId, rows])
+
+  function toggle() {
+    if (!open) load()
+    setOpen(o => !o)
+  }
+
+  return (
+    <div className="ms-h2h">
+      <button className="heuristic-toggle" onClick={toggle}>
+        <span>⚔ HEAD-TO-HEAD RECORD</span>
+        <span className={`drawer-chevron ${open ? 'open' : ''}`}>▼</span>
+      </button>
+      {open && (
+        loading ? (
+          <div className="ms-h2h-loading">Loading…</div>
+        ) : !rows?.length ? (
+          <div className="ms-h2h-empty">No head-to-head data yet — battle against other models to populate this.</div>
+        ) : (
+          <table className="ms-h2h-table">
+            <thead>
+              <tr>
+                <th>OPPONENT</th>
+                <th>W</th><th>L</th><th>T</th><th>GAMES</th><th>WIN%</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map(r => {
+                const winPct = r.games > 0 ? Math.round((r.wins / r.games) * 100) : 0
+                const oppName = `${r.opp_provider}/${r.opp_model}`.split('/').slice(-1)[0]
+                return (
+                  <tr key={`${r.opp_provider}/${r.opp_model}`}>
+                    <td className="ms-h2h-opp" title={`${r.opp_provider}/${r.opp_model}`}>{oppName}</td>
+                    <td className="ms-h2h-w">{r.wins}</td>
+                    <td className="ms-h2h-l">{r.losses}</td>
+                    <td className="ms-h2h-t">{r.ties}</td>
+                    <td className="ms-h2h-g">{r.games}</td>
+                    <td className="ms-h2h-pct" style={{
+                      color: winPct >= 60 ? 'var(--accent-green)'
+                           : winPct >= 40 ? 'var(--accent-amber)'
+                           : 'var(--accent-red)'
+                    }}>{winPct}%</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        )
+      )}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Export helpers
+// ---------------------------------------------------------------------------
+
+function exportBattleHistoryCSV(modelName, battles) {
+  const header = 'battle_id,result,opponent,turns,role,date'
+  const rows = battles.map(b =>
+    [b.id, b.result, `"${b.opponent}"`, b.total_turns ?? '', b.my_role, b.finished_at ?? ''].join(',')
+  )
+  const blob = new Blob([[header, ...rows].join('\n')], { type: 'text/csv' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `${modelName.replace(/[^a-z0-9]/gi, '_')}_battles.csv`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+function exportStatsJSON(modelName, stats) {
+  const blob = new Blob([JSON.stringify(stats, null, 2)], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `${modelName.replace(/[^a-z0-9]/gi, '_')}_stats.json`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+// ---------------------------------------------------------------------------
 // Main ModelStats component
 // ---------------------------------------------------------------------------
 
@@ -481,6 +578,18 @@ export default function ModelStats({ modelId, onClose, onReplaySelected }) {
             <span className="provider-tag">{model.provider}</span>
             <span className="version-tag">{model.prompt_version}</span>
           </div>
+        </div>
+        <div className="ms-export-buttons">
+          <button
+            className="ms-export-btn"
+            title="Download battle history as CSV"
+            onClick={() => exportBattleHistoryCSV(model.model_name, battle_history)}
+          >↓ CSV</button>
+          <button
+            className="ms-export-btn"
+            title="Download full stats as JSON"
+            onClick={() => exportStatsJSON(model.model_name, stats)}
+          >↓ JSON</button>
         </div>
         <div className="stats-kpis">
           <div className="kpi-block">
@@ -568,6 +677,11 @@ export default function ModelStats({ modelId, onClose, onReplaySelected }) {
           </div>
         </div>
       )}
+
+      {/* Head-to-head record */}
+      <div className="panel stats-panel">
+        <ModelH2H modelId={modelId} />
+      </div>
 
       {/* Lessons */}
       <div className="panel stats-panel">
