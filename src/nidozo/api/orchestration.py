@@ -9,6 +9,7 @@ from typing import Any
 
 from nidozo.api.helpers import _build_backend, _build_streaming_player, _model_name
 from nidozo.api.models import StartBattleRequest, StartSeasonRequest, StartTournamentRequest
+from nidozo.battle.presets import PRESET_FORMAT, build_preset_team_string
 
 logger = logging.getLogger(__name__)
 
@@ -100,9 +101,11 @@ async def run_battles(
 
     from nidozo.battle.tiers import TIER_TO_FORMAT
 
-    do_draft = req.tier != "random" and req.draft
+    do_draft = req.tier != "random" and req.draft and not (req.p1_preset or req.p2_preset)
+    use_preset = bool(req.p1_preset or req.p2_preset)
     showdown_format = (
-        "gen9randombattle" if req.tier == "random"
+        PRESET_FORMAT if use_preset
+        else "gen9randombattle" if req.tier == "random"
         else TIER_TO_FORMAT.get(req.tier, "gen9nationaldexag")
     )
     effective_prompt = "v3" if do_draft else req.prompt_version
@@ -133,6 +136,12 @@ async def run_battles(
             p1_team_id: int | None = None
             p2_team_id: int | None = None
 
+            # Preset teams take priority over draft and random fallback.
+            if req.p1_preset:
+                p1_team = build_preset_team_string(req.p1_preset)
+            if req.p2_preset:
+                p2_team = build_preset_team_string(req.p2_preset)
+
             if do_draft and p1_id is not None and req.p1_provider != "random":
                 await bus.publish({
                     "type": "draft_start",
@@ -159,12 +168,11 @@ async def run_battles(
 
             if do_draft:
                 store.set_battle_teams(battle_id, p1_team_id, p2_team_id, req.tier)
-            elif req.tier != "random":
-                # Non-random format (e.g. gen3ubers) requires a real team even
-                # when the draft phase was skipped.  Auto-generate random preset
-                # teams from the tier pool so Showdown doesn't reject the battle.
-                p1_team = _random_preset_team(req.tier)
-                p2_team = _random_preset_team(req.tier)
+            elif req.tier != "random" and not use_preset:
+                # Non-random format requires a real team even when draft was
+                # skipped and no preset was given.
+                p1_team = p1_team or _random_preset_team(req.tier)
+                p2_team = p2_team or _random_preset_team(req.tier)
 
             p1 = _build_streaming_player(
                 req.p1_provider, p1_model, "p1",
@@ -196,6 +204,8 @@ async def run_battles(
                 "drafted": do_draft,
                 "p1_personality": req.p1_personality,
                 "p2_personality": req.p2_personality,
+                "p1_preset": req.p1_preset,
+                "p2_preset": req.p2_preset,
             })
 
             await _battle_and_teardown(p1, p2)
@@ -271,9 +281,11 @@ async def run_tournament(
 
     from nidozo.battle.tiers import TIER_TO_FORMAT
 
-    do_draft = req.tier != "random" and req.draft
+    any_preset = any(ps.get("preset") for ps in player_specs)
+    do_draft = req.tier != "random" and req.draft and not any_preset
     showdown_format = (
-        "gen9randombattle" if req.tier == "random"
+        PRESET_FORMAT if any_preset
+        else "gen9randombattle" if req.tier == "random"
         else TIER_TO_FORMAT.get(req.tier, "gen9nationaldexag")
     )
     effective_prompt = "v3" if do_draft else req.prompt_version
@@ -289,7 +301,7 @@ async def run_tournament(
         "tier": req.tier,
     })
 
-    # Build lookups so each battle's p1/p2 can find their coach and personality config.
+    # Build lookups so each battle's p1/p2 can find their coach, personality, and preset.
     coach_lookup: dict[tuple[str, str], tuple[str | None, str | None]] = {
         (ps["provider"], ps["model_name"]): (
             ps.get("coach_provider"), ps.get("coach_model")
@@ -298,6 +310,10 @@ async def run_tournament(
     }
     personality_lookup: dict[tuple[str, str], str | None] = {
         (ps["provider"], ps["model_name"]): ps.get("personality")
+        for ps in player_specs
+    }
+    preset_lookup: dict[tuple[str, str], str | None] = {
+        (ps["provider"], ps["model_name"]): ps.get("preset")
         for ps in player_specs
     }
 
@@ -365,6 +381,13 @@ async def run_tournament(
             t_p1_team_id: int | None = None
             t_p2_team_id: int | None = None
 
+            t_p1_preset = preset_lookup.get((t_p1_prov, battle_info["p1_model"]))
+            t_p2_preset = preset_lookup.get((t_p2_prov, battle_info["p2_model"]))
+            if t_p1_preset:
+                t_p1_team = build_preset_team_string(t_p1_preset)
+            if t_p2_preset:
+                t_p2_team = build_preset_team_string(t_p2_preset)
+
             if do_draft and t_p1_id is not None and t_p1_prov != "random":
                 await bus.publish({
                     "type": "draft_start",
@@ -397,9 +420,9 @@ async def run_tournament(
 
             if do_draft:
                 store.set_battle_teams(battle_id, t_p1_team_id, t_p2_team_id, req.tier)
-            elif req.tier != "random":
-                t_p1_team = _random_preset_team(req.tier)
-                t_p2_team = _random_preset_team(req.tier)
+            elif req.tier != "random" and not any_preset:
+                t_p1_team = t_p1_team or _random_preset_team(req.tier)
+                t_p2_team = t_p2_team or _random_preset_team(req.tier)
 
             t_p1_coach_prov, t_p1_coach_model = coach_lookup.get(
                 (t_p1_prov, battle_info["p1_model"]), (None, None)
@@ -441,6 +464,8 @@ async def run_tournament(
                 "drafted": do_draft,
                 "p1_personality": t_p1_personality,
                 "p2_personality": t_p2_personality,
+                "p1_preset": t_p1_preset,
+                "p2_preset": t_p2_preset,
             })
 
             await _battle_and_teardown(p1, p2)
@@ -699,9 +724,11 @@ async def run_bracket_tournament(
         resolve_seed,
     )
 
-    do_draft = req.tier != "random" and req.draft
+    any_preset = any(ps.get("preset") for ps in player_specs)
+    do_draft = req.tier != "random" and req.draft and not any_preset
     showdown_format = (
-        "gen9randombattle" if req.tier == "random"
+        PRESET_FORMAT if any_preset
+        else "gen9randombattle" if req.tier == "random"
         else TIER_TO_FORMAT.get(req.tier, "gen9nationaldexag")
     )
     effective_prompt = "v3" if do_draft else req.prompt_version
@@ -713,6 +740,10 @@ async def run_bracket_tournament(
 
     personality_lookup: dict[tuple[str, str], str | None] = {
         (ps["provider"], ps["model_name"]): ps.get("personality")
+        for ps in player_specs
+    }
+    preset_lookup: dict[tuple[str, str], str | None] = {
+        (ps["provider"], ps["model_name"]): ps.get("preset")
         for ps in player_specs
     }
 
@@ -826,16 +857,20 @@ async def run_bracket_tournament(
                         if p2_prov != "random" else None
                     )
 
+                    b_p1_preset = preset_lookup.get((p1_prov, p1_model))
+                    b_p2_preset = preset_lookup.get((p2_prov, p2_model))
                     p1 = _build_streaming_player(
                         p1_prov, p1_model, "p1",
                         effective_prompt, store, battle_id, bus, cfg, showdown_format,
                         lessons=t_p1_lessons,
+                        team=build_preset_team_string(b_p1_preset) if b_p1_preset else None,
                         personality=personality_lookup.get((p1_prov, p1_model)),
                     )
                     p2 = _build_streaming_player(
                         p2_prov, p2_model, "p2",
                         effective_prompt, store, battle_id, bus, cfg, showdown_format,
                         lessons=t_p2_lessons,
+                        team=build_preset_team_string(b_p2_preset) if b_p2_preset else None,
                         personality=personality_lookup.get((p2_prov, p2_model)),
                     )
 
@@ -852,6 +887,8 @@ async def run_bracket_tournament(
                         "match_id": match_id,
                         "p1_personality": personality_lookup.get((p1_prov, p1_model)),
                         "p2_personality": personality_lookup.get((p2_prov, p2_model)),
+                        "p1_preset": b_p1_preset,
+                        "p2_preset": b_p2_preset,
                     })
 
                     await _battle_and_teardown(p1, p2)
@@ -1004,9 +1041,11 @@ async def run_season(
 
     from nidozo.battle.tiers import TIER_TO_FORMAT
 
-    do_draft = req.tier != "random" and req.draft
+    any_preset = any(ps.get("preset") for ps in player_specs)
+    do_draft = req.tier != "random" and req.draft and not any_preset
     showdown_format = (
-        "gen9randombattle" if req.tier == "random"
+        PRESET_FORMAT if any_preset
+        else "gen9randombattle" if req.tier == "random"
         else TIER_TO_FORMAT.get(req.tier, "gen9nationaldexag")
     )
     effective_prompt = "v3" if do_draft else req.prompt_version
@@ -1032,6 +1071,10 @@ async def run_season(
     }
     personality_lookup: dict[tuple[str, str], str | None] = {
         (ps["provider"], ps["model_name"]): ps.get("personality")
+        for ps in player_specs
+    }
+    preset_lookup: dict[tuple[str, str], str | None] = {
+        (ps["provider"], ps["model_name"]): ps.get("preset")
         for ps in player_specs
     }
 
@@ -1098,6 +1141,13 @@ async def run_season(
             s_p1_team_id: int | None = None
             s_p2_team_id: int | None = None
 
+            s_p1_preset = preset_lookup.get((s_p1_prov, battle_info["p1_model"]))
+            s_p2_preset = preset_lookup.get((s_p2_prov, battle_info["p2_model"]))
+            if s_p1_preset:
+                s_p1_team = build_preset_team_string(s_p1_preset)
+            if s_p2_preset:
+                s_p2_team = build_preset_team_string(s_p2_preset)
+
             if do_draft and s_p1_id is not None and s_p1_prov != "random":
                 await bus.publish({
                     "type": "draft_start",
@@ -1130,9 +1180,9 @@ async def run_season(
 
             if do_draft:
                 store.set_battle_teams(battle_id, s_p1_team_id, s_p2_team_id, req.tier)
-            elif req.tier != "random":
-                s_p1_team = _random_preset_team(req.tier)
-                s_p2_team = _random_preset_team(req.tier)
+            elif req.tier != "random" and not any_preset:
+                s_p1_team = s_p1_team or _random_preset_team(req.tier)
+                s_p2_team = s_p2_team or _random_preset_team(req.tier)
 
             s_p1_coach_prov, s_p1_coach_model = coach_lookup.get(
                 (s_p1_prov, battle_info["p1_model"]), (None, None)
@@ -1174,6 +1224,8 @@ async def run_season(
                 "drafted": do_draft,
                 "p1_personality": s_p1_personality,
                 "p2_personality": s_p2_personality,
+                "p1_preset": s_p1_preset,
+                "p2_preset": s_p2_preset,
             })
 
             await _battle_and_teardown(p1, p2)

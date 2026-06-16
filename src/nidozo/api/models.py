@@ -18,6 +18,11 @@ Tier = Literal["random", "ou", "ubers", "uu", "lc", "freeforall"]
 TournamentFormat = Literal["round_robin", "single_elim", "double_elim"]
 # Named play-style personas injected into the system prompt (None = no persona).
 Personality = Literal["aggressive", "defensive", "balanced", "trickster", "momentum"]
+# Curated 6-mon trainer-archetype teams (None = use random/draft as normal).
+PresetSlug = Literal[
+    "ash_kanto", "rival_gauntlet", "dragons_lair", "ghost_gang", "inferno_squad",
+    "aqua_armada", "eevee_squad", "steel_titans", "electric_storm", "champion_finest",
+]
 
 
 class StartBattleRequest(BaseModel):
@@ -38,6 +43,9 @@ class StartBattleRequest(BaseModel):
     # Optional play-style persona injected into the system prompt (None = no persona)
     p1_personality: Personality | None = None
     p2_personality: Personality | None = None
+    # Optional trainer-archetype preset team (overrides draft; forces AG format)
+    p1_preset: PresetSlug | None = None
+    p2_preset: PresetSlug | None = None
 
 
 class StartBattleResponse(BaseModel):
@@ -53,6 +61,8 @@ class PlayerSpec(BaseModel):
     coach_model: str | None = None
     # Optional play-style persona injected into the system prompt
     personality: Personality | None = None
+    # Optional trainer-archetype preset team
+    preset: PresetSlug | None = None
 
 
 class StartTournamentRequest(BaseModel):

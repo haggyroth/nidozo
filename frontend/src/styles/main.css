@@ -4774,6 +4774,64 @@ body::after {
 }
 .personality-chip-emoji { font-size: 0.65rem; }
 
+/* ---- Preset badge (in-battle chip) ---- */
+.preset-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.1rem 0.4rem;
+  border-radius: 3px;
+  background: rgba(120, 200, 255, 0.07);
+  border: 1px solid rgba(120, 200, 255, 0.2);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.5rem;
+  letter-spacing: 0.06em;
+  color: rgba(120, 200, 255, 0.75);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.preset-badge-emoji { font-size: 0.65rem; }
+.preset-badge-name {}
+
+/* ---- Preset selector (battle form) ---- */
+.preset-selector {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-top: 0.5rem;
+}
+.preset-selector-label {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.6rem;
+  letter-spacing: 0.08em;
+  color: rgba(120, 200, 255, 0.7);
+  text-transform: uppercase;
+}
+.preset-select {
+  width: 100%;
+}
+.preset-preview {
+  padding: 0.4rem 0.5rem;
+  border-radius: 4px;
+  background: rgba(120, 200, 255, 0.05);
+  border: 1px solid rgba(120, 200, 255, 0.15);
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+.preset-preview-flavour {
+  font-size: 0.65rem;
+  font-style: italic;
+  color: rgba(200, 220, 255, 0.7);
+  line-height: 1.4;
+}
+.preset-preview-mons {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.58rem;
+  letter-spacing: 0.04em;
+  color: rgba(120, 200, 255, 0.6);
+}
+
 /* ---- Own Pokémon moves on card ---- */
 .own-moves {
   margin-top: 0.4rem;

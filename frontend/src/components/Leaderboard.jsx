@@ -318,6 +318,35 @@ function CoachSelector({ label, provider, model, onProviderChange, onModelChange
 // Personality selector (compact — shown below each player)
 // ---------------------------------------------------------------------------
 
+function PresetSelector({ label, value, onChange, presets }) {
+  return (
+    <div className="preset-selector">
+      <label className="preset-selector-label">🎒 {label} PRESET TEAM</label>
+      <select
+        className="form-select preset-select"
+        value={value ?? 'none'}
+        onChange={e => onChange(e.target.value === 'none' ? null : e.target.value)}
+      >
+        <option value="none">— random / draft —</option>
+        {presets.map(p => (
+          <option key={p.slug} value={p.slug}>
+            {p.emoji} {p.name}
+          </option>
+        ))}
+      </select>
+      {value && value !== 'none' && (() => {
+        const p = presets.find(x => x.slug === value)
+        return p ? (
+          <div className="preset-preview">
+            <div className="preset-preview-flavour">{p.flavour}</div>
+            <div className="preset-preview-mons">{p.pokemon.map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(' · ')}</div>
+          </div>
+        ) : null
+      })()}
+    </div>
+  )
+}
+
 function PersonalitySelector({ value, onChange }) {
   return (
     <div className="personality-selector">
@@ -344,16 +373,22 @@ function PersonalitySelector({ value, onChange }) {
 function BattleForm({ onBattleStarted, lmModels, lmLoading }) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
+  const [presets, setPresets] = useState([])
   const [form, setForm] = useState({
     p1_provider: 'lmstudio', p2_provider: 'lmstudio',
     p1_model: '', p2_model: '',
     p1_coach_provider: 'none', p1_coach_model: '',
     p2_coach_provider: 'none', p2_coach_model: '',
     p1_personality: null, p2_personality: null,
+    p1_preset: null, p2_preset: null,
     n_battles: 1,
     tier: 'random',
     draft: false,
   })
+
+  useEffect(() => {
+    fetch('/api/presets').then(r => r.json()).then(setPresets).catch(() => {})
+  }, [])
 
   // Auto-fill with first two LM Studio models once they load.
   // Deferred to a microtask so setState is not called synchronously inside
@@ -385,6 +420,10 @@ function BattleForm({ onBattleStarted, lmModels, lmLoading }) {
       // Personality — omit if none selected
       if (!body.p1_personality) delete body.p1_personality
       if (!body.p2_personality) delete body.p2_personality
+      // Preset — omit if none selected; presets override draft
+      if (!body.p1_preset) delete body.p1_preset
+      if (!body.p2_preset) delete body.p2_preset
+      if (body.p1_preset || body.p2_preset) body.draft = false
       const res = await fetch('/api/battles/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -422,6 +461,12 @@ function BattleForm({ onBattleStarted, lmModels, lmLoading }) {
         value={form.p1_personality ?? 'none'}
         onChange={v => setForm(f => ({ ...f, p1_personality: v }))}
       />
+      <PresetSelector
+        label="P1"
+        value={form.p1_preset}
+        onChange={v => setForm(f => ({ ...f, p1_preset: v }))}
+        presets={presets}
+      />
       <ModelSelector
         label="PLAYER 2"
         provider={form.p2_provider} model={form.p2_model}
@@ -439,6 +484,12 @@ function BattleForm({ onBattleStarted, lmModels, lmLoading }) {
       <PersonalitySelector
         value={form.p2_personality ?? 'none'}
         onChange={v => setForm(f => ({ ...f, p2_personality: v }))}
+      />
+      <PresetSelector
+        label="P2"
+        value={form.p2_preset}
+        onChange={v => setForm(f => ({ ...f, p2_preset: v }))}
+        presets={presets}
       />
       <div className="form-group">
         <label className="form-label">Tier</label>
