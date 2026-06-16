@@ -9,7 +9,7 @@ from nidozo.llm.backend import ModelBackend
 
 # Prompt versions that require structured JSON output (grammar-sampling / response_format).
 # Update this set whenever a new JSON-output prompt version is added.
-_JSON_OUTPUT_PROMPT_VERSIONS: frozenset[str] = frozenset({"v2", "v3", "v4", "v5"})
+_JSON_OUTPUT_PROMPT_VERSIONS: frozenset[str] = frozenset({"v2", "v3", "v4", "v5", "v6"})
 
 
 def _model_name(provider: str, model: str | None) -> str:

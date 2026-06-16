@@ -78,6 +78,8 @@ def _resolve_move(
     identifier: str,
     battle: AbstractBattle,
     player: Player,
+    *,
+    terastallize: bool = False,
 ) -> BattleOrder | None:
     """Resolve a move identifier (slot number or name) to a BattleOrder."""
     moves = battle.available_moves
@@ -87,13 +89,19 @@ def _resolve_move(
 
     identifier = _strip_keyword_prefix(identifier)
 
+    # Guard: only pass terastallize=True when the battle permits it.
+    # If the player requests tera_move but can't Tera, fall back to a normal move.
+    if terastallize and not getattr(battle, "can_tera", False):
+        logger.debug("ACTION: tera_move requested but battle.can_tera is False — using normal move")
+        terastallize = False
+
     # Try numeric slot — extract leading digits to handle trailing markdown (e.g. "2**")
     m = re.match(r"(\d+)", identifier)
     if m:
         slot = int(m.group(1))
         idx = slot - 1
         if 0 <= idx < len(moves):
-            return player.create_order(moves[idx])
+            return player.create_order(moves[idx], terastallize=terastallize)
         logger.warning("ACTION: move slot %d out of range (have %d)", slot, len(moves))
         return None
 
@@ -102,14 +110,14 @@ def _resolve_move(
     norm_to_move = {_normalize(m.id): m for m in moves}
 
     if norm in norm_to_move:
-        return player.create_order(norm_to_move[norm])
+        return player.create_order(norm_to_move[norm], terastallize=terastallize)
 
     # Fuzzy fallback: tolerate typos like "thunderolt" → "thunderbolt", "icebeam" → "ice beam"
     close = get_close_matches(norm, norm_to_move.keys(), n=1, cutoff=_FUZZY_CUTOFF)
     if close:
         matched_id = norm_to_move[close[0]].id
         logger.debug("ACTION: fuzzy-matched move %r → %r", identifier, matched_id)
-        return player.create_order(norm_to_move[close[0]])
+        return player.create_order(norm_to_move[close[0]], terastallize=terastallize)
 
     logger.debug("ACTION: move name %r not found in available moves", identifier)
     return None
@@ -233,8 +241,9 @@ def _parse_json_action(
         logger.debug("JSON action missing action_type or identifier: %s", data)
         return None
 
-    if action_type == "move":
-        order = _resolve_move(identifier, battle, player)
+    if action_type in ("move", "tera_move"):
+        terastallize = action_type == "tera_move"
+        order = _resolve_move(identifier, battle, player, terastallize=terastallize)
         if order is None:
             logger.debug("JSON: move %r not resolved — available: %s",
                          identifier, [m.id for m in battle.available_moves])

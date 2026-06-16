@@ -262,6 +262,11 @@ export default function PokemonCard({ mon, side, isOpponent = false, isThinking 
             <div className="pokemon-name">{mon.species}</div>
             <div className="pokemon-level">Lv.{mon.level ?? 50}</div>
             {mon.status && <StatusBadge status={mon.status} />}
+            {mon.is_terastallized && (
+              <span className="tera-badge" title={`Terastallized: ${mon.tera_type ?? ''} type`}>
+                ◈ TERA{mon.tera_type ? ` ${mon.tera_type}` : ''}
+              </span>
+            )}
           </div>
           <div className="type-badges">
             {(mon.types || []).map(t => <TypeBadge key={t} type={t} />)}

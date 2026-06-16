@@ -124,7 +124,7 @@ CREATE TABLE IF NOT EXISTS seasons (
     format          TEXT    NOT NULL DEFAULT 'gen9randombattle',
     participants    TEXT    NOT NULL,  -- JSON [{provider, model_name}]
     rounds          INTEGER NOT NULL DEFAULT 1,
-    prompt_version  TEXT    NOT NULL DEFAULT 'v5',
+    prompt_version  TEXT    NOT NULL DEFAULT 'v6',
     total_battles   INTEGER NOT NULL DEFAULT 0,
     status          TEXT    NOT NULL DEFAULT 'pending',  -- pending|running|completed|cancelled
     created_at      TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
@@ -348,7 +348,7 @@ def migrate(conn: sqlite3.Connection) -> None:
                 format          TEXT    NOT NULL DEFAULT 'gen9randombattle',
                 participants    TEXT    NOT NULL,
                 rounds          INTEGER NOT NULL DEFAULT 1,
-                prompt_version  TEXT    NOT NULL DEFAULT 'v5',
+                prompt_version  TEXT    NOT NULL DEFAULT 'v6',
                 total_battles   INTEGER NOT NULL DEFAULT 0,
                 status          TEXT    NOT NULL DEFAULT 'pending',
                 created_at      TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),

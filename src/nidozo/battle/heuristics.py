@@ -307,6 +307,7 @@ def _battle_context(
         "opp_status": None,
         "opp_status_impact": None,
         "ko_risk_note": None,  # set when opponent's last move threatens a KO
+        "tera_note": None,  # set when Terastallize is available and strategically relevant
     }
 
     # Speed comparison
@@ -403,6 +404,57 @@ def _battle_context(
                         )
         except Exception:  # noqa: BLE001
             pass
+
+    # Terastallization advisory — surfaces when the player can still Tera this battle.
+    try:
+        can_tera = bool(getattr(battle, "can_tera", False))
+        if can_tera and own is not None:
+            tera_type = getattr(own, "tera_type", None)
+            if tera_type is not None:
+                tera_name = tera_type.name
+                # Determine STAB bonus: Tera same-type = 2× STAB; new type = 1.5× STAB
+                base_types = {getattr(own, "_type_1", None), getattr(own, "_type_2", None)} - {None}
+                same_type = tera_type in base_types
+                stab_note = "same as base typing (2× STAB bonus)" if same_type else "new type (1.5× STAB on matching moves)"
+                # Defensive benefit: check if Tera type changes the matchup vs current opponent
+                if opp is not None:
+                    # Use a lightweight proxy: would the Tera type resist the opponent's best move?
+                    from poke_env.battle.move_category import MoveCategory as _MC
+                    opp_moves = list(opp.moves.values())
+                    opp_damaging = [m for m in opp_moves if m.category != _MC.STATUS and m.base_power > 0]
+                    if opp_damaging:
+                        # Mock a temporary check using poke-env's type chart
+                        from poke_env.data.gen_data import GenData as _GD
+                        _gen = _GD.from_gen(9)
+                        tera_name_lower = tera_name.lower()
+                        type_chart = _gen.type_chart
+                        def _defending_mult(atk_type_name: str) -> float:
+                            row = type_chart.get(atk_type_name.upper(), {})
+                            return float(row.get(tera_name_lower.upper(), 1.0))
+                        worst_mult = max(
+                            (_defending_mult(m.type.name) for m in opp_damaging if hasattr(m, "type")),
+                            default=1.0,
+                        )
+                        if worst_mult <= 0.5:
+                            def_note = f"resists opponent's known moves as {tera_name}"
+                        elif worst_mult >= 2.0:
+                            def_note = f"still weak to opponent's moves as {tera_name} — no defensive benefit"
+                        else:
+                            def_note = f"neutral or better vs opponent's known moves as {tera_name}"
+                    else:
+                        def_note = "opponent moves not yet revealed"
+                    ctx["tera_note"] = (
+                        f"TERA AVAILABLE: Your {own.species} can Terastallize to {tera_name} type "
+                        f"({stab_note}; defense: {def_note}). "
+                        f"Use action_type 'tera_move' to Terastallize and attack in one action."
+                    )
+                else:
+                    ctx["tera_note"] = (
+                        f"TERA AVAILABLE: Your {own.species} can Terastallize to {tera_name} type "
+                        f"({stab_note}). Use action_type 'tera_move' to Terastallize and attack."
+                    )
+    except Exception:  # noqa: BLE001
+        pass
 
     return ctx
 
