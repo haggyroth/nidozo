@@ -88,6 +88,9 @@ def serialize_battle(battle: AbstractBattle, *, light: bool = False) -> dict[str
         ],
         "opponent_team_size_seen": len(battle.opponent_team),
         "force_switch": battle.force_switch,
+        # can_tera: whether the player can still Terastallize this battle.
+        # Once used, this becomes False for the rest of the battle.
+        "can_tera": bool(getattr(battle, "can_tera", False)),
         # recent_events is injected by LLMPlayer (stateful, not derivable from
         # a single battle snapshot). Absent here; always present in prompts.
         "recent_events": [],
@@ -123,9 +126,11 @@ def _serialize_own_pokemon(mon: Pokemon | None) -> dict[str, Any] | None:
     # May be None for bench mons whose stats haven't been reported yet.
     actual = {k: v for k, v in (mon.stats or {}).items() if v is not None}
     last_move = mon.last_move
+    tera = getattr(mon, "tera_type", None)
     return {
         "species": _species_name(mon),
         "level": mon.level,
+        # types already reflects Tera type when Terastallized (poke-env handles this).
         "types": [t.name for t in mon.types],
         "hp_fraction": round(mon.current_hp_fraction, 3),
         "fainted": mon.fainted,
@@ -135,13 +140,14 @@ def _serialize_own_pokemon(mon: Pokemon | None) -> dict[str, Any] | None:
         "ability": mon.ability,
         "base_stats": mon.base_stats,
         # actual_stats: real computed stats for this battle (level/EVs/nature applied).
-        # Use these for speed comparisons and damage estimates — they are more accurate
-        # than base_stats, which ignore level and individual variation.
         "actual_stats": actual if actual else None,
         "moves": moves,
         "effects": [e.name for e in mon.effects],
         # last_move: the most recent move used by this Pokémon (revealed information).
         "last_move": _serialize_move_basic(last_move) if last_move else None,
+        # Terastallization: own team knows their Tera type from teambuilder.
+        "is_terastallized": bool(getattr(mon, "is_terastallized", False)),
+        "tera_type": tera.name if tera is not None else None,
     }
 
 
@@ -156,9 +162,14 @@ def _serialize_opponent_pokemon(mon: Pokemon | None) -> dict[str, Any] | None:
     # this for us. We do NOT include possible_abilities or estimated stats.
     revealed_moves = {name: _serialize_move_basic(m) for name, m in mon.moves.items()}
     last_move = mon.last_move
+    is_tera = bool(getattr(mon, "is_terastallized", False))
+    # Tera type is hidden-info until the opponent actually Terastallizes — at
+    # that point the animation reveals it publicly, so it's safe to surface.
+    tera = getattr(mon, "tera_type", None) if is_tera else None
     return {
         "species": _species_name(mon),
         "level": mon.level,
+        # types already reflects Tera type when Terastallized (poke-env handles this).
         "types": [t.name for t in mon.types],
         "hp_fraction": round(mon.current_hp_fraction, 3),
         "fainted": mon.fainted,
@@ -176,6 +187,9 @@ def _serialize_opponent_pokemon(mon: Pokemon | None) -> dict[str, Any] | None:
         "moves_revealed": len(mon.moves),
         # last_move: the most recent move the opponent used this battle (already revealed).
         "last_move": _serialize_move_basic(last_move) if last_move else None,
+        # Terastallization: only exposed once it has occurred (publicly revealed event).
+        "is_terastallized": is_tera,
+        "tera_type": tera.name if tera is not None else None,
     }
 
 

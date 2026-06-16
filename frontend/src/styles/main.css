@@ -699,6 +699,27 @@ body::after {
 .status-FRZ { background: #006064; color: #b2ebf2; }
 .status-FNT { background: #b71c1c; color: #ffcdd2; }
 
+/* Terastallization badge */
+.tera-badge {
+  display: inline-block;
+  font-family: var(--font-pixel);
+  font-size: 0.38rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 2px;
+  letter-spacing: 0.05em;
+  margin-top: 0.5rem;
+  background: linear-gradient(135deg, #9c27b0 0%, #1565c0 100%);
+  color: #e8d5ff;
+  border: 1px solid rgba(180, 120, 255, 0.5);
+  box-shadow: 0 0 6px rgba(160, 80, 255, 0.4);
+  animation: tera-pulse 2s ease-in-out infinite;
+}
+
+@keyframes tera-pulse {
+  0%, 100% { box-shadow: 0 0 6px rgba(160, 80, 255, 0.4); }
+  50%       { box-shadow: 0 0 12px rgba(160, 80, 255, 0.8); }
+}
+
 /* Boosts */
 .stat-boosts {
   display: flex;

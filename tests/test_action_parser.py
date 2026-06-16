@@ -25,6 +25,7 @@ def _make_battle(moves=None, switches=None) -> MagicMock:
     battle.turn = 1
     battle.available_moves = moves or []
     battle.available_switches = switches or []
+    battle.can_tera = False
     return battle
 
 
@@ -46,7 +47,7 @@ def test_parses_move_action() -> None:
 
     result = parse_action("I'll go with move 1.\nACTION: move 1", battle, player)
 
-    player.create_order.assert_called_once_with(moves[0])
+    player.create_order.assert_called_once_with(moves[0], terastallize=False)
     assert result is not None
 
 
@@ -79,7 +80,7 @@ def test_uses_last_action_line_when_multiple() -> None:
     response = "ACTION: move 1\nActually...\nACTION: move 2"
     parse_action(response, battle, player)
 
-    player.create_order.assert_called_once_with(moves[1])
+    player.create_order.assert_called_once_with(moves[1], terastallize=False)
 
 
 def test_extra_whitespace_in_action_line() -> None:
@@ -149,7 +150,7 @@ def test_parses_move_by_name() -> None:
 
     result = parse_action("ACTION: move Thunderbolt", battle, player)
 
-    player.create_order.assert_called_once_with(moves[0])
+    player.create_order.assert_called_once_with(moves[0], terastallize=False)
     assert result is not None
 
 
@@ -182,7 +183,7 @@ def test_parses_bare_action_move_name() -> None:
 
     result = parse_action("I'll use thunderbolt.\nACTION: thunderbolt", battle, player)
 
-    player.create_order.assert_called_once_with(moves[0])
+    player.create_order.assert_called_once_with(moves[0], terastallize=False)
     assert result is not None
 
 
@@ -195,7 +196,7 @@ def test_last_valid_name_action_wins() -> None:
     response = "Maybe surf... ACTION: move Surf\nActually, ACTION: move IceBeam"
     parse_action(response, battle, player)
 
-    player.create_order.assert_called_once_with(moves[1])
+    player.create_order.assert_called_once_with(moves[1], terastallize=False)
 
 
 def test_unknown_move_name_returns_none() -> None:
@@ -214,7 +215,7 @@ def test_markdown_bold_around_action_line() -> None:
     battle = _make_battle(moves=moves)
     player = _make_player()
     result = parse_action("**ACTION: move 2**", battle, player)
-    player.create_order.assert_called_once_with(moves[1])
+    player.create_order.assert_called_once_with(moves[1], terastallize=False)
     assert result is not None
 
 
@@ -224,7 +225,7 @@ def test_markdown_bold_around_label_only() -> None:
     battle = _make_battle(moves=moves)
     player = _make_player()
     result = parse_action("**ACTION:** move Thunderbolt", battle, player)
-    player.create_order.assert_called_once_with(moves[0])
+    player.create_order.assert_called_once_with(moves[0], terastallize=False)
     assert result is not None
 
 
@@ -249,7 +250,7 @@ def test_name_fallback_when_slot_out_of_range() -> None:
     # "move 1" would succeed; but let's test name works independently
     result = parse_action("ACTION: move thunderbolt", battle, player)
     assert result is not None
-    player.create_order.assert_called_once_with(moves[0])
+    player.create_order.assert_called_once_with(moves[0], terastallize=False)
 
 
 # ---------------------------------------------------------------------------
@@ -281,7 +282,7 @@ def test_json_switch_identifier_with_move_prefix() -> None:
         battle, player,
     )
     assert result is not None
-    player.create_order.assert_called_once_with(moves[0])
+    player.create_order.assert_called_once_with(moves[0], terastallize=False)
 
 
 def test_json_switch_identifier_with_switch_and_species() -> None:
@@ -364,7 +365,7 @@ def test_json_move_by_name() -> None:
         '{"reasoning":"Thunderbolt is 2x effective.","action_type":"move","identifier":"thunderbolt"}',
         battle, player,
     )
-    player.create_order.assert_called_once_with(moves[0])
+    player.create_order.assert_called_once_with(moves[0], terastallize=False)
     assert result is not None
 
 
@@ -392,7 +393,7 @@ def test_json_move_by_slot() -> None:
         '{"action_type":"move","identifier":"2"}',
         battle, player,
     )
-    player.create_order.assert_called_once_with(moves[1])
+    player.create_order.assert_called_once_with(moves[1], terastallize=False)
     assert result is not None
 
 
@@ -408,7 +409,7 @@ def test_json_unknown_move_falls_back_to_regex() -> None:
         battle, player,
     )
     assert result is not None
-    player.create_order.assert_called_once_with(moves[0])
+    player.create_order.assert_called_once_with(moves[0], terastallize=False)
 
 
 def test_json_with_markdown_fence() -> None:
@@ -422,7 +423,7 @@ def test_json_with_markdown_fence() -> None:
         battle, player,
     )
     assert result is not None
-    player.create_order.assert_called_once_with(moves[0])
+    player.create_order.assert_called_once_with(moves[0], terastallize=False)
 
 
 def test_json_invalid_falls_back_to_regex() -> None:
@@ -433,7 +434,7 @@ def test_json_invalid_falls_back_to_regex() -> None:
 
     result = parse_action('{broken json}\nACTION: move 1', battle, player)
     assert result is not None
-    player.create_order.assert_called_once_with(moves[0])
+    player.create_order.assert_called_once_with(moves[0], terastallize=False)
 
 
 # ---------------------------------------------------------------------------
@@ -570,7 +571,7 @@ class TestThinkTagStripping:
         )
         result = parse_action(response, battle, player)
         assert result is not None
-        player.create_order.assert_called_once_with(moves[0])
+        player.create_order.assert_called_once_with(moves[0], terastallize=False)
 
     def test_think_tag_before_json_switch(self) -> None:
         """<think>...</think> before a JSON switch action."""
@@ -595,7 +596,7 @@ class TestThinkTagStripping:
         response = "<think>Surf is the best choice here.</think>\nACTION: move 1"
         result = parse_action(response, battle, player)
         assert result is not None
-        player.create_order.assert_called_once_with(moves[0])
+        player.create_order.assert_called_once_with(moves[0], terastallize=False)
 
     def test_multiline_think_block_stripped(self) -> None:
         """Multiline <think> content is fully stripped before parsing."""
@@ -667,7 +668,7 @@ class TestJsonControlCharSanitization:
         )
         result = parse_action(response, battle, player)
         assert result is not None
-        player.create_order.assert_called_once_with(moves[0])
+        player.create_order.assert_called_once_with(moves[0], terastallize=False)
 
     def test_literal_newline_in_reasoning_switch(self) -> None:
         """Sanitization also works when action_type is switch."""
@@ -706,7 +707,7 @@ class TestJsonControlCharSanitization:
         )
         result = parse_action(response, battle, player)
         assert result is not None
-        player.create_order.assert_called_once_with(moves[0])
+        player.create_order.assert_called_once_with(moves[0], terastallize=False)
 
     def test_code_fence_plus_literal_newlines(self) -> None:
         """Code-fenced JSON with literal newlines in reasoning is fully recovered."""
@@ -727,7 +728,7 @@ class TestJsonControlCharSanitization:
         )
         result = parse_action(response, battle, player)
         assert result is not None
-        player.create_order.assert_called_once_with(moves[0])
+        player.create_order.assert_called_once_with(moves[0], terastallize=False)
 
     def test_valid_json_unaffected(self) -> None:
         """Sanitization is a no-op on already-valid JSON — no regression."""
@@ -738,7 +739,7 @@ class TestJsonControlCharSanitization:
         response = '{"reasoning": "clean reasoning", "action_type": "move", "identifier": "tackle"}'
         result = parse_action(response, battle, player)
         assert result is not None
-        player.create_order.assert_called_once_with(moves[0])
+        player.create_order.assert_called_once_with(moves[0], terastallize=False)
 
     def test_unrecoverable_json_still_returns_none(self) -> None:
         """Truly broken JSON (no action keys anywhere) still returns None after sanitization."""
@@ -765,7 +766,7 @@ class TestFuzzyMoveMatching:
         result = parse_action('{"action_type":"move","identifier":"thunderolt","reasoning":"x"}', battle, player)
 
         assert result is not None
-        player.create_order.assert_called_once_with(moves[0])
+        player.create_order.assert_called_once_with(moves[0], terastallize=False)
 
     def test_fuzzy_matches_spaced_name(self) -> None:
         """'ice beam' → 'icebeam' (space inserted, normalizes away)."""
@@ -776,7 +777,7 @@ class TestFuzzyMoveMatching:
         result = parse_action('{"action_type":"move","identifier":"ice beam","reasoning":"x"}', battle, player)
 
         assert result is not None
-        player.create_order.assert_called_once_with(moves[0])
+        player.create_order.assert_called_once_with(moves[0], terastallize=False)
 
     def test_fuzzy_no_match_on_wild_guess(self) -> None:
         """A completely wrong name should not fuzzy-match anything (returns None)."""
@@ -797,4 +798,4 @@ class TestFuzzyMoveMatching:
         result = parse_action('{"action_type":"move","identifier":"fireblast","reasoning":"x"}', battle, player)
 
         assert result is not None
-        player.create_order.assert_called_once_with(moves[1])
+        player.create_order.assert_called_once_with(moves[1], terastallize=False)

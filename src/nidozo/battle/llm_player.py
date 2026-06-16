@@ -46,7 +46,7 @@ class LLMPlayer(Player):
     Args:
         backend: Any object satisfying the ModelBackend protocol.
         prompt_version: Prompt template version to use. All production callers
-            pass "v5" (the current default); "v1" is the fallback only.
+            pass "v6" (the current default); "v1" is the fallback only.
         store: Optional BattleStore for turn logging.
         battle_id: DB battle id — required when store is provided.
         player_role: "p1" or "p2" — required when store is provided.

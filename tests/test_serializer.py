@@ -215,6 +215,7 @@ def test_serialize_battle_structure() -> None:
         "opponent_active", "opponent_team",
         "opponent_team_size_seen",
         "available_moves", "available_switches", "force_switch",
+        "can_tera",
         "heuristics",
         "opponent_threat_map",
         "recent_events",
@@ -263,6 +264,7 @@ def test_serialize_battle_light_omits_decision_context() -> None:
         "opponent_active", "opponent_team",
         "opponent_team_size_seen",
         "available_moves", "available_switches", "force_switch",
+        "can_tera",
         "heuristics", "opponent_threat_map", "recent_events",
     }
     assert expected_keys == set(result.keys())
