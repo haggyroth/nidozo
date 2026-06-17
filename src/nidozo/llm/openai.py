@@ -1,6 +1,7 @@
 """OpenAI-compatible backend — covers OpenAI cloud and local LM Studio."""
 
 import logging
+import time
 from typing import Any
 
 import openai
@@ -83,7 +84,16 @@ class OpenAIBackend:
             # or text (json_object → 400); OpenAI cloud enforces the shape.
             kwargs["response_format"] = _ACTION_JSON_SCHEMA
 
+        if logger.isEnabledFor(logging.DEBUG):
+            prompt_text = "\n---\n".join(
+                f"[{m['role']}]\n{m.get('content', '')}" for m in messages
+            )
+            logger.debug("LLM prompt to %s:\n%s", self._model, prompt_text)
+
+        t0 = time.monotonic()
         response = await self._client.chat.completions.create(**kwargs)
+        elapsed = time.monotonic() - t0
+
         msg = response.choices[0].message
         content = msg.content or ""
 
@@ -99,6 +109,24 @@ class OpenAIBackend:
                 )
                 content = reasoning
 
+        usage = getattr(response, "usage", None)
+        if usage:
+            logger.info(
+                "%s — prompt=%d completion=%d tokens, %.1fs",
+                self._model,
+                getattr(usage, "prompt_tokens", 0),
+                getattr(usage, "completion_tokens", 0),
+                elapsed,
+                extra={
+                    "model": self._model,
+                    "prompt_tokens": getattr(usage, "prompt_tokens", 0),
+                    "completion_tokens": getattr(usage, "completion_tokens", 0),
+                    "elapsed_s": round(elapsed, 2),
+                },
+            )
+        else:
+            logger.info("%s — %.1fs (no usage data)", self._model, elapsed)
+
         if not content:
             finish = getattr(response.choices[0], "finish_reason", "unknown")
             logger.warning(
@@ -107,5 +135,7 @@ class OpenAIBackend:
                 self._model,
                 finish,
             )
+        elif logger.isEnabledFor(logging.DEBUG):
+            logger.debug("LLM response from %s:\n%s", self._model, content)
 
         return content
