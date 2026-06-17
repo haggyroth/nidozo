@@ -11,6 +11,22 @@
   </head>
   <body>
     <div id="root"></div>
+    <!-- Set the theme before paint to avoid a flash of the wrong palette.
+         Mirrors the resolution logic in src/hooks/useTheme.js. -->
+    <script>
+      (function () {
+        try {
+          var t = localStorage.getItem('nidozo-theme');
+          if (t !== 'light' && t !== 'dark') {
+            t = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches
+              ? 'light' : 'dark';
+          }
+          document.documentElement.setAttribute('data-theme', t);
+        } catch (e) {
+          document.documentElement.setAttribute('data-theme', 'dark');
+        }
+      })();
+    </script>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

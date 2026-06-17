@@ -228,10 +228,10 @@
 
 ### UI & Visualisation
 
-**UI/UX Overhaul**
-- Visual design pass across all pages: typography hierarchy, spacing system, animation polish
-- Mobile-responsive layout (currently desktop-only)
-- Dark/light theme toggle persisted to `localStorage`
+**UI/UX Overhaul** (in progress — phased)
+- ✅ Dark/light theme toggle persisted to `localStorage` (Phase 1 — shipped)
+- Mobile-responsive layout (currently desktop-only) — Phase 2
+- Visual design pass across all pages: typography hierarchy, spacing system, animation polish — Phase 3
 
 ---
 

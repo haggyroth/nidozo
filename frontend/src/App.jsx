@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import './styles/main.css'
 import Leaderboard from './components/Leaderboard'
 import BattleField from './components/BattleField'
+import ThemeToggle from './components/ThemeToggle'
 import { TournamentBar, WinnerBanner, TournamentEndOverlay } from './components/battleChrome'
 import { BadgeToastStack } from './components/battleShared'
 import BattleReplay from './components/BattleReplay'
@@ -184,6 +185,7 @@ function App() {
               SCORES
             </button>
           )}
+          <ThemeToggle />
         </nav>
       </header>
 
