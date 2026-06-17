@@ -9,6 +9,23 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.33.0] — 2026-06-17
+
+### Changed
+- **Classic view retired** — `BattleField.jsx` deleted; the Showdown cockpit is
+  now the only live battle renderer. The battle-view toggle, its `localStorage`
+  state, and `CLASSIC` / `SHOWDOWN` buttons are removed from `App.jsx`.
+- **Showdown cockpit parity additions before retirement**: turn counter
+  (`TURN N` / `READY`), weather badge, doubles `2v2` badge, and the Nidozo
+  `BattleLog` (filterable structured action log) are now rendered inside the
+  cockpit. BattleLog + PS protocol log sit in a new `.sbs-bottom` two-column
+  grid at the foot of the scene.
+- **`PokemonCard`**: `compact` prop removed (was doubles-only in Classic);
+  `BenchSlot` unexported (internal use only).
+- **CSS**: ~120 lines of Classic-only rules removed.
+
+---
+
 ## [0.32.0] — 2026-06-17
 
 ### Added
