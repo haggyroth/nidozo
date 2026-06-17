@@ -209,6 +209,7 @@ def test_serialize_battle_structure() -> None:
     result = serialize_battle(battle)
 
     expected_keys = {
+        "is_doubles",
         "turn", "format", "weather", "fields",
         "my_side_conditions", "opponent_side_conditions",
         "my_active", "my_team",
@@ -258,6 +259,7 @@ def test_serialize_battle_light_omits_decision_context() -> None:
 
     # Same top-level shape as the full serializer (stable contract for the UI)…
     expected_keys = {
+        "is_doubles",
         "turn", "format", "weather", "fields",
         "my_side_conditions", "opponent_side_conditions",
         "my_active", "my_team",

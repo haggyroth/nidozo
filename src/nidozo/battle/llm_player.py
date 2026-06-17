@@ -10,7 +10,7 @@ import time
 from collections.abc import Callable, Coroutine
 from typing import TYPE_CHECKING, Any
 
-from poke_env.battle import AbstractBattle
+from poke_env.battle import AbstractBattle, DoubleBattle
 from poke_env.player import Player
 from poke_env.player.battle_order import BattleOrder
 
@@ -116,10 +116,13 @@ class LLMPlayer(Player):
     async def choose_move(
         self, battle: AbstractBattle, *, state: dict[str, Any] | None = None
     ) -> BattleOrder:
-        # Recharge turn (e.g. after Hyper Beam): only one forced pseudo-move, skip LLM
-        moves = battle.available_moves
-        if len(moves) == 1 and moves[0].id == "recharge":
-            return self.create_order(moves[0])
+        # Recharge turn (e.g. after Hyper Beam): only one forced pseudo-move, skip LLM.
+        # Singles only — DoubleBattle.available_moves is a list-of-lists, so this
+        # single-move shortcut doesn't apply (poke-env handles forced doubles moves).
+        if not isinstance(battle, DoubleBattle):
+            moves = battle.available_moves
+            if len(moves) == 1 and moves[0].id == "recharge":
+                return self.create_order(moves[0])
 
         logger.info(
             "[%s] deciding turn %d",
@@ -288,6 +291,12 @@ class LLMPlayer(Player):
         if not prev_hp or battle.turn <= 1:
             return list(recent_events)
 
+        # Doubles state has list-shaped active fields; the detailed singles
+        # diffing below assumes a single active dict. Use a simpler HP-delta
+        # summary across all visible mons for doubles.
+        if isinstance(battle, DoubleBattle):
+            return self._build_recent_events_doubles(battle, state, prev_hp, recent_events)
+
         lines: list[str] = []
 
         prev_snap: dict[str, dict[str, Any]] = getattr(self, "_prev_snapshot", {})
@@ -379,47 +388,71 @@ class LLMPlayer(Player):
 
         return list(recent_events)
 
+    def _build_recent_events_doubles(
+        self,
+        battle: DoubleBattle,
+        state: dict[str, Any],
+        prev_hp: dict[str, float],
+        recent_events: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        """Doubles HP-delta summary across both active slots per side.
+
+        Simpler than the singles diff: report which active Pokémon took or
+        recovered HP last turn, for both sides, keyed by species.
+        """
+        lines: list[str] = []
+        last_action = getattr(self, "_last_action_display", None)
+        if last_action:
+            lines.append(f"Your action: {last_action}")
+
+        def _delta_line(species: str, curr: float, key: str, side: str) -> None:
+            prev = prev_hp.get(key)
+            if prev is not None and abs(curr - prev) > 0.01:
+                delta_pct = (curr - prev) * 100
+                direction = (
+                    f"took ~{abs(delta_pct):.0f}% damage" if delta_pct < 0
+                    else f"recovered ~{delta_pct:.0f}% HP"
+                )
+                lines.append(f"{side} {species.title()} {direction} (now {curr * 100:.0f}%)")
+
+        for slot in (state.get("my_active") or []):
+            if slot:
+                _delta_line(slot["species"], slot["hp_fraction"], slot["species"], "Your")
+        for slot in (state.get("opponent_active") or []):
+            if slot:
+                key = f"opp_{slot['species']}"
+                _delta_line(slot["species"], slot["hp_fraction"], key, "Opponent's")
+
+        if lines:
+            recent_events.append({"turn": battle.turn - 1, "lines": lines})
+            trimmed = recent_events[-_MAX_RECENT_EVENTS:]
+            self._recent_events = trimmed
+            return list(trimmed)
+        return list(recent_events)
+
     def _update_hp_snapshot(self, battle: AbstractBattle) -> None:
-        """Snapshot current HP fractions and state (status/item/ability) for all visible mons."""
+        """Snapshot current HP fractions and state (status/item/ability) for all visible mons.
+
+        Iterates the full team rosters (active + bench) so it works identically
+        for singles and doubles — no reliance on the single-vs-list shape of
+        ``battle.active_pokemon``.
+        """
         hp_snap: dict[str, float] = {}
         state_snap: dict[str, dict[str, Any]] = {}
+
+        def _snap(mon: Any, key: str) -> None:
+            hp_snap[key] = mon.current_hp_fraction
+            state_snap[key] = {
+                "status": mon.status.name if mon.status else None,
+                "item": mon.item,
+                "ability": mon.ability,
+            }
+
         try:
-            if battle.active_pokemon:
-                mon = battle.active_pokemon
-                key = mon.species
-                hp_snap[key] = mon.current_hp_fraction
-                state_snap[key] = {
-                    "status": mon.status.name if mon.status else None,
-                    "item": mon.item,
-                    "ability": mon.ability,
-                }
             for mon in battle.team.values():
-                if not mon.active:
-                    key = mon.species
-                    hp_snap[key] = mon.current_hp_fraction
-                    state_snap[key] = {
-                        "status": mon.status.name if mon.status else None,
-                        "item": mon.item,
-                        "ability": mon.ability,
-                    }
-            if battle.opponent_active_pokemon:
-                mon = battle.opponent_active_pokemon
-                key = f"opp_{mon.species}"
-                hp_snap[key] = mon.current_hp_fraction
-                state_snap[key] = {
-                    "status": mon.status.name if mon.status else None,
-                    "item": mon.item,
-                    "ability": mon.ability,
-                }
+                _snap(mon, mon.species)
             for mon in battle.opponent_team.values():
-                if not mon.active:
-                    key = f"opp_{mon.species}"
-                    hp_snap[key] = mon.current_hp_fraction
-                    state_snap[key] = {
-                        "status": mon.status.name if mon.status else None,
-                        "item": mon.item,
-                        "ability": mon.ability,
-                    }
+                _snap(mon, f"opp_{mon.species}")
         except Exception:  # noqa: BLE001
             pass
         self._prev_hp = hp_snap

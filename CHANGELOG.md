@@ -7,6 +7,30 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+- **Doubles battles (2v2)** — full decision-layer support for 2v2 with target
+  selection. `StartBattleRequest.doubles=true` runs a Showdown doubles format
+  (random → `gen9randomdoublesbattle`; non-random → NatDex Doubles) and forces
+  the new **prompt v7**.
+  - **Serializer**: `serialize_battle` routes `DoubleBattle` to a doubles state
+    shape — `my_active`/`opponent_active` are per-slot lists, `force_switch` and
+    `can_tera` are lists, `available_moves`/`available_switches` are per-slot
+    lists-of-lists, and `is_doubles` is on every state.
+  - **Action parser**: parses a doubles JSON `actions` array (one entry per
+    active slot) with an optional `target` field (`foe_1`/`foe_2`/`ally`/`self`),
+    resolving each into a `SingleBattleOrder` (validated against
+    `get_possible_showdown_targets`) combined into a `DoubleBattleOrder`.
+    Handles spread/self moves (no target), `pass` for empty slots, and invalid
+    targets (falls back to a legal one).
+  - **Heuristics**: `score_doubles_actions` scores both slots, adds per-move
+    targeting metadata (spread-foes / hits-ally-too / choose-foe / self-or-ally),
+    flags spread moves that damage your own ally, and notes partner-relevant
+    coverage vs the second foe.
+  - **Prompt v7**: doubles-aware system prompt (spread moves, focus fire,
+    partner synergy, target field) plus a dedicated `turn_doubles.txt.jinja`
+    template; `PromptBuilder` selects it when the state is doubles.
+  - 13 new doubles tests covering parser, heuristics, and serializer.
+
 ---
 
 ## [0.25.0] — 2026-06-10

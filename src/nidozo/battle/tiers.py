@@ -230,6 +230,39 @@ _TIER_POOLS: dict[str, frozenset[str] | None] = {
     "freeforall": None,
 }
 
+# ---------------------------------------------------------------------------
+# Doubles (2v2) format mapping — used when a battle is started with doubles=True
+# ---------------------------------------------------------------------------
+
+# Random doubles needs no team data (Showdown auto-generates). Non-random tiers
+# map to NatDex Doubles; Ubers/free-for-all use the most permissive doubles
+# ruleset so our broad pools validate.
+TIER_TO_DOUBLES_FORMAT: Final[dict[str, str]] = {
+    "ubers":      "gen9nationaldexdoublesubers",
+    "ou":         "gen9nationaldexdoubles",
+    "uu":         "gen9nationaldexdoubles",
+    "lc":         "gen9nationaldexdoubles",
+    "freeforall": "gen9nationaldexdoublesubers",
+}
+
+DOUBLES_RANDOM_FORMAT: Final[str] = "gen9randomdoublesbattle"
+
+
+def resolve_format(tier: str, *, doubles: bool = False) -> str:
+    """Return the Showdown format string for a tier and singles/doubles mode.
+
+    Random tier maps to the random (auto-team) format; other tiers map to the
+    NatDex format for the chosen mode. Preset handling is the caller's job —
+    presets force their own singles AG format upstream.
+    """
+    if doubles:
+        if tier == "random":
+            return DOUBLES_RANDOM_FORMAT
+        return TIER_TO_DOUBLES_FORMAT.get(tier, "gen9nationaldexdoublesubers")
+    if tier == "random":
+        return "gen9randombattle"
+    return TIER_TO_FORMAT.get(tier, "gen9nationaldexag")
+
 
 # ---------------------------------------------------------------------------
 # Public helpers
