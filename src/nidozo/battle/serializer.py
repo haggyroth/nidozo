@@ -16,10 +16,10 @@ from __future__ import annotations
 
 from typing import Any
 
-from poke_env.battle import AbstractBattle, Move, Pokemon
+from poke_env.battle import AbstractBattle, DoubleBattle, Move, Pokemon
 from poke_env.data.gen_data import GenData
 
-from nidozo.battle.heuristics import score_actions
+from nidozo.battle.heuristics import score_actions, score_doubles_actions
 
 
 def _species_name(mon: Pokemon) -> str:
@@ -50,8 +50,10 @@ def _species_name(mon: Pokemon) -> str:
 def serialize_battle(battle: AbstractBattle, *, light: bool = False) -> dict[str, Any]:
     """Return a structured dict representing the current battle state.
 
-    The returned dict is safe to render into either player's prompt — it
-    encodes perspective-correct information for the player whose turn it is.
+    Routes to doubles serialization automatically when the battle is a
+    ``DoubleBattle``.  The returned dict is safe to render into either
+    player's prompt — it encodes perspective-correct information for the
+    player whose turn it is.
 
     Args:
         light: When True, return a *render-only* snapshot: every field needed
@@ -65,7 +67,15 @@ def serialize_battle(battle: AbstractBattle, *, light: bool = False) -> dict[str
             Used for zero-lag ``state_update`` events (OP-01); the frontend
             preserves the last full turn's advisory when it merges these in.
     """
+    if isinstance(battle, DoubleBattle):
+        return _serialize_doubles_battle(battle, light=light)
+    return _serialize_singles_battle(battle, light=light)
+
+
+def _serialize_singles_battle(battle: AbstractBattle, *, light: bool = False) -> dict[str, Any]:
+    """Serialize a singles (1v1) battle state."""
     state: dict[str, Any] = {
+        "is_doubles": False,
         "turn": battle.turn,
         "format": battle.format,
         "weather": _serialize_weather(battle),
@@ -108,6 +118,90 @@ def serialize_battle(battle: AbstractBattle, *, light: bool = False) -> dict[str
     state["available_moves"] = [_serialize_move(m) for m in battle.available_moves]
     state["available_switches"] = [_species_name(p) for p in battle.available_switches]
     state["heuristics"] = score_actions(battle)
+    state["opponent_threat_map"] = _compute_threat_map(battle)
+    return state
+
+
+def _serialize_doubles_battle(battle: DoubleBattle, *, light: bool = False) -> dict[str, Any]:
+    """Serialize a doubles (2v2) battle state.
+
+    The state shape differs from singles:
+    - ``my_active`` / ``opponent_active``: list of up to 2 Pokémon dicts
+      (one per slot), each with a ``slot`` key (0 or 1).
+    - ``force_switch``: list of 2 booleans.
+    - ``can_tera``: list of 2 booleans.
+    - ``available_moves`` / ``available_switches``: two lists (per slot).
+    """
+    # Doubles has two active Pokémon per side (either may be None if only one remains)
+    my_active_list = battle.active_pokemon  # List[Optional[Pokemon]]
+    opp_active_list = battle.opponent_active_pokemon  # List[Optional[Pokemon]]
+    force_switch = list(battle.force_switch)  # List[bool], len 2
+    can_tera_list = list(getattr(battle, "can_tera", [False, False]))  # List[bool]
+
+    # Bench = team members that aren't active in either slot
+    active_ids = {id(p) for p in my_active_list if p is not None}
+    my_bench = [
+        _serialize_own_pokemon(p)
+        for p in battle.team.values()
+        if id(p) not in active_ids
+    ]
+    opp_active_ids = {id(p) for p in opp_active_list if p is not None}
+    opp_bench = [
+        _serialize_opponent_pokemon(p)
+        for p in battle.opponent_team.values()
+        if id(p) not in opp_active_ids
+    ]
+
+    my_active_serialized = [
+        {**(_serialize_own_pokemon(p) or {}), "slot": i}
+        if p is not None else None
+        for i, p in enumerate(my_active_list)
+    ]
+    opp_active_serialized = [
+        {**(_serialize_opponent_pokemon(p) or {}), "slot": i}
+        if p is not None else None
+        for i, p in enumerate(opp_active_list)
+    ]
+
+    state: dict[str, Any] = {
+        "is_doubles": True,
+        "turn": battle.turn,
+        "format": battle.format,
+        "weather": _serialize_weather(battle),
+        "fields": _serialize_fields(battle),
+        "my_side_conditions": _serialize_side_conditions(battle.side_conditions),
+        "opponent_side_conditions": _serialize_side_conditions(
+            battle.opponent_side_conditions
+        ),
+        "my_active": my_active_serialized,
+        "my_team": my_bench,
+        "opponent_active": opp_active_serialized,
+        "opponent_team": opp_bench,
+        "opponent_team_size_seen": len(battle.opponent_team),
+        "force_switch": force_switch,
+        "can_tera": can_tera_list,
+        "recent_events": [],
+    }
+
+    if light:
+        state["available_moves"] = [[], []]
+        state["available_switches"] = [[], []]
+        state["heuristics"] = None
+        state["opponent_threat_map"] = []
+        return state
+
+    # available_moves / switches are per-slot lists-of-lists in DoubleBattle
+    raw_moves: list[list[Move]] = battle.available_moves
+    raw_switches: list[list[Pokemon]] = battle.available_switches
+    state["available_moves"] = [
+        [_serialize_move(m) for m in slot_moves]
+        for slot_moves in raw_moves
+    ]
+    state["available_switches"] = [
+        [_species_name(p) for p in slot_switches]
+        for slot_switches in raw_switches
+    ]
+    state["heuristics"] = score_doubles_actions(battle)
     state["opponent_threat_map"] = _compute_threat_map(battle)
     return state
 

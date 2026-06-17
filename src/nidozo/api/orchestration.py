@@ -99,16 +99,25 @@ async def run_battles(
     """Run one or more battles sequentially as a background task."""
     from poke_env import LocalhostServerConfiguration
 
-    from nidozo.battle.tiers import TIER_TO_FORMAT
+    from nidozo.battle.tiers import resolve_format
 
-    do_draft = req.tier != "random" and req.draft and not (req.p1_preset or req.p2_preset)
     use_preset = bool(req.p1_preset or req.p2_preset)
+    # Doubles is incompatible with drafted/preset teams in this cut (those team
+    # builders are singles-only), so doubles takes priority and disables draft.
+    doubles = bool(getattr(req, "doubles", False)) and not use_preset
+    do_draft = (
+        not doubles
+        and req.tier != "random"
+        and req.draft
+        and not use_preset
+    )
     showdown_format = (
         PRESET_FORMAT if use_preset
-        else "gen9randombattle" if req.tier == "random"
-        else TIER_TO_FORMAT.get(req.tier, "gen9nationaldexag")
+        else resolve_format(req.tier, doubles=doubles)
     )
-    effective_prompt = "v3" if do_draft else req.prompt_version
+    # Doubles requires the v7 prompt (it carries the 2v2 turn template); draft
+    # uses v3; otherwise honour the request.
+    effective_prompt = "v7" if doubles else ("v3" if do_draft else req.prompt_version)
     cfg = LocalhostServerConfiguration
 
     for battle_id in battle_ids:

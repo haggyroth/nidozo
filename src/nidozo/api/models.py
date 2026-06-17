@@ -12,7 +12,7 @@ from pydantic import BaseModel, Field
 Provider = Literal["random", "anthropic", "openai", "lmstudio"]
 # Coaches must be a real LLM backend — "random" has no coach implementation.
 CoachProvider = Literal["anthropic", "openai", "lmstudio"]
-PromptVersion = Literal["v1", "v2", "v3", "v4", "v5", "v6"]
+PromptVersion = Literal["v1", "v2", "v3", "v4", "v5", "v6", "v7"]
 # Exactly the tiers the backend supports (is_valid_tier / _TIER_POOLS + random).
 Tier = Literal["random", "ou", "ubers", "uu", "lc", "freeforall"]
 TournamentFormat = Literal["round_robin", "single_elim", "double_elim"]
@@ -35,6 +35,10 @@ class StartBattleRequest(BaseModel):
     n_battles: int = Field(1, ge=1, le=50)
     tier: Tier = "random"
     draft: bool = False    # If True and tier != "random", run LLM draft phase first
+    # Doubles (2v2): when True, the battle uses a Showdown doubles format with
+    # target selection. Random tier → gen9randomdoublesbattle (no team data
+    # needed); non-random tiers → NatDex Doubles. Presets are singles-only.
+    doubles: bool = False
     # Optional coach model per player (None = no coach)
     p1_coach_provider: CoachProvider | None = None
     p1_coach_model: str | None = None

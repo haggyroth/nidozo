@@ -205,6 +205,14 @@
 - **Competitive event annotations** (#176): per-turn history now surfaces status applied/cured (burn, paralysis, sleep, poison, toxic, freeze — own and opponent), item consumed (own, e.g. Focus Sash activated), opponent item/ability revealed on first observation, and priority bracket note on any opponent move with non-zero priority; `_update_hp_snapshot` extended to snapshot status/item/ability alongside HP; `_build_recent_events` diffs snapshots to generate human-readable annotation lines
 - **Structured JSON logging** (#177): `configure_logging()` now called automatically in `create_app()` so logs are active on every startup; `LOG_LEVEL` env var controls verbosity (default `INFO`, set `DEBUG` for full traces); `LOG_FILE` env var mirrors all records to disk; `_JsonFormatter` emits `extra={}` fields as top-level JSON keys (structured `battle_id`, `player`, `turn`, `action`, `elapsed_s`, `prompt_tokens`, `completion_tokens`); per-turn INFO trace in `LLMPlayer` (`[p1] deciding turn 4` → `[p1] turn 4 → thunderbolt (2.3s)`); LM Studio / OpenAI backend logs token usage + latency at INFO and full prompt + response at DEBUG; `httpx`/`httpcore` loggers enabled at DEBUG to expose raw HTTP traffic to LM Studio
 
+### v0.30 — Doubles Battles (2v2, decision layer)
+- **2v2 with target selection**: `StartBattleRequest.doubles=true` runs a Showdown doubles format — random → `gen9randomdoublesbattle` (auto-generated teams), non-random tiers → NatDex Doubles via new `resolve_format()` / `TIER_TO_DOUBLES_FORMAT` in `tiers.py`. Doubles forces prompt **v7** and disables draft/preset (singles-only team builders)
+- **Serializer**: `serialize_battle` routes `DoubleBattle` to a doubles state shape — `my_active`/`opponent_active` are per-slot lists (with a `slot` index), `force_switch`/`can_tera` are lists, `available_moves`/`available_switches` are per-slot lists-of-lists; every state carries `is_doubles`
+- **Action parser extended for `target`**: doubles JSON is an `actions` array (one entry per active slot), each with an optional `target` (`foe_1`/`foe_2`/`ally`/`self`); resolved per slot into `SingleBattleOrder`s (validated against `get_possible_showdown_targets`) and combined into a `DoubleBattleOrder`. Handles spread/self moves (no target), `pass` for empty slots, and invalid-target fallback
+- **Heuristics for spread moves & partner synergy**: `score_doubles_actions` scores both slots and tags each move with targeting metadata (spread-foes / hits-ally-too / choose-foe / self-or-ally), flags spread moves that also hit your own ally, and notes coverage vs the second foe
+- **Prompt v7**: doubles-aware system prompt (spread moves, focus fire, partner synergy, target field) + dedicated `turn_doubles.txt.jinja`; `PromptBuilder` auto-selects it when `is_doubles`
+- 13 new doubles tests (parser/heuristics/serializer); singles unaffected (858 tests green)
+
 ---
 
 ## Upcoming
@@ -235,14 +243,13 @@
 - Expose team size as a configurable battle option alongside tier and format
 - Action parser and serializer updates for different team sizes
 
-**Doubles Battles**
-- 2v2 format with target selection
-- Prompt and action parser extended for `target` field
-- Heuristic engine updated for spread moves and partner synergy
+**Doubles Battles — frontend & extensions** (decision layer shipped — see v0.30 under Completed)
+- Battlefield visualizer: render two active Pokémon per side with per-slot target arrows
+- Doubles for drafted/preset teams (current cut is random + auto-generated NatDex Doubles teams)
+- Doubles tournaments and seasons (currently single battles only)
 
 **Deeper Competitive Features**
 - Speed tier display: annotate whether each switch candidate moves before/after the opponent (extend existing speed note from heuristic advisory into the bench summary)
-- Doubles support: 2v2 format with target selection; prompt and action parser extended for `target` field
 
 ---
 

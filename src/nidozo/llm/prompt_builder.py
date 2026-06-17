@@ -41,6 +41,14 @@ class PromptBuilder:
             lstrip_blocks=True,
         )
         self._turn_template = self._jinja_env.get_template("turn.txt.jinja")
+        # Optional doubles turn template — present only in versions that support
+        # 2v2 (v7+). When a battle state has is_doubles=True and this template
+        # exists, build_turn renders it instead of the singles template.
+        doubles_path = self._version_dir / "turn_doubles.txt.jinja"
+        self._turn_doubles_template = (
+            self._jinja_env.get_template("turn_doubles.txt.jinja")
+            if doubles_path.is_file() else None
+        )
 
     def build_system(
         self,
@@ -67,7 +75,12 @@ class PromptBuilder:
         return Message(role="system", content=content)
 
     def build_turn(self, battle_state: dict[str, Any]) -> Message:
-        rendered = self._turn_template.render(**battle_state)
+        # Doubles battles render a distinct template (two active slots, target
+        # field) when the version provides one; otherwise fall back to singles.
+        if battle_state.get("is_doubles") and self._turn_doubles_template is not None:
+            rendered = self._turn_doubles_template.render(**battle_state)
+        else:
+            rendered = self._turn_template.render(**battle_state)
         return Message(role="user", content=rendered)
 
     def build_messages(
