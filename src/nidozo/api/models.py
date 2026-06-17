@@ -57,7 +57,7 @@ class StartBattleRequest(BaseModel):
     p2_preset: PresetSlug | None = None
 
     @model_validator(mode="after")
-    def validate_team_size_constraints(self) -> "StartBattleRequest":
+    def validate_team_size_constraints(self) -> StartBattleRequest:
         if (self.p1_preset or self.p2_preset) and self.team_size != 6:
             raise ValueError("Preset teams are fixed 6-mon rosters — team_size must be 6 when using presets")
         return self
