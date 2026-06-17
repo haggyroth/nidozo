@@ -9,6 +9,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.34.0] — 2026-06-17
+
+### Added
+- **`GET /api/personalities`** — live persona list from backend (`slug`, `display_name`, `description`, `emoji`). `emoji` field added to `Personality` dataclass; backend is now the single source of truth.
+- **`GET /api/stats/personalities`** — per-slug win/loss/tie counts and win-rate % across all completed battles; `store.get_personality_stats()` aggregates across both player slots via UNION ALL.
+- **GlobalStats: Play Style Win Rates panel** — W/L/T segment bar + win-rate % per persona, fetched in parallel with global stats.
+- **25 new tests**: `tests/test_personalities.py` (registry consistency, lookup edge cases) and 9 additions to `test_prompt_builder.py` (injection, ordering, all 5 personas parametrised).
+- **`BattleForm`**: fetches `/api/personalities` on mount — hardcoded list removed. Selector shows selected persona description below the dropdown.
+
+---
+
 ## [0.33.0] — 2026-06-17
 
 ### Changed

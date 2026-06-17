@@ -220,6 +220,14 @@
 - **`PlayerHeuristicPanels`** shared helper in `battleShared.jsx` keeps both views in sync; `.doubles-heuristic-stack` CSS container keeps per-slot drawers in a single grid cell
 - 939 tests green
 
+### v0.34 — Personality Profiles: Gap Fill (#196)
+- **`GET /api/personalities`** — backend is now the single source of truth for persona metadata; `emoji` field added to `Personality` dataclass
+- **`GET /api/stats/personalities`** — per-slug win/loss/tie counts and win-rate % across all completed battles
+- **GlobalStats: Play Style Win Rates panel** — W/L/T segment bar + win-rate % per persona
+- **`BattleForm`** fetches `/api/personalities` on mount; hardcoded list removed; selector shows persona description on selection
+- **25 new tests**: `test_personalities.py` (registry consistency, lookup edge cases) + 9 additions to `test_prompt_builder.py` (injection, ordering, all 5 personas parametrised)
+- 967 tests green
+
 ### v0.33 — Classic View Retirement
 - **Showdown cockpit is now the sole live battle renderer** — `BattleField.jsx` deleted; the Classic card-based arena is fully retired
 - **Cockpit parity features added before retirement**: turn counter (`TURN N` / `READY`), weather badge, 2v2 doubles badge, and Nidozo structured `BattleLog` (filterable action log) now all appear in the Showdown cockpit
