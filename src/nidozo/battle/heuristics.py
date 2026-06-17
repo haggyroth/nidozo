@@ -346,7 +346,9 @@ def _battle_context(
             ctx["phase"] = "endgame_last_vs_last"
         elif own_remaining <= 2 or opp_remaining <= 2:
             ctx["phase"] = "late"
-        elif own_remaining + opp_remaining <= 6:
+        elif own_remaining + opp_remaining <= len(battle.team):
+            # Midgame when fewer than half the total Pokémon remain (scales with team size:
+            # ≤6 for 6v6, ≤4 for 4v4, ≤3 for 3v3). battle.team is the full roster.
             ctx["phase"] = "midgame"
         else:
             ctx["phase"] = "early"

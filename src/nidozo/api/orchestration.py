@@ -73,19 +73,19 @@ def _bracket_advance_slot(
     return 1 if p1_seed < p2_seed else 2
 
 
-def _random_preset_team(tier: str) -> str:
-    """Build a random 6-Pokémon team string from the tier's preset pool.
+def _random_preset_team(tier: str, team_size: int = 6) -> str:
+    """Build a random team string of *team_size* Pokémon from the tier's pool.
 
     Used when a non-random tier battle is started with *draft=False* — the
-    format (e.g. gen3ubers) requires a real team, but no draft was run.
-    Each player gets a fresh random selection so they aren't mirror teams.
+    format requires a real team, but no draft was run.  Each player gets a
+    fresh random selection so they aren't mirror teams.
     """
     from nidozo.battle.team_builder import all_species, build_team_string, load_movesets
     from nidozo.battle.tiers import get_pool
 
     movesets = load_movesets()
     pool = get_pool(tier, all_species(movesets))
-    picks = random.sample(pool, min(6, len(pool)))
+    picks = random.sample(pool, min(team_size, len(pool)))
     return build_team_string(picks, movesets)
 
 
@@ -105,6 +105,7 @@ async def run_battles(
     # Doubles is incompatible with drafted/preset teams in this cut (those team
     # builders are singles-only), so doubles takes priority and disables draft.
     doubles = bool(getattr(req, "doubles", False)) and not use_preset
+    team_size: int = getattr(req, "team_size", 6)
     do_draft = (
         not doubles
         and req.tier != "random"
@@ -113,7 +114,7 @@ async def run_battles(
     )
     showdown_format = (
         PRESET_FORMAT if use_preset
-        else resolve_format(req.tier, doubles=doubles)
+        else resolve_format(req.tier, doubles=doubles, team_size=team_size)
     )
     # Doubles requires the v7 prompt (it carries the 2v2 turn template); draft
     # uses v3; otherwise honour the request.
@@ -159,7 +160,7 @@ async def run_battles(
                     "battle_id": battle_id,
                 })
                 p1_backend = _build_backend(req.p1_provider, p1_model)
-                p1_draft = await run_draft_phase(p1_backend, p1_id, req.tier, store, bus, "p1")
+                p1_draft = await run_draft_phase(p1_backend, p1_id, req.tier, store, bus, "p1", team_size=team_size)
                 p1_team = p1_draft["team_string"]
                 p1_team_id = p1_draft["team_id"]
 
@@ -171,7 +172,7 @@ async def run_battles(
                     "battle_id": battle_id,
                 })
                 p2_backend = _build_backend(req.p2_provider, p2_model)
-                p2_draft = await run_draft_phase(p2_backend, p2_id, req.tier, store, bus, "p2")
+                p2_draft = await run_draft_phase(p2_backend, p2_id, req.tier, store, bus, "p2", team_size=team_size)
                 p2_team = p2_draft["team_string"]
                 p2_team_id = p2_draft["team_id"]
 
@@ -180,8 +181,8 @@ async def run_battles(
             elif req.tier != "random" and not use_preset:
                 # Non-random format requires a real team even when draft was
                 # skipped and no preset was given.
-                p1_team = p1_team or _random_preset_team(req.tier)
-                p2_team = p2_team or _random_preset_team(req.tier)
+                p1_team = p1_team or _random_preset_team(req.tier, team_size)
+                p2_team = p2_team or _random_preset_team(req.tier, team_size)
 
             p1 = _build_streaming_player(
                 req.p1_provider, p1_model, "p1",
@@ -288,14 +289,15 @@ async def run_tournament(
     """Run all battles in a tournament sequentially as a background task."""
     from poke_env import LocalhostServerConfiguration
 
-    from nidozo.battle.tiers import TIER_TO_FORMAT
+    from nidozo.battle.tiers import resolve_format
 
     any_preset = any(ps.get("preset") for ps in player_specs)
+    team_size: int = getattr(req, "team_size", 6)
+    doubles: bool = getattr(req, "doubles", False)
     do_draft = req.tier != "random" and req.draft and not any_preset
     showdown_format = (
         PRESET_FORMAT if any_preset
-        else "gen9randombattle" if req.tier == "random"
-        else TIER_TO_FORMAT.get(req.tier, "gen9nationaldexag")
+        else resolve_format(req.tier, doubles=doubles, team_size=team_size)
     )
     effective_prompt = "v3" if do_draft else req.prompt_version
     cfg = LocalhostServerConfiguration
@@ -407,7 +409,7 @@ async def run_tournament(
                 })
                 p1_backend = _build_backend(t_p1_prov, battle_info["p1_model"])
                 p1_draft_r = await run_draft_phase(
-                    p1_backend, t_p1_id, req.tier, store, bus, "p1"
+                    p1_backend, t_p1_id, req.tier, store, bus, "p1", team_size=team_size
                 )
                 t_p1_team = p1_draft_r["team_string"]
                 t_p1_team_id = p1_draft_r["team_id"]
@@ -422,7 +424,7 @@ async def run_tournament(
                 })
                 p2_backend = _build_backend(t_p2_prov, battle_info["p2_model"])
                 p2_draft_r = await run_draft_phase(
-                    p2_backend, t_p2_id, req.tier, store, bus, "p2"
+                    p2_backend, t_p2_id, req.tier, store, bus, "p2", team_size=team_size
                 )
                 t_p2_team = p2_draft_r["team_string"]
                 t_p2_team_id = p2_draft_r["team_id"]
@@ -430,8 +432,8 @@ async def run_tournament(
             if do_draft:
                 store.set_battle_teams(battle_id, t_p1_team_id, t_p2_team_id, req.tier)
             elif req.tier != "random" and not any_preset:
-                t_p1_team = t_p1_team or _random_preset_team(req.tier)
-                t_p2_team = t_p2_team or _random_preset_team(req.tier)
+                t_p1_team = t_p1_team or _random_preset_team(req.tier, team_size)
+                t_p2_team = t_p2_team or _random_preset_team(req.tier, team_size)
 
             t_p1_coach_prov, t_p1_coach_model = coach_lookup.get(
                 (t_p1_prov, battle_info["p1_model"]), (None, None)
@@ -560,6 +562,7 @@ async def run_draft_phase(
     store: Any,
     bus: Any,
     player_role: str,
+    team_size: int = 6,
 ) -> dict[str, Any]:
     """Run the draft for one player and return {team_string, team_id}."""
     from nidozo.battle.draft import run_draft
@@ -572,6 +575,7 @@ async def run_draft_phase(
         bus=bus,
         player_role=player_role,
         prompt_version="v3",
+        team_size=team_size,
     )
     return {"team_string": result.team_string, "team_id": result.team_id}
 
@@ -1048,14 +1052,15 @@ async def run_season(
     """Run all battles in a season sequentially as a background task."""
     from poke_env import LocalhostServerConfiguration
 
-    from nidozo.battle.tiers import TIER_TO_FORMAT
+    from nidozo.battle.tiers import resolve_format
 
     any_preset = any(ps.get("preset") for ps in player_specs)
+    team_size: int = getattr(req, "team_size", 6)
+    doubles: bool = getattr(req, "doubles", False)
     do_draft = req.tier != "random" and req.draft and not any_preset
     showdown_format = (
         PRESET_FORMAT if any_preset
-        else "gen9randombattle" if req.tier == "random"
-        else TIER_TO_FORMAT.get(req.tier, "gen9nationaldexag")
+        else resolve_format(req.tier, doubles=doubles, team_size=team_size)
     )
     effective_prompt = "v3" if do_draft else req.prompt_version
     cfg = LocalhostServerConfiguration
@@ -1167,7 +1172,7 @@ async def run_season(
                 })
                 p1_backend = _build_backend(s_p1_prov, battle_info["p1_model"])
                 p1_draft_r = await run_draft_phase(
-                    p1_backend, s_p1_id, req.tier, store, bus, "p1"
+                    p1_backend, s_p1_id, req.tier, store, bus, "p1", team_size=team_size
                 )
                 s_p1_team = p1_draft_r["team_string"]
                 s_p1_team_id = p1_draft_r["team_id"]
@@ -1182,7 +1187,7 @@ async def run_season(
                 })
                 p2_backend = _build_backend(s_p2_prov, battle_info["p2_model"])
                 p2_draft_r = await run_draft_phase(
-                    p2_backend, s_p2_id, req.tier, store, bus, "p2"
+                    p2_backend, s_p2_id, req.tier, store, bus, "p2", team_size=team_size
                 )
                 s_p2_team = p2_draft_r["team_string"]
                 s_p2_team_id = p2_draft_r["team_id"]
@@ -1190,8 +1195,8 @@ async def run_season(
             if do_draft:
                 store.set_battle_teams(battle_id, s_p1_team_id, s_p2_team_id, req.tier)
             elif req.tier != "random" and not any_preset:
-                s_p1_team = s_p1_team or _random_preset_team(req.tier)
-                s_p2_team = s_p2_team or _random_preset_team(req.tier)
+                s_p1_team = s_p1_team or _random_preset_team(req.tier, team_size)
+                s_p2_team = s_p2_team or _random_preset_team(req.tier, team_size)
 
             s_p1_coach_prov, s_p1_coach_model = coach_lookup.get(
                 (s_p1_prov, battle_info["p1_model"]), (None, None)

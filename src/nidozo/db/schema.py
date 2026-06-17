@@ -2,7 +2,7 @@
 
 import sqlite3
 
-SCHEMA_VERSION = 14
+SCHEMA_VERSION = 15
 
 # Table definitions only — safe to run against any DB version via IF NOT EXISTS.
 # Indexes are kept separate because they may reference columns (e.g. tournament_id)
@@ -67,7 +67,8 @@ CREATE TABLE IF NOT EXISTS battles (
     finished_at     TEXT,
     narrative       TEXT,   -- LLM-generated post-battle story (NULL until generated)
     p1_personality  TEXT,   -- play-style persona slug for p1 (NULL = no persona)
-    p2_personality  TEXT    -- play-style persona slug for p2 (NULL = no persona)
+    p2_personality  TEXT,   -- play-style persona slug for p2 (NULL = no persona)
+    team_size       INTEGER NOT NULL DEFAULT 6   -- 3, 4, or 6
 );
 
 -- ELO delta per model per battle (for history / audit)
@@ -414,4 +415,15 @@ def migrate(conn: sqlite3.Connection) -> None:
             CREATE INDEX IF NOT EXISTS idx_badges_model ON badges(model_id, earned_at);
         """)
         conn.execute("UPDATE schema_version SET version=14")
+        conn.commit()
+
+    if version < 15:
+        # Add team_size column to battles for audit / filtering by format variant.
+        try:
+            conn.execute(
+                "ALTER TABLE battles ADD COLUMN team_size INTEGER NOT NULL DEFAULT 6"
+            )
+        except sqlite3.OperationalError:
+            pass  # column already exists
+        conn.execute("UPDATE schema_version SET version=15")
         conn.commit()

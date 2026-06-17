@@ -384,6 +384,8 @@ function BattleForm({ onBattleStarted, lmModels, lmLoading }) {
     n_battles: 1,
     tier: 'random',
     draft: false,
+    doubles: false,
+    team_size: 6,
   })
 
   useEffect(() => {
@@ -423,7 +425,8 @@ function BattleForm({ onBattleStarted, lmModels, lmLoading }) {
       // Preset — omit if none selected; presets override draft
       if (!body.p1_preset) delete body.p1_preset
       if (!body.p2_preset) delete body.p2_preset
-      if (body.p1_preset || body.p2_preset) body.draft = false
+      if (body.p1_preset || body.p2_preset) { body.draft = false; body.team_size = 6 }
+      body.team_size = Number(body.team_size)
       const res = await fetch('/api/battles/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -512,6 +515,40 @@ function BattleForm({ onBattleStarted, lmModels, lmLoading }) {
           />
         </div>
       )}
+      <div className="form-group form-group--inline">
+        <label className="form-label">Doubles (2v2 per turn)</label>
+        <input
+          type="checkbox"
+          className="form-checkbox"
+          checked={form.doubles}
+          onChange={e => setForm(f => ({
+            ...f,
+            doubles: e.target.checked,
+            // Reset to a valid team_size for the new mode
+            team_size: e.target.checked ? 6 : 6,
+          }))}
+        />
+      </div>
+      <div className="form-group">
+        <label className="form-label">Team size</label>
+        <select
+          className="form-select"
+          value={form.team_size}
+          onChange={e => setForm(f => ({ ...f, team_size: Number(e.target.value) }))}
+        >
+          {form.doubles ? (
+            <>
+              <option value={6}>6v6 (bring 6, use 2)</option>
+              <option value={4}>4v4 — VGC style (bring 4, use 2)</option>
+            </>
+          ) : (
+            <>
+              <option value={6}>6v6 — standard</option>
+              <option value={3}>3v3 — compact</option>
+            </>
+          )}
+        </select>
+      </div>
       <div className="form-group">
         <label className="form-label">Number of battles</label>
         <input

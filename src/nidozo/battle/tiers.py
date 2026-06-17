@@ -6,10 +6,21 @@ eliminates per-generation legality maintenance and lets Showdown validate teams
 automatically.
 
 Showdown format strings used:
-  gen9randombattle    — random tier (Showdown auto-generates teams, no data needed)
-  gen9nationaldexag   — freeforall / ubers (NatDex Anything Goes, no ban list)
-  gen9nationaldex     — ou (NatDex OU bans applied)
-  gen9nationaldexlc   — lc (NatDex Little Cup)
+  gen9randombattle           — random tier (Showdown auto-generates teams, no data needed)
+  gen9nationaldexag          — freeforall / ubers (NatDex Anything Goes, no ban list)
+  gen9nationaldex            — ou (NatDex OU bans applied)
+  gen9nationaldexlc          — lc (NatDex Little Cup)
+
+3v3 / 4v4 custom formats (require a locally patched Showdown server):
+  gen9nationaldex3v3         — 3-mon NatDex OU
+  gen9nationaldexag3v3       — 3-mon NatDex AG
+  gen9nationaldexlc3v3       — 3-mon NatDex LC
+  gen9nationaldexdoubles4v4  — 4-mon NatDex Doubles
+  gen9nationaldexdoublesubers4v4 — 4-mon NatDex Doubles Ubers
+
+  Add these to your local Pokémon Showdown server's config/formats.ts using:
+    { name: "NatDex 3v3", format: "gen9nationaldex3v3", teamSize: 3 }
+  etc. — see ROADMAP for the exact snippets.
 
 Tier pools are sourced from Showdown's factory-sets.json (competitive Gen 9 tiers).
 ``freeforall`` has no restriction — the pool is everything in natdex_movesets.json.
@@ -211,6 +222,24 @@ TIER_TO_FORMAT: Final[dict[str, str]] = {
     "freeforall": "gen9nationaldexag",   # most permissive; full natdex_movesets pool
 }
 
+# 3v3 singles formats (custom — require local Showdown server config)
+TIER_TO_3V3_FORMAT: Final[dict[str, str]] = {
+    "ubers":      "gen9nationaldexag3v3",
+    "ou":         "gen9nationaldex3v3",
+    "uu":         "gen9nationaldex3v3",
+    "lc":         "gen9nationaldexlc3v3",
+    "freeforall": "gen9nationaldexag3v3",
+}
+
+# 4v4 doubles formats (custom — bring 4, use 2 per turn; requires local Showdown server config)
+TIER_TO_DOUBLES_4V4_FORMAT: Final[dict[str, str]] = {
+    "ubers":      "gen9nationaldexdoublesubers4v4",
+    "ou":         "gen9nationaldexdoubles4v4",
+    "uu":         "gen9nationaldexdoubles4v4",
+    "lc":         "gen9nationaldexdoubles4v4",
+    "freeforall": "gen9nationaldexdoublesubers4v4",
+}
+
 # Display names shown in the frontend
 TIER_DISPLAY: Final[dict[str, str]] = {
     "ubers":      "Ubers (NatDex AG)",
@@ -248,19 +277,24 @@ TIER_TO_DOUBLES_FORMAT: Final[dict[str, str]] = {
 DOUBLES_RANDOM_FORMAT: Final[str] = "gen9randomdoublesbattle"
 
 
-def resolve_format(tier: str, *, doubles: bool = False) -> str:
-    """Return the Showdown format string for a tier and singles/doubles mode.
+def resolve_format(tier: str, *, doubles: bool = False, team_size: int = 6) -> str:
+    """Return the Showdown format string for a tier, mode, and team size.
 
-    Random tier maps to the random (auto-team) format; other tiers map to the
-    NatDex format for the chosen mode. Preset handling is the caller's job —
-    presets force their own singles AG format upstream.
+    Random tier always maps to the standard random format regardless of team_size
+    (Showdown auto-generates those teams, so our team_size is irrelevant).
+    Custom 3v3/4v4 format strings require the local Showdown server to have the
+    corresponding format definitions — see module docstring for setup instructions.
     """
     if doubles:
         if tier == "random":
             return DOUBLES_RANDOM_FORMAT
+        if team_size == 4:
+            return TIER_TO_DOUBLES_4V4_FORMAT.get(tier, "gen9nationaldexdoublesubers4v4")
         return TIER_TO_DOUBLES_FORMAT.get(tier, "gen9nationaldexdoublesubers")
     if tier == "random":
         return "gen9randombattle"
+    if team_size == 3:
+        return TIER_TO_3V3_FORMAT.get(tier, "gen9nationaldexag3v3")
     return TIER_TO_FORMAT.get(tier, "gen9nationaldexag")
 
 
