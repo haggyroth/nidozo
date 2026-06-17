@@ -6334,3 +6334,69 @@ body::after {
 .badge-toast-close:hover {
   color: var(--text-bright);
 }
+
+/* ============================================================
+   RESPONSIVE — Phase 2 of the UI/UX overhaul
+   The app shipped desktop-only. This consolidated block makes the shared
+   chrome (header, nav, panels, tables, the fixed Showdown stage) usable on
+   tablet and phone widths. Component-specific stacking (home/arena/stats
+   grids) lives in the per-component @media blocks above; this covers the
+   global layout and the gaps those didn't.
+   ============================================================ */
+
+/* ---- Tablet & down ---- */
+@media (max-width: 768px) {
+  .app-shell { padding: 0 1rem 3rem; }
+
+  /* Header: stack the logo above a full-width, wrapping nav. */
+  .app-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.85rem;
+    padding: 1rem 0 0.85rem;
+    margin-bottom: 1.5rem;
+  }
+  .app-nav {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
+  /* Push the theme toggle to the end of the nav row. */
+  .theme-toggle { margin-left: auto; }
+
+  .panel { padding: 1rem; }
+
+  /* Wide data tables scroll horizontally instead of forcing the page wider. */
+  .leaderboard-table,
+  .mm-table,
+  .ts-standings-table,
+  .ts-battle-table,
+  .stats-battle-table,
+  .ms-h2h-table {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Fixed-size Showdown scene (640×360) scrolls within its wrapper. */
+  .sbs-stage-scroll {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+/* ---- Phone ---- */
+@media (max-width: 480px) {
+  .app-shell { padding: 0 0.75rem 2.5rem; }
+  .app-logo { font-size: 0.72rem; }
+  .nav-btn { padding: 0.5rem 0.7rem; }
+  .panel { padding: 0.85rem; }
+
+  /* Tabs/segmented controls wrap rather than overflow. */
+  .lb-tier-tabs,
+  .form-tabs,
+  .ts-tabs { flex-wrap: wrap; }
+}
+
+/* The Showdown scroll wrapper is full-width so its inner fixed stage can scroll. */
+.sbs-stage-scroll { width: 100%; }

@@ -154,18 +154,23 @@ export default function ShowdownBattleScene({ room, p1State, p2State, battleInfo
         </div>
       </div>
 
-      <div className="sbs-stage">
-        {/* PS Battle class draws the animated scene into this div. */}
-        <div ref={frameRef} className="sbs-frame" />
+      {/* Scroll wrapper: the PS scene is a fixed 640×360 canvas, so on narrow
+          viewports it scrolls horizontally inside this wrapper rather than
+          forcing the whole page wider. */}
+      <div className="sbs-stage-scroll">
+        <div className="sbs-stage">
+          {/* PS Battle class draws the animated scene into this div. */}
+          <div ref={frameRef} className="sbs-frame" />
 
-        {/* Overlay: only visible when not yet live or after the battle ends. */}
-        {status !== 'live' && (
-          <div className={`sbs-status-overlay sbs-status-overlay--${status}`}>
-            {status === 'connecting' && 'Connecting to battle room…'}
-            {status === 'ended'      && 'Battle ended.'}
-            {status === 'error'      && 'Connection error — try refreshing.'}
-          </div>
-        )}
+          {/* Overlay: only visible when not yet live or after the battle ends. */}
+          {status !== 'live' && (
+            <div className={`sbs-status-overlay sbs-status-overlay--${status}`}>
+              {status === 'connecting' && 'Connecting to battle room…'}
+              {status === 'ended'      && 'Battle ended.'}
+              {status === 'error'      && 'Connection error — try refreshing.'}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Win-probability panel (HP-ratio based) — hidden until state arrives. */}
