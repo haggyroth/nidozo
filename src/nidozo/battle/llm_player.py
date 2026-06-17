@@ -6,6 +6,7 @@ import asyncio
 import json
 import logging
 import os
+import time
 from collections.abc import Callable, Coroutine
 from typing import TYPE_CHECKING, Any
 
@@ -120,6 +121,12 @@ class LLMPlayer(Player):
         if len(moves) == 1 and moves[0].id == "recharge":
             return self.create_order(moves[0])
 
+        logger.info(
+            "[%s] deciding turn %d",
+            self._player_role, battle.turn,
+            extra={"player": self._player_role, "turn": battle.turn, "battle_id": self._battle_id},
+        )
+
         # serialize_battle runs the full heuristic engine (damage formulas, type
         # chart, switch scoring). The streaming subclass already computes one
         # snapshot for its WS events and passes it in, so we reuse it rather than
@@ -160,11 +167,13 @@ class LLMPlayer(Player):
             personality=self._personality,
         )
         response: str | None = None
+        _extra = {"player": self._player_role, "turn": battle.turn, "battle_id": self._battle_id}
 
         # Call the LLM with one retry. Each attempt is bounded by a per-turn
         # timeout so a hung backend can't stall the battle. The fallback reason
         # records *why* we fell back (backend_timeout / backend_error /
         # empty_response / parse_failure) so analysis can tell them apart.
+        _t0 = time.monotonic()
         for attempt in range(2):
             try:
                 if self._turn_timeout is not None:
@@ -175,8 +184,9 @@ class LLMPlayer(Player):
                     response = await self._backend.complete(messages)
             except TimeoutError:
                 logger.error(
-                    "LLM backend timed out on turn %d (attempt %d, %.0fs)",
-                    battle.turn, attempt + 1, self._turn_timeout,
+                    "[%s] turn %d LLM timed out (attempt %d, %.0fs limit)",
+                    self._player_role, battle.turn, attempt + 1, self._turn_timeout,
+                    extra=_extra,
                 )
                 if attempt == 1:
                     self._log_turn(battle.turn, None, False, None, state_json, coach_advice,
@@ -184,7 +194,11 @@ class LLMPlayer(Player):
                     return self.choose_random_move(battle)
                 continue
             except Exception as exc:
-                logger.error("LLM backend error on turn %d (attempt %d): %s", battle.turn, attempt + 1, exc)
+                logger.error(
+                    "[%s] turn %d LLM error (attempt %d): %s",
+                    self._player_role, battle.turn, attempt + 1, exc,
+                    extra=_extra,
+                )
                 if attempt == 1:
                     self._log_turn(battle.turn, None, False, None, state_json, coach_advice,
                                    fallback_reason="backend_error")
@@ -196,31 +210,47 @@ class LLMPlayer(Player):
 
             if attempt == 0:
                 logger.warning(
-                    "Empty response from LLM on turn %d — retrying once.", battle.turn
+                    "[%s] turn %d empty LLM response — retrying once",
+                    self._player_role, battle.turn,
+                    extra=_extra,
                 )
+
+        _elapsed = time.monotonic() - _t0
 
         if not response:
             logger.warning(
-                "LLM returned empty response on turn %d after retry — falling back to random.",
-                battle.turn,
+                "[%s] turn %d empty LLM response after retry — falling back to random",
+                self._player_role, battle.turn,
+                extra=_extra,
             )
             self._log_turn(battle.turn, None, False, "", state_json, coach_advice,
                            fallback_reason="empty_response")
             return self.choose_random_move(battle)
 
+        if logger.isEnabledFor(logging.DEBUG):
+            logger.debug(
+                "[%s] turn %d raw LLM response:\n%s",
+                self._player_role, battle.turn, response,
+                extra=_extra,
+            )
+
         order = parse_action(response, battle, self)
         if order is None:
             logger.warning(
-                "Action parse failed on turn %d — falling back to random move.\n"
-                "Response was:\n%s",
-                battle.turn,
-                response,
+                "[%s] turn %d parse failed — falling back to random (response: %r)",
+                self._player_role, battle.turn, response[:200],
+                extra=_extra,
             )
             self._log_turn(battle.turn, None, False, response, state_json, coach_advice,
                            fallback_reason="parse_failure")
             return self.choose_random_move(battle)
 
         action_label = getattr(order, "message", str(order))
+        logger.info(
+            "[%s] turn %d → %s (%.1fs)",
+            self._player_role, battle.turn, action_label, _elapsed,
+            extra={**_extra, "action": action_label, "elapsed_s": round(_elapsed, 2)},
+        )
         self._log_turn(battle.turn, action_label, True, response, state_json, coach_advice)
         # Store for next turn's battle history summary
         self._last_action_display = self._action_display(response)

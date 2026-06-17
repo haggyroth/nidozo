@@ -12,6 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from nidozo import __version__
 from nidozo.api.events import EventBus
 from nidozo.api.lifespan import create_lifespan
+from nidozo.api.logging_config import configure_logging
 from nidozo.api.middleware import add_cors
 from nidozo.api.routes import create_router
 from nidozo.api.ws import create_ws_router
@@ -23,6 +24,7 @@ _FRONTEND_DIST = Path(__file__).parent.parent.parent.parent / "frontend" / "dist
 
 
 def create_app(db_path: Path = _DB_PATH) -> FastAPI:
+    configure_logging()
     bus = EventBus()
     store = BattleStore(db_path)
     active_tasks: dict[int, asyncio.Task[None]] = {}
