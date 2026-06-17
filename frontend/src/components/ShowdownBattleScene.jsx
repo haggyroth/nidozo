@@ -21,7 +21,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useShowdownBundle } from '../hooks/useShowdownBundle'
-import { WinProbBar, PlayerLabel, HeuristicDrawer, ThinkingBadge, PersonalityChip, PresetBadge } from './battleShared'
+import { WinProbBar, PlayerLabel, PlayerHeuristicPanels, ThinkingBadge, PersonalityChip, PresetBadge } from './battleShared'
 import { BattleBadges, CancelBattleButton } from './battleChrome'
 
 /** Strip the room-prefix line and proxy keepalive; return bare |...| lines. */
@@ -183,18 +183,10 @@ export default function ShowdownBattleScene({ room, p1State, p2State, battleInfo
         />
       </div>
 
-      {/* Heuristic advisory — one drawer per player, each from its own state. */}
+      {/* Heuristic advisory — per player, doubles-aware (two drawers per player). */}
       <div className="sbs-heuristics">
-        <HeuristicDrawer
-          heuristics={p1State?.state?.heuristics}
-          moves={p1State?.state?.available_moves}
-          label={`${p1Short} HEURISTICS`}
-        />
-        <HeuristicDrawer
-          heuristics={p2State?.state?.heuristics}
-          moves={p2State?.state?.available_moves}
-          label={`${p2Short} HEURISTICS`}
-        />
+        <PlayerHeuristicPanels state={p1State?.state} label={p1Short} />
+        <PlayerHeuristicPanels state={p2State?.state} label={p2Short} />
       </div>
 
       <div ref={logRef} className="sbs-log" />
