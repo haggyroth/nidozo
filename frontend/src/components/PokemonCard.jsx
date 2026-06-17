@@ -107,7 +107,7 @@ function StatusBadge({ status }) {
   return <span className={`status-badge status-${label}`}>{label}</span>
 }
 
-export function BenchSlot({ mon }) {
+function BenchSlot({ mon }) {
   const tooltip = useTooltip()
   if (!mon) return <div className="bench-slot empty" />
   const url = spriteUrl(mon.species)
@@ -180,7 +180,7 @@ function MoveList({ moves }) {
   )
 }
 
-export default function PokemonCard({ mon, side, isOpponent = false, isThinking = false, bench = [], compact = false }) {
+export default function PokemonCard({ mon, side, isOpponent = false, isThinking = false, bench = [] }) {
   // ---- Tooltip ----
   const tooltip = useTooltip()
 
@@ -221,7 +221,7 @@ export default function PokemonCard({ mon, side, isOpponent = false, isThinking 
   // ---- Empty card ----
   if (!mon) {
     return (
-      <div className={`pokemon-card ${side} empty${compact ? ' compact' : ''}`}>
+      <div className={`pokemon-card ${side} empty`}>
         <div className="card-empty-label">waiting…</div>
         {isThinking && (
           <div className="thinking-dots standalone">
@@ -243,7 +243,7 @@ export default function PokemonCard({ mon, side, isOpponent = false, isThinking 
   return (
     <>
     <div
-      className={`pokemon-card ${side}${isThinking ? ' is-thinking' : ''}${compact ? ' compact' : ''} ${animClass}`}
+      className={`pokemon-card ${side}${isThinking ? ' is-thinking' : ''} ${animClass}`}
       style={{ background: bg, ...accentStyle }}
       onMouseEnter={tooltip.onEnter}
       onMouseLeave={tooltip.onLeave}
@@ -251,7 +251,7 @@ export default function PokemonCard({ mon, side, isOpponent = false, isThinking 
       {/* Sprite — shake animation attaches here */}
       <PokemonSprite
         species={mon.species}
-        size={compact ? 64 : 88}
+        size={88}
         isThinking={isThinking}
         animClass={animClass === 'card-hit' ? 'sprite-shake' : ''}
       />

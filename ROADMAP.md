@@ -220,6 +220,14 @@
 - **`PlayerHeuristicPanels`** shared helper in `battleShared.jsx` keeps both views in sync; `.doubles-heuristic-stack` CSS container keeps per-slot drawers in a single grid cell
 - 939 tests green
 
+### v0.33 — Classic View Retirement
+- **Showdown cockpit is now the sole live battle renderer** — `BattleField.jsx` deleted; the Classic card-based arena is fully retired
+- **Cockpit parity features added before retirement**: turn counter (`TURN N` / `READY`), weather badge, 2v2 doubles badge, and Nidozo structured `BattleLog` (filterable action log) now all appear in the Showdown cockpit
+- **Nidozo BattleLog + PS protocol log** rendered side-by-side in a new `.sbs-bottom` two-column grid at the foot of the cockpit
+- **App simplification**: battle-view toggle state, `localStorage` read/write, and `CLASSIC` / `SHOWDOWN` toggle buttons removed from `App.jsx`
+- **PokemonCard cleanup**: `compact` prop and `BenchSlot` export removed (Classic-only)
+- **CSS**: ~120 lines of Classic-only rules removed (`.battlefield-wrapper`, `.battle-header`, `.turn-counter`, `.arena-player-col`, `.doubles-pair`, `.pokemon-card.compact`, `.battle-view-toggle`, `.bvt-btn*`)
+
 ---
 
 ## Upcoming
@@ -244,10 +252,6 @@
   near-duplicate values) snapped onto a 13-step `--fs-*` token scale for a
   clean, centrally tunable hierarchy; `prefers-reduced-motion` support added
   across the 28 animations
-
-**Classic view retirement** (planned)
-- Remove the Classic card-based arena and make Showdown the only live view;
-  the Classic code reached its final state at v0.32
 
 ---
 

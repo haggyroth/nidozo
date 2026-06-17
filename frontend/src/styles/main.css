@@ -501,27 +501,8 @@ body::after {
 .winner-tie { color: var(--text-dim); }
 
 /* ============================================================
-   BATTLEFIELD
+   WEATHER BADGE (shared: Classic retired, Showdown cockpit)
    ============================================================ */
-.battlefield-wrapper {
-  display: flex;
-  flex-direction: column;
-  gap: 1.25rem;
-}
-
-.battle-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.turn-counter {
-  font-family: var(--font-pixel);
-  font-size: var(--fs-sm);
-  color: var(--accent-cyan);
-  letter-spacing: 0.1em;
-}
-
 .weather-badge {
   font-size: var(--fs-xl);
   padding: 0.3rem 0.75rem;
@@ -529,11 +510,6 @@ body::after {
   border: 1px solid rgba(100,150,255,0.3);
   border-radius: var(--radius-sm);
   color: #90b4ff;
-}
-
-.battle-status-text {
-  font-size: var(--fs-xl);
-  color: var(--text-dim);
 }
 
 /* Win-probability bar */
@@ -1524,12 +1500,6 @@ body::after {
 }
 
 /* ---- Thinking badge in header ---- */
-.battle-header-center {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
-
 .thinking-badge {
   display: flex;
   align-items: center;
@@ -1883,14 +1853,8 @@ body::after {
 }
 
 /* ============================================================
-   CANCEL BUTTON (battlefield header)
+   CANCEL BUTTON
    ============================================================ */
-.battle-header-right {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 0.35rem;
-}
 .btn-cancel-battle {
   background: none;
   border: 1px solid rgba(255,68,85,0.35);
@@ -4828,37 +4792,7 @@ body::after {
 .rng-crit { color: #ffd700; font-weight: 600; }
 .rng-miss  { color: var(--text-dim); font-weight: 600; }
 
-/* ---- Arena player column wrappers ---- */
-.arena-player-col {
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-  min-width: 0;
-}
-
-/* ---- Doubles: two active cards side-by-side within each player column ---- */
-.doubles-pair {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.4rem;
-}
-
-/* Compact card variant for doubles — less padding, tighter layout */
-.pokemon-card.compact {
-  padding: 0.65rem 0.7rem;
-  min-height: 150px;
-}
-.pokemon-card.compact .card-body { gap: 0.25rem; }
-.pokemon-card.compact .pokemon-name {
-  font-size: var(--fs-sm);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 8rem;
-}
-.pokemon-card.compact .own-moves { display: none; } /* hide moves list in compact view */
-
-/* Doubles badge in battle header */
+/* Doubles badge in battle header / cockpit */
 .doubles-badge {
   font-family: var(--font-pixel);
   font-size: var(--fs-xs);
@@ -4868,11 +4802,6 @@ body::after {
   border-radius: 3px;
   padding: 0.15rem 0.4rem;
   letter-spacing: 0.05em;
-}
-
-/* Responsive: stack doubles pairs vertically on very narrow screens */
-@media (max-width: 480px) {
-  .doubles-pair { grid-template-columns: 1fr; }
 }
 
 /* Doubles heuristic stack: slot 0 and slot 1 drawers stacked vertically
@@ -6116,6 +6045,14 @@ body::after {
 .sbs-status-chip--ended { color: var(--accent-amber); }
 .sbs-status-chip--error { color: var(--accent-red); }
 
+.sbs-turn-counter {
+  font-family: var(--font-pixel);
+  font-size: var(--fs-xs);
+  color: var(--accent-cyan);
+  letter-spacing: 0.1em;
+  flex-shrink: 0;
+}
+
 /* Win-probability panel — sits between the stage and the log. */
 .sbs-winprob {
   padding: var(--space-sm) var(--space-md);
@@ -6189,6 +6126,21 @@ body::after {
   color: var(--text-secondary);
 }
 
+/* Bottom row: Nidozo structured action log + raw PS protocol log */
+.sbs-bottom {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1px;
+  background: var(--border);
+  border-top: 1px solid var(--border);
+}
+.sbs-bottom > * { background: var(--bg-panel); }
+/* On narrow viewports stack the two logs vertically */
+@media (max-width: 900px) { .sbs-bottom { grid-template-columns: 1fr; } }
+/* When rendered inside sbs-bottom the log's own border-top is redundant */
+.sbs-bottom > .sbs-log { border-top: none; min-height: 160px; max-height: 260px; }
+.sbs-bottom > .battle-log-panel { min-height: 160px; max-height: 260px; }
+
 .sbs-placeholder {
   padding: 2rem;
   text-align: center;
@@ -6217,41 +6169,6 @@ body::after {
 .sbs-status-overlay--ended      { color: #ffc800; }
 .sbs-status-overlay--error      { color: #ff4444; }
 
-/* ── Battle view toggle (Classic / Showdown) ─────────────────────────────── */
-
-.battle-view-toggle {
-  display: flex;
-  gap: 0.25rem;
-  padding: 0.5rem 1rem;
-  border-bottom: 1px solid var(--border);
-  background: var(--bg-panel);
-}
-
-.bvt-btn {
-  font-family: var(--font-pixel);
-  font-size: var(--fs-xs);
-  padding: 0.35rem 0.9rem;
-  background: transparent;
-  border: 1px solid var(--border);
-  color: var(--text-dim);
-  cursor: pointer;
-  border-radius: var(--radius-sm);
-  transition: all var(--transition);
-  letter-spacing: 0.05em;
-}
-
-.bvt-btn:hover {
-  border-color: var(--accent-cyan);
-  color: var(--accent-cyan);
-  background: rgba(0,221,255,0.06);
-}
-
-.bvt-btn.active {
-  border-color: var(--accent-cyan);
-  color: var(--accent-cyan);
-  background: rgba(0,221,255,0.1);
-  box-shadow: 0 0 8px rgba(0,221,255,0.15);
-}
 
 /* ── Achievements & Badges ───────────────────────────────────────────────── */
 
