@@ -7,6 +7,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Changed
+- **Dependabot** — added `.github/dependabot.yml` for weekly automated dependency
+  updates across three ecosystems: `uv` (Python, root `pyproject.toml`/`uv.lock`),
+  `npm` (`frontend/`), and `github-actions` (pinned workflow actions). Minor/patch
+  bumps are grouped per ecosystem to reduce PR noise; majors open individual PRs.
+
 ### Added
 - **Doubles battles (2v2)** — full decision-layer support for 2v2 with target
   selection. `StartBattleRequest.doubles=true` runs a Showdown doubles format

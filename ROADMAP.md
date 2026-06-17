@@ -264,4 +264,4 @@
 - **Tier 3 (partial)** — `pytest.mark.integration` infrastructure is in place; `test_ws_showdown_integration.py` covers the spectator proxy. Still needed: integration tests for `battle/orchestration.py` and `llm/draft.py`; dedicated CI job that starts the Showdown server
 
 **Infrastructure**
-- Dependabot for Python and npm dependency updates
+- ~~Dependabot for Python and npm dependency updates~~ — shipped (weekly `uv` / `npm` / `github-actions` updates via `.github/dependabot.yml`)
