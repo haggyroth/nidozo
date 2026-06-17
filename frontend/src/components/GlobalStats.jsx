@@ -1,4 +1,4 @@
-import { useEffect, useReducer } from 'react'
+import { useEffect, useReducer, useState } from 'react'
 import EmptyState from './EmptyState'
 
 // ---------------------------------------------------------------------------
@@ -197,6 +197,51 @@ function TopMoves({ top_moves }) {
 }
 
 // ---------------------------------------------------------------------------
+// Personality win-rate breakdown
+// ---------------------------------------------------------------------------
+
+const PERSONALITY_META = {
+  aggressive: { emoji: '⚔️', label: 'All-out Attacker' },
+  defensive:  { emoji: '🛡️', label: 'Bulwark' },
+  balanced:   { emoji: '⚖️', label: 'Adaptive' },
+  trickster:  { emoji: '🎭', label: 'Mindgame Specialist' },
+  momentum:   { emoji: '💨', label: 'Tempo Player' },
+}
+
+function PersonalityStats({ personality_stats }) {
+  if (!personality_stats?.length) return (
+    <EmptyState compact icon="🎭" title="No personality data yet" hint="Run battles with a play style set to see win-rate breakdowns." />
+  )
+  return (
+    <div className="gs-personality-list">
+      {personality_stats.map(r => {
+        const meta = PERSONALITY_META[r.personality] ?? { emoji: '❓', label: r.personality }
+        const winPct  = r.total > 0 ? Math.round((r.wins  / r.total) * 100) : 0
+        const lossPct = r.total > 0 ? Math.round((r.losses / r.total) * 100) : 0
+        const tiePct  = r.total > 0 ? Math.round((r.ties  / r.total) * 100) : 0
+        return (
+          <div key={r.personality} className="gs-personality-row">
+            <span className="gs-personality-emoji">{meta.emoji}</span>
+            <div className="gs-personality-info">
+              <span className="gs-personality-name">{meta.label}</span>
+              <div className="gs-personality-bar-wrap">
+                <div className="gs-personality-segment gs-pseg-win"  style={{ width: `${winPct}%`  }} title={`${r.wins} wins`} />
+                <div className="gs-personality-segment gs-pseg-loss" style={{ width: `${lossPct}%` }} title={`${r.losses} losses`} />
+                <div className="gs-personality-segment gs-pseg-tie"  style={{ width: `${tiePct}%`  }} title={`${r.ties} ties`} />
+              </div>
+              <span className="gs-personality-rate">
+                {r.win_rate != null ? `${r.win_rate}% WR` : '—'}
+              </span>
+            </div>
+            <span className="gs-personality-total">{r.total} battles</span>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Recent battles feed
 // ---------------------------------------------------------------------------
 
@@ -256,13 +301,21 @@ export default function GlobalStats({ onClose, onReplaySelected }) {
     reducer,
     { loading: true, error: null, data: null },
   )
+  const [personalityStats, setPersonalityStats] = useState(null)
 
   useEffect(() => {
     let cancelled = false
     dispatch({ type: 'start' })
-    fetch('/api/stats/global')
-      .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json() })
-      .then(d => { if (!cancelled) dispatch({ type: 'success', data: d }) })
+    Promise.all([
+      fetch('/api/stats/global').then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json() }),
+      fetch('/api/stats/personalities').then(r => r.ok ? r.json() : []).catch(() => []),
+    ])
+      .then(([global, personalities]) => {
+        if (!cancelled) {
+          dispatch({ type: 'success', data: global })
+          setPersonalityStats(personalities)
+        }
+      })
       .catch(e => { if (!cancelled) dispatch({ type: 'error', error: e.message }) })
     return () => { cancelled = true }
   }, [])
@@ -335,6 +388,15 @@ export default function GlobalStats({ onClose, onReplaySelected }) {
           <span className="panel-subtitle">most chosen across all models</span>
         </div>
         <TopMoves top_moves={top_moves} />
+      </div>
+
+      {/* Personality win-rate breakdown */}
+      <div className="panel stats-panel">
+        <div className="panel-title">
+          PLAY STYLE WIN RATES
+          <span className="panel-subtitle">battles where that personality was active (as either player)</span>
+        </div>
+        <PersonalityStats personality_stats={personalityStats} />
       </div>
     </div>
   )

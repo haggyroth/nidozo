@@ -15,6 +15,7 @@ class Personality:
     slug: str
     display_name: str
     description: str  # one-line summary shown in the UI
+    emoji: str        # single emoji shown in the UI selector
     prompt_block: str  # injected into the system prompt
 
 
@@ -25,6 +26,7 @@ PERSONALITIES: dict[str, Personality] = {
             slug="aggressive",
             display_name="All-out Attacker",
             description="Maximum damage every turn — pressure the opponent into bad decisions.",
+            emoji="⚔️",
             prompt_block=(
                 "## Your Play Style: All-out Attacker\n"
                 "You play to destroy. Offense is your best defense.\n"
@@ -39,6 +41,7 @@ PERSONALITIES: dict[str, Personality] = {
             slug="defensive",
             display_name="Bulwark",
             description="Survive, outlast, and win through attrition.",
+            emoji="🛡️",
             prompt_block=(
                 "## Your Play Style: Bulwark\n"
                 "You play to outlast. Your priority is not dying.\n"
@@ -53,6 +56,7 @@ PERSONALITIES: dict[str, Personality] = {
             slug="balanced",
             display_name="Adaptive",
             description="Situational reads — offense or defense based on what the battle demands.",
+            emoji="⚖️",
             prompt_block=(
                 "## Your Play Style: Adaptive\n"
                 "You adapt to what each turn demands.\n"
@@ -67,6 +71,7 @@ PERSONALITIES: dict[str, Personality] = {
             slug="trickster",
             display_name="Mindgame Specialist",
             description="Unconventional plays, status moves, and prediction-breaking choices.",
+            emoji="🎭",
             prompt_block=(
                 "## Your Play Style: Mindgame Specialist\n"
                 "You play to surprise. Predictability is your only real weakness.\n"
@@ -81,6 +86,7 @@ PERSONALITIES: dict[str, Personality] = {
             slug="momentum",
             display_name="Tempo Player",
             description="Never give a free turn — control the pace and punish passivity.",
+            emoji="💨",
             prompt_block=(
                 "## Your Play Style: Tempo Player\n"
                 "You play to control the pace. Never give your opponent a free turn.\n"

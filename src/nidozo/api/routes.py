@@ -85,6 +85,25 @@ def create_router(
         """Aggregate stats across all battles and models."""
         return store.get_global_stats()
 
+    @router.get("/api/stats/personalities")
+    def get_personality_stats() -> list[dict[str, Any]]:
+        """Win/loss/tie counts per personality slug across all completed battles."""
+        return store.get_personality_stats()
+
+    @router.get("/api/personalities")
+    def list_personalities() -> list[dict[str, Any]]:
+        """Return all available play-style personas for the battle form."""
+        from nidozo.battle.personalities import PERSONALITIES
+        return [
+            {
+                "slug":         p.slug,
+                "display_name": p.display_name,
+                "description":  p.description,
+                "emoji":        p.emoji,
+            }
+            for p in PERSONALITIES.values()
+        ]
+
     @router.get("/api/leaderboard")
     def get_leaderboard(grouped: bool = True, tier: str | None = None) -> list[dict[str, Any]]:
         return store.leaderboard(grouped=grouped, tier=tier)

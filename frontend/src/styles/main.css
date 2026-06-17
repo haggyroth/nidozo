@@ -1727,6 +1727,13 @@ body::after {
   width: 100%;
 }
 
+.personality-description {
+  font-size: var(--fs-sm);
+  color: var(--text-dim);
+  font-style: italic;
+  line-height: 1.4;
+}
+
 /* ============================================================
    FORM TABS (battle / tournament toggle)
    ============================================================ */
@@ -5493,6 +5500,62 @@ body::after {
   font-size: var(--fs-lg);
   font-style: italic;
   padding: 0.5rem 0;
+}
+
+/* Personality win-rate breakdown */
+.gs-personality-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.gs-personality-row {
+  display: grid;
+  grid-template-columns: 1.6rem 1fr auto;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.gs-personality-emoji { font-size: var(--fs-xl); line-height: 1; }
+
+.gs-personality-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.gs-personality-name {
+  font-size: var(--fs-lg);
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.gs-personality-bar-wrap {
+  display: flex;
+  height: 6px;
+  border-radius: 3px;
+  overflow: hidden;
+  background: var(--bg-card);
+  gap: 1px;
+}
+
+.gs-personality-segment { height: 100%; transition: width 0.3s ease; }
+.gs-pseg-win  { background: var(--accent-green); }
+.gs-pseg-loss { background: var(--accent-red); }
+.gs-pseg-tie  { background: var(--text-muted); }
+
+.gs-personality-rate {
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  color: var(--accent-cyan);
+  font-weight: 600;
+}
+
+.gs-personality-total {
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+  white-space: nowrap;
 }
 
 /* ============================================================
