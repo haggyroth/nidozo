@@ -1,0 +1,68 @@
+# Dependabot configuration — automated dependency updates.
+# Docs: https://docs.github.com/code-security/dependabot/dependabot-version-updates
+#
+# Three ecosystems are tracked:
+#   - uv             → Python deps (pyproject.toml + uv.lock at the repo root)
+#   - npm            → frontend deps (frontend/package.json + package-lock.json)
+#   - github-actions → pinned action versions in .github/workflows
+#
+# Minor + patch bumps are grouped into a single PR per ecosystem to cut noise;
+# major bumps open their own PRs so breaking changes get individual review.
+version: 2
+updates:
+  # --- Python (uv) ---
+  - package-ecosystem: "uv"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "python"
+    groups:
+      python-minor-patch:
+        update-types:
+          - "minor"
+          - "patch"
+
+  # --- Frontend (npm) ---
+  - package-ecosystem: "npm"
+    directory: "/frontend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "frontend"
+    groups:
+      npm-minor-patch:
+        update-types:
+          - "minor"
+          - "patch"
+
+  # --- GitHub Actions ---
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "ci"
+    groups:
+      actions-all:
+        update-types:
+          - "minor"
+          - "patch"
