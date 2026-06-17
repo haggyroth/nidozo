@@ -212,7 +212,6 @@ function PersonalityStats({ personality_stats }) {
   if (!personality_stats?.length) return (
     <EmptyState compact icon="🎭" title="No personality data yet" hint="Run battles with a play style set to see win-rate breakdowns." />
   )
-  const maxTotal = Math.max(...personality_stats.map(r => r.total), 1)
   return (
     <div className="gs-personality-list">
       {personality_stats.map(r => {
