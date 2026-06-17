@@ -9,6 +9,36 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.32.0] — 2026-06-17
+
+### Added
+- **Doubles-aware Classic and Showdown battle views** — both the Classic
+  card arena and the Showdown cockpit now correctly render 2v2 doubles
+  battles. Classic: a `doubles-pair` grid shows two compact `PokemonCard`s
+  per side (64px sprites, ellipsis name truncation, moves list hidden),
+  with a bench row below. A "2v2" badge appears in the battle header.
+  Showdown: the PS renderer handles the scene natively; the cockpit's
+  heuristic panels now dispatch to two per-slot drawers (slot 0 / slot 1)
+  for doubles, unchanged for singles. Win-probability bar now counts active
+  slots + bench HP in doubles, not bench-only. `PlayerHeuristicPanels`
+  helper shared by both views so they can't drift apart. (#194)
+- **Configurable team size** — `team_size: Literal[3, 4, 6]` added to all
+  three request types (`StartBattleRequest`, `StartTournamentRequest`,
+  `StartSeasonRequest`). 3v3 singles and 4v4 doubles dispatch to dedicated
+  Showdown format strings via new `TIER_TO_3V3_FORMAT` and
+  `TIER_TO_DOUBLES_4V4_FORMAT` maps in `tiers.py`. Draft sampling respects
+  the configured size. Heuristics midgame threshold now scales with team
+  size (`≤ len(team)` remaining = the halfway point). DB schema v15 adds
+  `battles.team_size INTEGER NOT NULL DEFAULT 6`. Frontend Leaderboard
+  exposes a doubles checkbox and a team-size selector (3 / 4 / 6). (#193)
+
+### Changed
+- `BenchSlot` exported from `PokemonCard.jsx` for use in `BattleField`.
+- `PokemonCard` gains a `compact` prop (smaller sprite, reduced padding,
+  name truncation) used by the doubles pair layout.
+
+---
+
 ## [0.31.0] — 2026-06-17
 
 ### Added

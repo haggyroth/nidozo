@@ -213,6 +213,13 @@
 - **Prompt v7**: doubles-aware system prompt (spread moves, focus fire, partner synergy, target field) + dedicated `turn_doubles.txt.jinja`; `PromptBuilder` auto-selects it when `is_doubles`
 - 13 new doubles tests (parser/heuristics/serializer); singles unaffected (858 tests green)
 
+### v0.32 — Configurable Team Size + Doubles Frontend (#193, #194)
+- **Configurable team size**: `team_size: Literal[3, 4, 6]` on all request types; 3v3 singles and 4v4 doubles dispatch to dedicated Showdown format strings (`TIER_TO_3V3_FORMAT`, `TIER_TO_DOUBLES_4V4_FORMAT`); draft sampling respects size; heuristics midgame threshold scales with `len(team)`; DB schema v15 adds `battles.team_size INTEGER NOT NULL DEFAULT 6`; Leaderboard form exposes doubles toggle + team-size selector
+- **Doubles-aware Classic view**: `BattleField` renders a `doubles-pair` grid (two compact `PokemonCard`s per side) when `is_doubles`, bench row below; "2v2" amber badge in header; `BenchSlot` exported for external use; `compact` prop on `PokemonCard` (64px sprite, ellipsis name, tighter padding)
+- **Doubles-aware Showdown cockpit**: heuristic panels use `PlayerHeuristicPanels` — two per-slot drawers for doubles, one drawer for singles; win-probability bar now counts active slots + bench HP in doubles
+- **`PlayerHeuristicPanels`** shared helper in `battleShared.jsx` keeps both views in sync; `.doubles-heuristic-stack` CSS container keeps per-slot drawers in a single grid cell
+- 939 tests green
+
 ---
 
 ## Upcoming
@@ -238,18 +245,18 @@
   clean, centrally tunable hierarchy; `prefers-reduced-motion` support added
   across the 28 animations
 
+**Classic view retirement** (planned)
+- Remove the Classic card-based arena and make Showdown the only live view;
+  the Classic code reached its final state at v0.32
+
 ---
 
 ### Platform Expansion
 
 > Gen 9 National Dex is now the canonical ruleset — see **OP-03** under Completed.
+> Configurable team size (3v3 / 4v4 / 6v6) shipped in v0.32.
 
-**3v3 / 6v6 Team Size Config**
-- Expose team size as a configurable battle option alongside tier and format
-- Action parser and serializer updates for different team sizes
-
-**Doubles Battles — frontend & extensions** (decision layer shipped — see v0.30 under Completed)
-- Battlefield visualizer: render two active Pokémon per side with per-slot target arrows
+**Doubles Battles — extensions** (decision layer + frontend shipped — see v0.30/v0.32)
 - Doubles for drafted/preset teams (current cut is random + auto-generated NatDex Doubles teams)
 - Doubles tournaments and seasons (currently single battles only)
 
