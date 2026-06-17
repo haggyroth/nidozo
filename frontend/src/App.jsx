@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import './styles/main.css'
 import Leaderboard from './components/Leaderboard'
-import BattleField from './components/BattleField'
 import ThemeToggle from './components/ThemeToggle'
 import { TournamentBar, WinnerBanner, TournamentEndOverlay } from './components/battleChrome'
 import { BadgeToastStack } from './components/battleShared'
@@ -17,9 +16,6 @@ import { useBattleStream } from './hooks/useBattleStream'
 function App() {
   const [view, setView]                       = useState('home')
   const [dismissed, setDismissed]             = useState(false)
-  const [battleView, setBattleViewRaw]        = useState(
-    () => localStorage.getItem('nidozo-battle-view') ?? 'showdown'
-  )
   const [replayBattleId, setReplayBattleId]   = useState(null)
   const [statsModelId, setStatsModelId]       = useState(null)
   const [tournamentId, setTournamentId]       = useState(null)
@@ -125,11 +121,6 @@ function App() {
 
   function handleGlobalStatsClose() {
     setView('home')
-  }
-
-  function setBattleView(v) {
-    setBattleViewRaw(v)
-    localStorage.setItem('nidozo-battle-view', v)
   }
 
   // Keyboard shortcut: R = watch replay once a battle has a result.
@@ -247,40 +238,16 @@ function App() {
                   />
                 )}
 
-                <div className="battle-view-toggle">
-                  <button
-                    className={`bvt-btn ${battleView === 'classic' ? 'active' : ''}`}
-                    onClick={() => setBattleView('classic')}
-                  >CLASSIC</button>
-                  <button
-                    className={`bvt-btn ${battleView === 'showdown' ? 'active' : ''}`}
-                    onClick={() => setBattleView('showdown')}
-                    title={showdownRoom ? 'Pokémon Showdown renderer' : 'Available once a battle starts'}
-                  >SHOWDOWN</button>
-                </div>
-
-                {battleView === 'showdown' && showdownRoom
-                  ? <ShowdownBattleScene
-                      room={showdownRoom}
-                      p1State={p1State}
-                      p2State={p2State}
-                      battleInfo={battleInfo}
-                      battleResult={battleResult}
-                      thinking={thinking}
-                      coachThinking={coachThinking}
-                    />
-                  : (
-                    <BattleField
-                      p1State={p1State}
-                      p2State={p2State}
-                      battleInfo={battleInfo}
-                      battleResult={result}
-                      events={events}
-                      thinking={thinking}
-                      coachThinking={coachThinking}
-                    />
-                  )
-                }
+                <ShowdownBattleScene
+                  room={showdownRoom}
+                  p1State={p1State}
+                  p2State={p2State}
+                  battleInfo={battleInfo}
+                  battleResult={battleResult}
+                  thinking={thinking}
+                  coachThinking={coachThinking}
+                  events={events}
+                />
 
                 {/* Lifecycle overlays — shared by both stages */}
                 <WinnerBanner

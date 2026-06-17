@@ -23,6 +23,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useShowdownBundle } from '../hooks/useShowdownBundle'
 import { WinProbBar, PlayerLabel, PlayerHeuristicPanels, ThinkingBadge, PersonalityChip, PresetBadge } from './battleShared'
 import { BattleBadges, CancelBattleButton } from './battleChrome'
+import BattleLog from './BattleLog'
 
 /** Strip the room-prefix line and proxy keepalive; return bare |...| lines. */
 function protocolLinesFromFrame(frame) {
@@ -31,7 +32,7 @@ function protocolLinesFromFrame(frame) {
     .filter(line => line && !line.startsWith('>') && line !== '|ping')
 }
 
-export default function ShowdownBattleScene({ room, p1State, p2State, battleInfo, battleResult, thinking, coachThinking }) {
+export default function ShowdownBattleScene({ room, p1State, p2State, battleInfo, battleResult, thinking, coachThinking, events = [] }) {
   const { ready: bundleReady, error: bundleError } = useShowdownBundle()
   const frameRef  = useRef(null)
   const logRef    = useRef(null)
@@ -130,6 +131,10 @@ export default function ShowdownBattleScene({ room, p1State, p2State, battleInfo
   const isLive = battleInfo && !battleResult
   const currentBattleId = battleInfo?.battle_id
 
+  const turn      = Math.max(p1State?.turn ?? 0, p2State?.turn ?? 0)
+  const isDoubles = p1State?.state?.is_doubles ?? p2State?.state?.is_doubles ?? false
+  const weather   = p1State?.state?.weather ?? p2State?.state?.weather ?? null
+
   return (
     <div className="showdown-battle-scene sbs-cockpit">
       {/* Header: model labels per side, centered status chip, thinking badge. */}
@@ -142,6 +147,9 @@ export default function ShowdownBattleScene({ room, p1State, p2State, battleInfo
         </div>
         <div className="sbs-header-center">
           <BattleBadges tier={battleInfo?.tier} drafted={battleInfo?.drafted} />
+          {isDoubles && <span className="doubles-badge">2v2</span>}
+          {weather && <div className="weather-badge">🌤 {weather}</div>}
+          <span className="sbs-turn-counter">{turn > 0 ? `TURN ${turn}` : 'READY'}</span>
           <span className={`sbs-status-chip sbs-status-chip--${status}`}>{statusLabel}</span>
           <ThinkingBadge role={coachThinking || thinking} isCoach={!!coachThinking} />
           {isLive && <CancelBattleButton battleId={currentBattleId} />}
@@ -189,7 +197,11 @@ export default function ShowdownBattleScene({ room, p1State, p2State, battleInfo
         <PlayerHeuristicPanels state={p2State?.state} label={p2Short} />
       </div>
 
-      <div ref={logRef} className="sbs-log" />
+      {/* Bottom: Nidozo structured action log + raw PS protocol log side-by-side */}
+      <div className="sbs-bottom">
+        <BattleLog events={events} />
+        <div ref={logRef} className="sbs-log" />
+      </div>
     </div>
   )
 }
