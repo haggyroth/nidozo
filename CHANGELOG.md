@@ -7,6 +7,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+---
+
+## [0.31.0] — 2026-06-17
+
 ### Added
 - **Typography & motion pass** (UI/UX overhaul, Phase 3) — the stylesheet had
   ~329 hardcoded font sizes spread across 26 near-duplicate values
@@ -40,6 +44,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   updates across three ecosystems: `uv` (Python, root `pyproject.toml`/`uv.lock`),
   `npm` (`frontend/`), and `github-actions` (pinned workflow actions). Minor/patch
   bumps are grouped per ecosystem to reduce PR noise; majors open individual PRs.
+
+---
+
+## [0.30.0] — 2026-06-16
 
 ### Added
 - **Doubles battles (2v2)** — full decision-layer support for 2v2 with target
