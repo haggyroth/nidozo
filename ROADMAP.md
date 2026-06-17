@@ -201,6 +201,10 @@
 - **Party presets — trainer themes** (#174): 10 curated 6-mon teams (Ash's Kanto, Dragon's Lair, Ghost Gang, Inferno Squad, etc.); `GET /api/presets`; `PresetSelector` in battle form with flavour text + team preview; `PresetBadge` chip in both battle views; always forces `gen9nationaldexag`; draft auto-bypassed
 - **Terastallization awareness** (#175): `can_tera` at state level; `is_terastallized` + `tera_type` on own and opponent mons (opponent only revealed post-Tera); `tera_note` in heuristic battle context; `action_type: "tera_move"` in parser; prompt v6 with full Tera rules + `tera_move` action + example; `◈ TERA TYPE` badge on Pokémon card
 
+### v0.29 — Competitive Annotations & Logging (#176–#177)
+- **Competitive event annotations** (#176): per-turn history now surfaces status applied/cured (burn, paralysis, sleep, poison, toxic, freeze — own and opponent), item consumed (own, e.g. Focus Sash activated), opponent item/ability revealed on first observation, and priority bracket note on any opponent move with non-zero priority; `_update_hp_snapshot` extended to snapshot status/item/ability alongside HP; `_build_recent_events` diffs snapshots to generate human-readable annotation lines
+- **Structured JSON logging** (#177): `configure_logging()` now called automatically in `create_app()` so logs are active on every startup; `LOG_LEVEL` env var controls verbosity (default `INFO`, set `DEBUG` for full traces); `LOG_FILE` env var mirrors all records to disk; `_JsonFormatter` emits `extra={}` fields as top-level JSON keys (structured `battle_id`, `player`, `turn`, `action`, `elapsed_s`, `prompt_tokens`, `completion_tokens`); per-turn INFO trace in `LLMPlayer` (`[p1] deciding turn 4` → `[p1] turn 4 → thunderbolt (2.3s)`); LM Studio / OpenAI backend logs token usage + latency at INFO and full prompt + response at DEBUG; `httpx`/`httpcore` loggers enabled at DEBUG to expose raw HTTP traffic to LM Studio
+
 ---
 
 ## Upcoming
@@ -237,17 +241,12 @@
 - Heuristic engine updated for spread moves and partner synergy
 
 **Deeper Competitive Features**
-- Battle event annotation: item activations, ability procs, status cures inline in battle log and replay
-- Speed tie and priority bracket resolution visible in the battle log
+- Speed tier display: annotate whether each switch candidate moves before/after the opponent (extend existing speed note from heuristic advisory into the bench summary)
+- Doubles support: 2v2 format with target selection; prompt and action parser extended for `target` field
 
 ---
 
 ### Technical Debt & Housekeeping
-
-**File Logging**
-- Structured file-based log output (JSON lines) alongside the current console logs
-- Configurable log level and rotation; separate logs for battle events, LLM calls, and errors
-- Useful for post-hoc debugging and offline analysis without a DB query
 
 **Containerisation**
 - `docker-compose.yml` for the full dev stack: Showdown server, FastAPI backend, Vite dev server
