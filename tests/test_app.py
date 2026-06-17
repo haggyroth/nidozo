@@ -151,11 +151,13 @@ def test_cors_allows_serve_py_origin(tmp_path: Path) -> None:
 def test_ws_route_registered(tmp_path: Path) -> None:
     """The /ws/battles WebSocket route is present in the app."""
     app = _create(tmp_path)
-    paths = [getattr(r, "path", None) for r in app.routes]
-    assert "/ws/battles" in paths
+    # Resolve by endpoint name rather than scanning app.routes for a `.path`:
+    # Starlette ≥1.2 wraps included routers in an `_IncludedRouter` (no flat
+    # `.path`), so a path scan misses sub-router routes. url_path_for walks the
+    # router tree and raises if the route is missing, so it asserts presence.
+    assert app.url_path_for("battle_stream") == "/ws/battles"
 
 
 def test_healthz_route_registered(tmp_path: Path) -> None:
     app = _create(tmp_path)
-    paths = [getattr(r, "path", None) for r in app.routes]
-    assert "/healthz" in paths
+    assert app.url_path_for("healthz") == "/healthz"
