@@ -8,6 +8,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [Unreleased]
 
 ### Added
+- **Mobile-responsive layout** (UI/UX overhaul, Phase 2) — the app shipped
+  desktop-only; it now adapts down to phone widths. A consolidated responsive
+  layer adds tablet (≤768px) and phone (≤480px) breakpoints: the header/nav
+  stacks (logo above a wrapping nav, theme toggle pushed right), shell/panel
+  padding shrinks, the battle/tier/tournament tab rows wrap, wide data tables
+  (leaderboard, head-to-head matrix, tournament/season/stats tables) gain
+  horizontal scroll, and the fixed 640×360 Showdown stage is wrapped in a
+  horizontal-scroll container so it no longer forces the page wider. Desktop
+  layout is unchanged.
 - **Dark/light theme toggle** (UI/UX overhaul, Phase 1) — a persisted theme
   switch in the nav (`☀`/`☾`). `useTheme` hook + an inline no-flash script in
   `index.html` set `<html data-theme>` before paint and remember the choice in

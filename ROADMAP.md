@@ -230,7 +230,9 @@
 
 **UI/UX Overhaul** (in progress — phased)
 - ✅ Dark/light theme toggle persisted to `localStorage` (Phase 1 — shipped)
-- Mobile-responsive layout (currently desktop-only) — Phase 2
+- ✅ Mobile-responsive layout (Phase 2 — shipped): stacking header/nav, wrapping
+  tabs, horizontal-scroll data tables, scroll-wrapped Showdown stage, reduced
+  shell/panel padding at tablet (≤768px) and phone (≤480px) breakpoints
 - Visual design pass across all pages: typography hierarchy, spacing system, animation polish — Phase 3
 
 ---
