@@ -4836,6 +4836,53 @@ body::after {
   min-width: 0;
 }
 
+/* ---- Doubles: two active cards side-by-side within each player column ---- */
+.doubles-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.4rem;
+}
+
+/* Compact card variant for doubles — less padding, tighter layout */
+.pokemon-card.compact {
+  padding: 0.65rem 0.7rem;
+  min-height: 150px;
+}
+.pokemon-card.compact .card-body { gap: 0.25rem; }
+.pokemon-card.compact .pokemon-name {
+  font-size: var(--fs-sm);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 8rem;
+}
+.pokemon-card.compact .own-moves { display: none; } /* hide moves list in compact view */
+
+/* Doubles badge in battle header */
+.doubles-badge {
+  font-family: var(--font-pixel);
+  font-size: var(--fs-xs);
+  color: var(--accent-amber);
+  background: rgba(247,201,72,0.12);
+  border: 1px solid rgba(247,201,72,0.3);
+  border-radius: 3px;
+  padding: 0.15rem 0.4rem;
+  letter-spacing: 0.05em;
+}
+
+/* Responsive: stack doubles pairs vertically on very narrow screens */
+@media (max-width: 480px) {
+  .doubles-pair { grid-template-columns: 1fr; }
+}
+
+/* Doubles heuristic stack: slot 0 and slot 1 drawers stacked vertically
+   inside a single grid cell (both Classic and Showdown views). */
+.doubles-heuristic-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
 /* ---- Player model name labels on battle scene ---- */
 .player-label {
   display: flex;
@@ -6087,8 +6134,9 @@ body::after {
 }
 .sbs-heuristics:empty { display: none; }
 .sbs-heuristics > .heuristic-drawer { background: var(--bg-panel); }
-/* When only one player has heuristics, let it span the full width. */
-.sbs-heuristics > .heuristic-drawer:only-child { grid-column: 1 / -1; }
+/* When only one player has heuristics (or doubles stack), span full width. */
+.sbs-heuristics > .heuristic-drawer:only-child,
+.sbs-heuristics > .doubles-heuristic-stack:only-child { grid-column: 1 / -1; }
 
 /* The PS Battle class draws an absolutely-positioned 640×360 .battle scene into
    $frame (battle.css owns the scene styling). The stage centres that fixed

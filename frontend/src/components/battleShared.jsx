@@ -8,9 +8,23 @@
 import { useState } from 'react'
 import { TypeBadge } from './PokemonCard'
 
-/** Team-HP score for win-probability: sum of bench hp_fractions, or active HP. */
+/** Team-HP score for win-probability: sum of all mons' hp_fractions.
+ *
+ * Singles: my_active is a single mon; my_team is bench only.
+ * Doubles: my_active is a list of active slots; my_team is bench only.
+ * We include every slot so the win-prob bar reflects the full team. */
 function teamHpScore(state) {
   if (!state) return null
+
+  if (state.is_doubles) {
+    const active = (state.my_active ?? []).filter(Boolean)
+    const bench  = state.my_team ?? []
+    const all    = [...active, ...bench]
+    if (all.length === 0) return null
+    return all.reduce((acc, m) => acc + Math.max(0, m.hp_fraction ?? 0), 0)
+  }
+
+  // Singles: my_team is bench (active mon excluded)
   const team = state.my_team ?? []
   if (team.length > 0) {
     return team.reduce((acc, m) => acc + Math.max(0, m.hp_fraction ?? 0), 0)
@@ -254,6 +268,45 @@ export function BadgeToastStack({ badges, onDismiss }) {
         </div>
       ))}
     </div>
+  )
+}
+
+/**
+ * Renders the correct set of HeuristicDrawer(s) for one player's state.
+ *
+ * Singles: one drawer fed by heuristics.move_scores + flat available_moves.
+ * Doubles: two drawers (slot 0 / slot 1) fed by heuristics.slot_0/slot_1
+ *          and per-slot available_moves sub-arrays.
+ */
+/**
+ * Renders the correct set of HeuristicDrawer(s) for one player's state.
+ *
+ * Always returns a single root element so callers can place it in CSS grids
+ * without worrying about fragment overflow.
+ *
+ * Singles: one drawer fed by heuristics.move_scores + flat available_moves.
+ * Doubles: two drawers (slot 0 / slot 1) stacked vertically, fed by
+ *          heuristics.slot_0/slot_1 and per-slot available_moves sub-arrays.
+ */
+export function PlayerHeuristicPanels({ state, label }) {
+  if (!state) return null
+  if (state.is_doubles) {
+    const h = state.heuristics
+    const m = state.available_moves ?? [[], []]
+    if (!h) return null
+    return (
+      <div className="doubles-heuristic-stack">
+        <HeuristicDrawer heuristics={h.slot_0} moves={m[0]} label={`${label} SLOT 0`} />
+        <HeuristicDrawer heuristics={h.slot_1} moves={m[1]} label={`${label} SLOT 1`} />
+      </div>
+    )
+  }
+  return (
+    <HeuristicDrawer
+      heuristics={state.heuristics}
+      moves={state.available_moves}
+      label={`${label} HEURISTICS`}
+    />
   )
 }
 
