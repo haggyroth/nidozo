@@ -12,8 +12,9 @@ import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from poke_env.battle import DoubleBattle
 
-from nidozo.battle.llm_player import LLMPlayer
+from nidozo.battle.llm_player import LLMPlayer, _status_label, _status_verb
 
 # ---------------------------------------------------------------------------
 # Shared fixtures
@@ -1036,3 +1037,355 @@ async def test_run_draft_emits_bus_events(tmp_path) -> None:
     complete_events = [c for c in calls if c["type"] == "draft_complete"]
     assert len(pick_events) == 6
     assert len(complete_events) == 1
+
+
+# ---------------------------------------------------------------------------
+# Module-level helpers: _status_verb / _status_label
+# ---------------------------------------------------------------------------
+
+
+def test_status_verb_known_codes() -> None:
+    assert _status_verb("BRN") == "burned"
+    assert _status_verb("PAR") == "paralyzed"
+    assert _status_verb("SLP") == "put to sleep"
+    assert _status_verb("PSN") == "poisoned"
+    assert _status_verb("TOX") == "badly poisoned"
+    assert _status_verb("FRZ") == "frozen"
+
+
+def test_status_verb_unknown_falls_back() -> None:
+    assert _status_verb("XYZ") == "inflicted with XYZ"
+
+
+def test_status_verb_case_insensitive() -> None:
+    assert _status_verb("brn") == "burned"
+
+
+def test_status_label_known_codes() -> None:
+    assert _status_label("BRN") == "burn"
+    assert _status_label("PAR") == "paralysis"
+    assert _status_label("SLP") == "sleep"
+    assert _status_label("PSN") == "poison"
+    assert _status_label("TOX") == "toxic poison"
+    assert _status_label("FRZ") == "freeze"
+
+
+def test_status_label_unknown_falls_back_lowercase() -> None:
+    assert _status_label("CONFUSION") == "confusion"
+
+
+def test_status_label_case_insensitive() -> None:
+    assert _status_label("brn") == "burn"
+
+
+# ---------------------------------------------------------------------------
+# _action_display
+# ---------------------------------------------------------------------------
+
+
+def test_action_display_none_returns_none(mock_backend) -> None:
+    player = _make_player(mock_backend)
+    assert player._action_display(None) is None
+
+
+def test_action_display_empty_string_returns_none(mock_backend) -> None:
+    player = _make_player(mock_backend)
+    assert player._action_display("") is None
+
+
+def test_action_display_valid_json_returns_formatted(mock_backend) -> None:
+    player = _make_player(mock_backend)
+    result = player._action_display('{"action_type":"move","identifier":"thunderbolt"}')
+    assert result == "move thunderbolt"
+
+
+def test_action_display_json_missing_identifier_returns_none(mock_backend) -> None:
+    player = _make_player(mock_backend)
+    assert player._action_display('{"action_type":"move"}') is None
+
+
+def test_action_display_json_missing_action_type_returns_none(mock_backend) -> None:
+    player = _make_player(mock_backend)
+    assert player._action_display('{"identifier":"thunderbolt"}') is None
+
+
+def test_action_display_invalid_json_returns_none(mock_backend) -> None:
+    player = _make_player(mock_backend)
+    assert player._action_display("not json at all") is None
+
+
+def test_action_display_json_array_not_dict_returns_none(mock_backend) -> None:
+    player = _make_player(mock_backend)
+    assert player._action_display('["move", "thunderbolt"]') is None
+
+
+# ---------------------------------------------------------------------------
+# _build_recent_events — singles path
+# ---------------------------------------------------------------------------
+
+
+def _make_singles_battle(turn: int = 3) -> MagicMock:
+    """Minimal singles AbstractBattle mock (not a DoubleBattle)."""
+    battle = MagicMock(spec=["turn", "active_pokemon", "opponent_active_pokemon",
+                              "team", "opponent_team", "force_switch"])
+    battle.turn = turn
+    battle.active_pokemon = None
+    battle.opponent_active_pokemon = None
+    battle.team = {}
+    battle.opponent_team = {}
+    # spec doesn't include DoubleBattle attributes, so isinstance(battle, DoubleBattle) → False
+    return battle
+
+
+def test_build_recent_events_returns_empty_on_turn_1(mock_backend) -> None:
+    player = _make_player(mock_backend)
+    battle = _make_singles_battle(turn=1)
+    result = player._build_recent_events(battle, {})
+    assert result == []
+
+
+def test_build_recent_events_returns_empty_when_no_prev_hp(mock_backend) -> None:
+    player = _make_player(mock_backend)
+    battle = _make_singles_battle(turn=5)
+    player._prev_hp = {}  # no snapshot yet
+    result = player._build_recent_events(battle, {})
+    assert result == []
+
+
+def test_build_recent_events_records_hp_damage(mock_backend) -> None:
+    player = _make_player(mock_backend)
+    battle = _make_singles_battle(turn=4)
+    player._prev_hp = {"pikachu": 1.0}
+    player._prev_snapshot = {}
+
+    state = {"my_active": {"species": "pikachu", "hp_fraction": 0.5}}
+    result = player._build_recent_events(battle, state)
+
+    assert result
+    assert any("50%" in line or "took" in line for entry in result for line in entry["lines"])
+
+
+def test_build_recent_events_records_hp_recovery(mock_backend) -> None:
+    player = _make_player(mock_backend)
+    battle = _make_singles_battle(turn=4)
+    player._prev_hp = {"pikachu": 0.4}
+    player._prev_snapshot = {}
+
+    state = {"my_active": {"species": "pikachu", "hp_fraction": 0.8}}
+    result = player._build_recent_events(battle, state)
+
+    assert any("recovered" in line for entry in result for line in entry["lines"])
+
+
+def test_build_recent_events_ignores_tiny_hp_change(mock_backend) -> None:
+    player = _make_player(mock_backend)
+    battle = _make_singles_battle(turn=4)
+    player._prev_hp = {"pikachu": 0.800}
+    player._prev_snapshot = {}
+
+    state = {"my_active": {"species": "pikachu", "hp_fraction": 0.802}}
+    result = player._build_recent_events(battle, state)
+    # Change < 1% → no HP line emitted, so recent_events stays empty.
+    assert result == []
+
+
+def test_build_recent_events_records_status_applied(mock_backend) -> None:
+    player = _make_player(mock_backend)
+    battle = _make_singles_battle(turn=4)
+    player._prev_hp = {"pikachu": 0.9}
+    player._prev_snapshot = {"pikachu": {"status": None, "item": None, "ability": None}}
+
+    mon = MagicMock()
+    mon.status = MagicMock()
+    mon.status.name = "BRN"
+    mon.item = None
+    battle.active_pokemon = mon
+
+    state = {"my_active": {"species": "pikachu", "hp_fraction": 0.9}}
+    result = player._build_recent_events(battle, state)
+    assert any("burned" in line for entry in result for line in entry["lines"])
+
+
+def test_build_recent_events_records_opponent_move(mock_backend) -> None:
+    player = _make_player(mock_backend)
+    battle = _make_singles_battle(turn=4)
+    player._prev_hp = {"pikachu": 1.0}
+    player._prev_snapshot = {}
+
+    opp = MagicMock()
+    opp_move = MagicMock()
+    opp_move.id = "fire_blast"
+    opp_move.priority = 0
+    opp.last_move = opp_move
+    battle.opponent_active_pokemon = opp
+
+    state = {"my_active": {"species": "pikachu", "hp_fraction": 0.5}}
+    result = player._build_recent_events(battle, state)
+    assert any("Fire Blast" in line for entry in result for line in entry["lines"])
+
+
+def test_build_recent_events_records_opponent_item_revealed(mock_backend) -> None:
+    player = _make_player(mock_backend)
+    battle = _make_singles_battle(turn=4)
+    player._prev_hp = {"opp_blastoise": 0.6}
+    player._prev_snapshot = {
+        "opp_blastoise": {"status": None, "item": None, "ability": None}
+    }
+
+    opp = MagicMock()
+    opp.status = None
+    opp.item = "leftovers"
+    opp.ability = None
+    opp.last_move = None  # not testing move display here
+    battle.opponent_active_pokemon = opp
+
+    state = {
+        "opponent_active": {"species": "blastoise", "hp_fraction": 0.55},
+    }
+    result = player._build_recent_events(battle, state)
+    assert any("Leftovers" in line for entry in result for line in entry["lines"])
+
+
+def test_build_recent_events_trims_to_max_recent(mock_backend) -> None:
+    player = _make_player(mock_backend)
+    # Pre-seed with 3 events (the max).
+    existing = [{"turn": i, "lines": ["event"]} for i in range(3)]
+    player._recent_events = list(existing)
+    player._prev_hp = {"pikachu": 1.0}
+    player._prev_snapshot = {}
+
+    battle = _make_singles_battle(turn=10)
+    state = {"my_active": {"species": "pikachu", "hp_fraction": 0.5}}
+    result = player._build_recent_events(battle, state)
+    # Must not grow beyond _MAX_RECENT_EVENTS (3).
+    assert len(result) <= 3
+
+
+# ---------------------------------------------------------------------------
+# _build_recent_events_doubles
+# ---------------------------------------------------------------------------
+
+
+def _make_doubles_battle(turn: int = 4) -> MagicMock:
+    """Mock that passes isinstance(..., DoubleBattle)."""
+    battle = MagicMock(spec=DoubleBattle)
+    battle.turn = turn
+    return battle
+
+
+def test_build_recent_events_routes_doubles_to_doubles_helper(mock_backend) -> None:
+    player = _make_player(mock_backend)
+    battle = _make_doubles_battle()
+    player._prev_hp = {"pikachu": 1.0}  # non-empty so the branch isn't short-circuited
+    player._recent_events = []
+
+    state = {
+        "my_active": [{"species": "pikachu", "hp_fraction": 0.5}],
+        "opponent_active": [],
+    }
+    result = player._build_recent_events(battle, state)
+    # The doubles helper should fire and record the HP delta.
+    assert any("pikachu" in line.lower() for entry in result for line in entry["lines"])
+
+
+def test_build_recent_events_doubles_records_both_sides(mock_backend) -> None:
+    player = _make_player(mock_backend)
+    battle = _make_doubles_battle()
+    player._prev_hp = {"pikachu": 1.0, "opp_blastoise": 0.8}
+    player._recent_events = []
+
+    state = {
+        "my_active": [{"species": "pikachu", "hp_fraction": 0.4}],
+        "opponent_active": [{"species": "blastoise", "hp_fraction": 0.3}],
+    }
+    result = player._build_recent_events(battle, state)
+    all_lines = [line for entry in result for line in entry["lines"]]
+    assert any("Pikachu" in line for line in all_lines)
+    assert any("Blastoise" in line for line in all_lines)
+
+
+def test_build_recent_events_doubles_ignores_tiny_changes(mock_backend) -> None:
+    player = _make_player(mock_backend)
+    battle = _make_doubles_battle()
+    player._prev_hp = {"pikachu": 0.500}
+    player._recent_events = []
+
+    state = {
+        "my_active": [{"species": "pikachu", "hp_fraction": 0.501}],
+        "opponent_active": [],
+    }
+    result = player._build_recent_events(battle, state)
+    assert result == []
+
+
+def test_build_recent_events_doubles_includes_last_action(mock_backend) -> None:
+    player = _make_player(mock_backend)
+    battle = _make_doubles_battle()
+    player._prev_hp = {"pikachu": 1.0}
+    player._recent_events = []
+    player._last_action_display = "move thunderbolt"
+
+    state = {
+        "my_active": [{"species": "pikachu", "hp_fraction": 0.4}],
+        "opponent_active": [],
+    }
+    result = player._build_recent_events(battle, state)
+    all_lines = [line for entry in result for line in entry["lines"]]
+    assert any("thunderbolt" in line for line in all_lines)
+
+
+def test_build_recent_events_doubles_skips_none_slots(mock_backend) -> None:
+    player = _make_player(mock_backend)
+    battle = _make_doubles_battle()
+    player._prev_hp = {}
+    player._recent_events = []
+
+    state = {
+        "my_active": [None, {"species": "charizard", "hp_fraction": 0.5}],
+        "opponent_active": [None],
+    }
+    # Should not raise on None slots.
+    result = player._build_recent_events(battle, state)
+    assert isinstance(result, list)
+
+
+# ---------------------------------------------------------------------------
+# _update_hp_snapshot
+# ---------------------------------------------------------------------------
+
+
+def test_update_hp_snapshot_captures_team_and_opponent(mock_backend) -> None:
+    player = _make_player(mock_backend)
+    battle = MagicMock()
+
+    own = MagicMock()
+    own.species = "pikachu"
+    own.current_hp_fraction = 0.75
+    own.status = None
+    own.item = "lightball"
+    own.ability = "staticability"
+
+    opp = MagicMock()
+    opp.species = "blastoise"
+    opp.current_hp_fraction = 0.5
+    opp.status = None
+    opp.item = None
+    opp.ability = None
+
+    battle.team = {"pikachu": own}
+    battle.opponent_team = {"blastoise": opp}
+
+    player._update_hp_snapshot(battle)
+
+    assert player._prev_hp["pikachu"] == pytest.approx(0.75)
+    assert player._prev_hp["opp_blastoise"] == pytest.approx(0.5)
+    assert player._prev_snapshot["pikachu"]["item"] == "lightball"
+
+
+def test_update_hp_snapshot_swallows_exception(mock_backend) -> None:
+    player = _make_player(mock_backend)
+    battle = MagicMock()
+    battle.team = MagicMock(side_effect=AttributeError("no team"))
+
+    # Should not raise.
+    player._update_hp_snapshot(battle)
