@@ -228,12 +228,15 @@
 
 ### UI & Visualisation
 
-**UI/UX Overhaul** (in progress — phased)
-- ✅ Dark/light theme toggle persisted to `localStorage` (Phase 1 — shipped)
-- ✅ Mobile-responsive layout (Phase 2 — shipped): stacking header/nav, wrapping
-  tabs, horizontal-scroll data tables, scroll-wrapped Showdown stage, reduced
+**UI/UX Overhaul** ✅ shipped (phased — v0.31)
+- ✅ Dark/light theme toggle persisted to `localStorage` (Phase 1)
+- ✅ Mobile-responsive layout (Phase 2): stacking header/nav, wrapping tabs,
+  horizontal-scroll data tables, scroll-wrapped Showdown stage, reduced
   shell/panel padding at tablet (≤768px) and phone (≤480px) breakpoints
-- Visual design pass across all pages: typography hierarchy, spacing system, animation polish — Phase 3
+- ✅ Typography & motion pass (Phase 3): ~329 hardcoded font sizes (26 muddy
+  near-duplicate values) snapped onto a 13-step `--fs-*` token scale for a
+  clean, centrally tunable hierarchy; `prefers-reduced-motion` support added
+  across the 28 animations
 
 ---
 
