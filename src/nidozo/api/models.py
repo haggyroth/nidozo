@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 # Closed enums shared across requests. Invalid values are rejected at the API
 # boundary (422) instead of silently degrading deep in a background task — e.g.
@@ -35,10 +35,15 @@ class StartBattleRequest(BaseModel):
     n_battles: int = Field(1, ge=1, le=50)
     tier: Tier = "random"
     draft: bool = False    # If True and tier != "random", run LLM draft phase first
-    # Doubles (2v2): when True, the battle uses a Showdown doubles format with
-    # target selection. Random tier → gen9randomdoublesbattle (no team data
-    # needed); non-random tiers → NatDex Doubles. Presets are singles-only.
+    # Doubles (2v2 per turn): when True, uses a Showdown doubles format.
+    # Random tier → gen9randomdoublesbattle; non-random → NatDex Doubles.
+    # Presets are singles-only and force doubles=False.
     doubles: bool = False
+    # Team size: how many Pokémon each player brings. 6=standard, 3=3v3 singles,
+    # 4=4v4 doubles (bring 4, use 2 per turn — VGC-style). 3v3/4v4 require custom
+    # Showdown format definitions on the local server (see tiers.py docstring).
+    # Presets are fixed 6-mon teams and require team_size=6.
+    team_size: Literal[3, 4, 6] = 6
     # Optional coach model per player (None = no coach)
     p1_coach_provider: CoachProvider | None = None
     p1_coach_model: str | None = None
@@ -50,6 +55,12 @@ class StartBattleRequest(BaseModel):
     # Optional trainer-archetype preset team (overrides draft; forces AG format)
     p1_preset: PresetSlug | None = None
     p2_preset: PresetSlug | None = None
+
+    @model_validator(mode="after")
+    def validate_team_size_constraints(self) -> StartBattleRequest:
+        if (self.p1_preset or self.p2_preset) and self.team_size != 6:
+            raise ValueError("Preset teams are fixed 6-mon rosters — team_size must be 6 when using presets")
+        return self
 
 
 class StartBattleResponse(BaseModel):
@@ -76,6 +87,8 @@ class StartTournamentRequest(BaseModel):
     tier: Tier = "random"
     draft: bool = False    # If True and tier != "random", run LLM draft phase before each battle
     tournament_format: TournamentFormat = "round_robin"
+    doubles: bool = False
+    team_size: Literal[3, 4, 6] = 6
 
 
 class StartTournamentResponse(BaseModel):
@@ -92,6 +105,8 @@ class StartSeasonRequest(BaseModel):
     prompt_version: PromptVersion = "v6"
     tier: Tier = "random"
     draft: bool = False
+    doubles: bool = False
+    team_size: Literal[3, 4, 6] = 6
 
 
 class StartSeasonResponse(BaseModel):

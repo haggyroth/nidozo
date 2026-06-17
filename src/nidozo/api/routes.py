@@ -327,13 +327,14 @@ def create_router(
         req: StartBattleRequest,
         background_tasks: BackgroundTasks,
     ) -> StartBattleResponse:
-        from nidozo.battle.tiers import TIER_TO_FORMAT
+        from nidozo.battle.tiers import resolve_format
 
         # tier / prompt_version / providers are validated by the Pydantic model
         # (Literal types → 422 on bad input), so no manual checks are needed here.
+        use_preset = bool(req.p1_preset or req.p2_preset)
         showdown_format = (
-            "gen9randombattle" if req.tier == "random"
-            else TIER_TO_FORMAT.get(req.tier, "gen9nationaldexag")
+            "gen9nationaldexag" if use_preset
+            else resolve_format(req.tier, doubles=req.doubles, team_size=req.team_size)
         )
         effective_prompt = "v3" if (req.tier != "random" and req.draft) else req.prompt_version
 
@@ -358,6 +359,7 @@ def create_router(
                 p2_id,
                 p1_personality=req.p1_personality,
                 p2_personality=req.p2_personality,
+                team_size=req.team_size,
             )
             battle_ids.append(bid)
 
@@ -378,15 +380,12 @@ def create_router(
     ) -> StartTournamentResponse:
         import itertools
 
-        from nidozo.battle.tiers import TIER_TO_FORMAT
+        from nidozo.battle.tiers import resolve_format
 
         # players (min_length=2), tier, tournament_format, prompt_version and
         # providers are all validated by the Pydantic model (Literal / Field
         # constraints → 422 on bad input), so no manual checks are needed here.
-        showdown_format = (
-            "gen9randombattle" if req.tier == "random"
-            else TIER_TO_FORMAT.get(req.tier, "gen9nationaldexag")
-        )
+        showdown_format = resolve_format(req.tier, doubles=req.doubles, team_size=req.team_size)
         effective_prompt = "v3" if (req.tier != "random" and req.draft) else req.prompt_version
 
         player_specs: list[dict[str, Any]] = [
@@ -459,6 +458,7 @@ def create_router(
                         tournament_id=tournament_id,
                         p1_personality=a.get("personality"),
                         p2_personality=b.get("personality"),
+                        team_size=req.team_size,
                     )
                     battle_ids.append(bid)
                     battle_num += 1
@@ -488,15 +488,12 @@ def create_router(
     ) -> StartSeasonResponse:
         import itertools
 
-        from nidozo.battle.tiers import TIER_TO_FORMAT
+        from nidozo.battle.tiers import resolve_format
 
         # players (min_length=2), tier, prompt_version and providers are validated
         # by the Pydantic model (Literal / Field constraints → 422), so no manual
         # checks are needed here.
-        showdown_format = (
-            "gen9randombattle" if req.tier == "random"
-            else TIER_TO_FORMAT.get(req.tier, "gen9nationaldexag")
-        )
+        showdown_format = resolve_format(req.tier, doubles=req.doubles, team_size=req.team_size)
         effective_prompt = "v3" if (req.tier != "random" and req.draft) else req.prompt_version
 
         player_specs: list[dict[str, Any]] = [
@@ -540,6 +537,7 @@ def create_router(
                         season_id=season_id,
                         p1_personality=a.get("personality"),
                         p2_personality=b.get("personality"),
+                        team_size=req.team_size,
                     )
                     battle_ids.append(bid)
                     battle_num += 1

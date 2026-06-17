@@ -892,18 +892,22 @@ def test_battle_phase_endgame_ahead() -> None:
 
 
 def test_battle_phase_midgame() -> None:
-    """3 own + 3 opp (sum=6) → midgame."""
-    mons = [_mock_pokemon(f"m{i}") for i in range(6)]
-    for m in mons:
-        m.fainted = False
+    """3 own + 3 opp remaining (sum=6) in a 6-mon team → midgame.
+
+    Threshold is len(battle.team) = 6; sum==6 triggers midgame.
+    """
+    # 12 mons total (6 own roster, 6 opp roster); mark half fainted so 3 per side remain.
+    all_mons = [_mock_pokemon(f"m{i}") for i in range(12)]
+    for i, m in enumerate(all_mons):
+        m.fainted = i in (3, 4, 5, 9, 10, 11)  # 3 own + 3 opp fainted
     battle = MagicMock()
     battle.available_moves = []
     battle.available_switches = []
-    battle.active_pokemon = mons[0]
-    battle.opponent_active_pokemon = mons[3]
+    battle.active_pokemon = all_mons[0]
+    battle.opponent_active_pokemon = all_mons[6]
     battle.weather = {}
-    battle.team = {m.species: m for m in mons[:3]}
-    battle.opponent_team = {m.species: m for m in mons[3:]}
+    battle.team = {m.species: m for m in all_mons[:6]}
+    battle.opponent_team = {m.species: m for m in all_mons[6:]}
 
     ctx = score_actions(battle)["battle_context"]
     assert ctx.get("phase") == "midgame"

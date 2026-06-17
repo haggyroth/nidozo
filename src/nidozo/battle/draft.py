@@ -37,7 +37,6 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-_DRAFT_TEAM_SIZE = 6
 _MAX_RETRIES = 3  # retries per pick on parse/validation failure
 
 
@@ -133,11 +132,12 @@ async def run_draft(
     bus: EventBus | None = None,
     player_role: str = "p1",
     prompt_version: str = "v3",
+    team_size: int = 6,
 ) -> DraftResult:
-    """Run the full 6-pick draft for one player.
+    """Run the draft for one player, picking *team_size* Pokémon.
 
     Emits ``draft_pick`` events via *bus* as each pick is made, and a
-    ``draft_complete`` event when all 6 are selected.
+    ``draft_complete`` event when all picks are selected.
 
     Args:
         backend:       LLM backend to use for pick calls.
@@ -147,6 +147,7 @@ async def run_draft(
         bus:           EventBus for WS events (optional; skipped if None).
         player_role:   ``"p1"`` or ``"p2"`` (for WS events).
         prompt_version: Prompt version to log (default ``"v3"``).
+        team_size:     Number of Pokémon to draft (default 6).
 
     Returns:
         :class:`DraftResult` with the completed team details.
@@ -171,12 +172,12 @@ async def run_draft(
     # Build a mutable pool (display-name strings, to match what the model sees)
     remaining_pool = list(pool_info)  # list of dicts
 
-    for pick_num in range(1, _DRAFT_TEAM_SIZE + 1):
+    for pick_num in range(1, team_size + 1):
         available_names: set[str] = {m["species"] for m in remaining_pool}
         messages = _build_draft_messages(
             tier_display=tier_display,
             pick_num=pick_num,
-            total_picks=_DRAFT_TEAM_SIZE,
+            total_picks=team_size,
             picked=picked_info,
             pool=remaining_pool,
             system_prompt=system_prompt,
@@ -194,12 +195,12 @@ async def run_draft(
                     break
                 logger.warning(
                     "Draft pick %d/%d (role=%s): parse failed (attempt %d/%d), response: %.100s",
-                    pick_num, _DRAFT_TEAM_SIZE, player_role, attempt + 1, _MAX_RETRIES, raw,
+                    pick_num, team_size, player_role, attempt + 1, _MAX_RETRIES, raw,
                 )
             except Exception as exc:
                 logger.error(
                     "Draft pick %d/%d (role=%s): backend error (attempt %d/%d): %s",
-                    pick_num, _DRAFT_TEAM_SIZE, player_role, attempt + 1, _MAX_RETRIES, exc,
+                    pick_num, team_size, player_role, attempt + 1, _MAX_RETRIES, exc,
                 )
 
         # Fallback: pick first remaining if all retries failed
@@ -208,7 +209,7 @@ async def run_draft(
             pick_reasoning = "(fallback — parse failed)"
             logger.warning(
                 "Draft pick %d/%d (role=%s): all retries exhausted, falling back to %s",
-                pick_num, _DRAFT_TEAM_SIZE, player_role, pick_species,
+                pick_num, team_size, player_role, pick_species,
             )
 
         # Find the matching entry in remaining_pool
@@ -233,7 +234,7 @@ async def run_draft(
 
         logger.info(
             "Draft pick %d/%d (role=%s): %s — %s",
-            pick_num, _DRAFT_TEAM_SIZE, player_role, pick_species, pick_reasoning[:80],
+            pick_num, team_size, player_role, pick_species, pick_reasoning[:80],
         )
 
     # Build team string

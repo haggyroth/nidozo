@@ -310,15 +310,16 @@ class BattleStore:
         season_id: int | None = None,
         p1_personality: str | None = None,
         p2_personality: str | None = None,
+        team_size: int = 6,
     ) -> int:
         """Insert a battle row and return its id."""
         cur = self._conn.execute(
             """INSERT INTO battles
                (battle_tag, format, p1_model_id, p2_model_id, tournament_id, season_id,
-                p1_personality, p2_personality, status)
-               VALUES (?,?,?,?,?,?,?,?,'pending')""",
+                p1_personality, p2_personality, team_size, status)
+               VALUES (?,?,?,?,?,?,?,?,?,'pending')""",
             (battle_tag, format, p1_model_id, p2_model_id, tournament_id, season_id,
-             p1_personality, p2_personality),
+             p1_personality, p2_personality, team_size),
         )
         self._conn.commit()
         row_id = cur.lastrowid
