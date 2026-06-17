@@ -7,6 +7,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+- **Dark/light theme toggle** (UI/UX overhaul, Phase 1) — a persisted theme
+  switch in the nav (`☀`/`☾`). `useTheme` hook + an inline no-flash script in
+  `index.html` set `<html data-theme>` before paint and remember the choice in
+  `localStorage` (falling back to the OS `prefers-color-scheme`, defaulting to
+  dark). `main.css` gains a `:root[data-theme="light"]` layer overriding the
+  structural tokens (surfaces, borders, text, and neon accents tuned for
+  contrast on white); type colours, HP fills, and the Showdown game stage stay
+  constant. Dark remains the default and is unchanged.
+
 ### Changed
 - **Dependabot** — added `.github/dependabot.yml` for weekly automated dependency
   updates across three ecosystems: `uv` (Python, root `pyproject.toml`/`uv.lock`),

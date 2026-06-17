@@ -78,6 +78,68 @@
   --transition: 0.25s ease;
 }
 
+/* ============================================================
+   LIGHT THEME
+   The app shipped dark-only; dark remains the default palette in :root above.
+   Light is opt-in via <html data-theme="light"> (set by useTheme +
+   the no-flash inline script in index.html). We only override the *structural*
+   tokens — backgrounds, borders, text, and the neon accents that need more
+   contrast on a light surface. Type colours and HP-bar fills stay constant
+   (they sit on their own coloured chips/bars and read fine on either theme).
+   ============================================================ */
+:root[data-theme="light"] {
+  /* Surfaces — light blue-grey console, white panels */
+  --bg-deep:      #eef2f8;
+  --bg-panel:     #ffffff;
+  --bg-card:      #f7f9fc;
+  --bg-raised:    #eaeff6;
+
+  --border:       #d2dbe8;
+  --border-bright:#a7b8cf;
+  --border-glow:  #0088dd;
+
+  --text-primary: #16222e;
+  --text-dim:     #56697d;
+  --text-muted:   #93a3b5;
+
+  /* Neon accents darkened for contrast on white */
+  --accent-green: #0a9d57;
+  --accent-cyan:  #0689b0;
+  --accent-amber: #b9820a;
+  --accent-red:   #dc3247;
+
+  /* HP thresholds — slightly deepened so the fills read on light bars */
+  --hp-high:   #18a957;
+  --hp-mid:    #e0a200;
+  --hp-low:    #e02744;
+
+  /* Decision-quality colours (mirrors the second :root block) */
+  --clr-optimal:    #0a9d57;
+  --clr-good:       #c79100;
+  --clr-suboptimal: #e0691a;
+  --clr-fallback:   #dc3247;
+  --clr-switch:     #2f7fd0;
+  --clr-no-data:    #aab8c6;
+}
+
+/* The dark CRT vignette + scanlines fight a light surface — soften them. */
+:root[data-theme="light"] body {
+  background-image:
+    repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0, 40, 90, 0.03) 2px,
+      rgba(0, 40, 90, 0.03) 4px
+    );
+}
+:root[data-theme="light"] body::before {
+  background: radial-gradient(ellipse at 50% 0%, rgba(0, 136, 221, 0.05) 0%, transparent 70%);
+}
+:root[data-theme="light"] body::after {
+  background: radial-gradient(ellipse at 50% 100%, rgba(70, 100, 130, 0.06) 0%, transparent 60%);
+}
+
 /* ---- Reset ---- */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -182,6 +244,30 @@ body::after {
   color: var(--accent-cyan);
   background: rgba(0,221,255,0.06);
   box-shadow: 0 0 10px rgba(0,221,255,0.15);
+}
+
+/* ---- Theme toggle ---- */
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  font-size: 0.9rem;
+  line-height: 1;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  transition: all var(--transition);
+}
+.theme-toggle:hover {
+  border-color: var(--accent-amber);
+  color: var(--accent-amber);
+  background: rgba(255, 204, 0, 0.08);
+  box-shadow: 0 0 10px rgba(255, 204, 0, 0.15);
 }
 
 /* ============================================================
