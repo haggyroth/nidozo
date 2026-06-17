@@ -178,7 +178,7 @@ class _StreamingMixin:
         self,
         opponent: str,
         n_challenges: int,
-        to_wait: Optional[asyncio.Event] = None,
+        to_wait: asyncio.Event | None = None,
     ) -> None:
         """Override _send_challenges to add a per-challenge timeout.
 
