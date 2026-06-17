@@ -8,6 +8,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [Unreleased]
 
 ### Added
+- **Typography & motion pass** (UI/UX overhaul, Phase 3) — the stylesheet had
+  ~329 hardcoded font sizes spread across 26 near-duplicate values
+  (0.58/0.6/0.62/0.63rem…) that muddied the hierarchy. They're snapped onto a
+  documented 13-step `--fs-*` token scale (small intentional ≤~10% shifts on the
+  worst offenders), so type sizing is now consistent and tunable from one place.
+  Added `prefers-reduced-motion` support: the 28 animations (hit flash, sprite
+  shake, heal pulse, faint fade, thinking pulse, scanlines) and all transitions
+  collapse to near-instant for users who request reduced motion — functional
+  state still applies, only the motion is removed.
 - **Mobile-responsive layout** (UI/UX overhaul, Phase 2) — the app shipped
   desktop-only; it now adapts down to phone widths. A consolidated responsive
   layer adds tablet (≤768px) and phone (≤480px) breakpoints: the header/nav

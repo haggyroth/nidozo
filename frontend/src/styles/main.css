@@ -63,15 +63,24 @@
   --space-xl:  1.5rem;
   --space-2xl: 2rem;
 
-  /* Type scale — the UI is pixel-font dense, so steps cluster small. --fs-sm
-     (0.65rem) is the workhorse body size; pixel-font headers use --fs-sm/--fs-md. */
-  --fs-2xs: 0.5rem;
-  --fs-xs:  0.6rem;
-  --fs-sm:  0.65rem;
-  --fs-md:  0.7rem;
-  --fs-lg:  0.85rem;
-  --fs-xl:  1rem;
-  --fs-2xl: 1.25rem;
+  /* Type scale (Phase 3) — the UI is pixel-font dense, so steps cluster small.
+     This is the single source of truth for font sizes; the codebase had ~26
+     near-duplicate hardcoded values (0.58/0.6/0.62/0.63…) that muddied the
+     hierarchy. They're now snapped onto these 13 steps. --fs-md (0.6rem) is the
+     workhorse body/label size; pixel-font micro-labels use --fs-3xs…--fs-2xs. */
+  --fs-3xs: 0.4rem;
+  --fs-2xs: 0.45rem;
+  --fs-xs:  0.5rem;
+  --fs-sm:  0.55rem;
+  --fs-md:  0.6rem;
+  --fs-lg:  0.65rem;
+  --fs-xl:  0.7rem;
+  --fs-2xl: 0.8rem;
+  --fs-3xl: 0.9rem;
+  --fs-4xl: 1rem;
+  --fs-5xl: 1.25rem;
+  --fs-6xl: 1.7rem;
+  --fs-7xl: 2rem;
 
   --radius-sm: 3px;
   --radius:    6px;
@@ -204,7 +213,7 @@ body::after {
 
 .app-logo {
   font-family: var(--font-pixel);
-  font-size: 0.85rem;
+  font-size: var(--fs-3xl);
   color: var(--accent-cyan);
   text-shadow: 0 0 12px rgba(0,221,255,0.7), 0 0 30px rgba(0,221,255,0.3);
   letter-spacing: 0.08em;
@@ -213,7 +222,7 @@ body::after {
 
 .app-logo span {
   display: block;
-  font-size: 0.45rem;
+  font-size: var(--fs-2xs);
   color: var(--text-dim);
   text-shadow: none;
   margin-top: 4px;
@@ -227,7 +236,7 @@ body::after {
 
 .nav-btn {
   font-family: var(--font-pixel);
-  font-size: 0.5rem;
+  font-size: var(--fs-xs);
   padding: 0.5rem 1rem;
   background: transparent;
   border: 1px solid var(--border);
@@ -254,7 +263,7 @@ body::after {
   width: 2rem;
   height: 2rem;
   padding: 0;
-  font-size: 0.9rem;
+  font-size: var(--fs-3xl);
   line-height: 1;
   background: transparent;
   border: 1px solid var(--border);
@@ -282,7 +291,7 @@ body::after {
 
 .panel-title {
   font-family: var(--font-pixel);
-  font-size: 0.5rem;
+  font-size: var(--fs-xs);
   color: var(--accent-cyan);
   letter-spacing: 0.15em;
   margin-bottom: 1rem;
@@ -323,7 +332,7 @@ body::after {
 }
 
 .form-label {
-  font-size: 0.65rem;
+  font-size: var(--fs-lg);
   color: var(--text-dim);
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -332,7 +341,7 @@ body::after {
 .form-select,
 .form-input {
   font-family: var(--font-mono);
-  font-size: 0.8rem;
+  font-size: var(--fs-2xl);
   background: var(--bg-deep);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
@@ -352,7 +361,7 @@ body::after {
 
 .btn-start {
   font-family: var(--font-pixel);
-  font-size: 0.55rem;
+  font-size: var(--fs-sm);
   padding: 0.85rem 1.5rem;
   background: linear-gradient(135deg, rgba(0,255,136,0.15), rgba(0,221,255,0.1));
   border: 1px solid var(--accent-green);
@@ -389,7 +398,7 @@ body::after {
   border-left: 3px solid var(--hp-low, #ef4444);
   background: rgba(239, 68, 68, 0.08);
   color: var(--hp-low, #ef4444);
-  font-size: 0.8rem;
+  font-size: var(--fs-2xl);
   font-family: var(--font-mono, monospace);
   border-radius: 0 4px 4px 0;
 }
@@ -398,12 +407,12 @@ body::after {
 .leaderboard-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.78rem;
+  font-size: var(--fs-2xl);
 }
 
 .leaderboard-table th {
   font-family: var(--font-pixel);
-  font-size: 0.42rem;
+  font-size: var(--fs-2xs);
   color: var(--text-dim);
   letter-spacing: 0.1em;
   padding: 0.5rem 0.75rem;
@@ -428,7 +437,7 @@ body::after {
 
 .rank-badge {
   font-family: var(--font-pixel);
-  font-size: 0.4rem;
+  font-size: var(--fs-3xs);
   color: var(--text-muted);
 }
 
@@ -438,7 +447,7 @@ body::after {
 
 .model-name { color: var(--text-primary); }
 .provider-tag {
-  font-size: 0.65rem;
+  font-size: var(--fs-lg);
   color: var(--text-dim);
   display: flex;
   align-items: center;
@@ -454,7 +463,7 @@ body::after {
   background: rgba(0, 170, 255, 0.12);
   border: 1px solid rgba(0, 170, 255, 0.25);
   color: var(--accent-cyan);
-  font-size: 0.55rem;
+  font-size: var(--fs-sm);
   padding: 0 0.3rem;
   border-radius: 2px;
   letter-spacing: 0.03em;
@@ -468,7 +477,7 @@ body::after {
 .battle-entry {
   padding: 0.75rem;
   border-bottom: 1px solid rgba(30,58,95,0.4);
-  font-size: 0.72rem;
+  font-size: var(--fs-xl);
   display: grid;
   grid-template-columns: 1fr auto;
   gap: 0.5rem;
@@ -483,7 +492,7 @@ body::after {
 .battle-meta {
   text-align: right;
   color: var(--text-dim);
-  font-size: 0.65rem;
+  font-size: var(--fs-lg);
   line-height: 1.6;
 }
 
@@ -508,13 +517,13 @@ body::after {
 
 .turn-counter {
   font-family: var(--font-pixel);
-  font-size: 0.55rem;
+  font-size: var(--fs-sm);
   color: var(--accent-cyan);
   letter-spacing: 0.1em;
 }
 
 .weather-badge {
-  font-size: 0.7rem;
+  font-size: var(--fs-xl);
   padding: 0.3rem 0.75rem;
   background: rgba(100,150,255,0.12);
   border: 1px solid rgba(100,150,255,0.3);
@@ -523,7 +532,7 @@ body::after {
 }
 
 .battle-status-text {
-  font-size: 0.72rem;
+  font-size: var(--fs-xl);
   color: var(--text-dim);
 }
 
@@ -540,7 +549,7 @@ body::after {
   justify-content: space-between;
   margin-bottom: 0.3rem;
   font-family: 'IBM Plex Mono', monospace;
-  font-size: 0.65rem;
+  font-size: var(--fs-lg);
 }
 
 .win-prob-pct {
@@ -553,7 +562,7 @@ body::after {
 .win-prob-pct--p2 { color: var(--accent-red); }
 
 .win-prob-name {
-  font-size: 0.58rem;
+  font-size: var(--fs-sm);
   text-transform: uppercase;
   opacity: 0.7;
   letter-spacing: 0.04em;
@@ -564,13 +573,13 @@ body::after {
 }
 
 .win-prob-num {
-  font-size: 0.78rem;
+  font-size: var(--fs-2xl);
   font-weight: 600;
   letter-spacing: -0.01em;
 }
 
 .win-prob-mid-label {
-  font-size: 0.5rem;
+  font-size: var(--fs-xs);
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--text-muted);
@@ -643,7 +652,7 @@ body::after {
 
 .vs-divider {
   font-family: var(--font-pixel);
-  font-size: 0.6rem;
+  font-size: var(--fs-md);
   color: var(--text-muted);
   letter-spacing: 0.1em;
   padding: 0 0.5rem;
@@ -726,7 +735,7 @@ body::after {
   align-items: center;
   justify-content: center;
   color: var(--text-muted);
-  font-size: 0.7rem;
+  font-size: var(--fs-xl);
 }
 
 .card-header {
@@ -738,7 +747,7 @@ body::after {
 
 .pokemon-name {
   font-family: var(--font-pixel);
-  font-size: 0.55rem;
+  font-size: var(--fs-sm);
   color: var(--text-primary);
   letter-spacing: 0.05em;
   text-transform: uppercase;
@@ -746,7 +755,7 @@ body::after {
 }
 
 .pokemon-level {
-  font-size: 0.65rem;
+  font-size: var(--fs-lg);
   color: var(--text-dim);
   margin-top: 2px;
 }
@@ -759,7 +768,7 @@ body::after {
 }
 
 .type-badge {
-  font-size: 0.58rem;
+  font-size: var(--fs-sm);
   padding: 0.2rem 0.45rem;
   border-radius: 2px;
   font-weight: 600;
@@ -772,7 +781,7 @@ body::after {
 .status-badge {
   display: inline-block;
   font-family: var(--font-pixel);
-  font-size: 0.38rem;
+  font-size: var(--fs-3xs);
   padding: 0.25rem 0.5rem;
   border-radius: 2px;
   letter-spacing: 0.05em;
@@ -789,7 +798,7 @@ body::after {
 .tera-badge {
   display: inline-block;
   font-family: var(--font-pixel);
-  font-size: 0.38rem;
+  font-size: var(--fs-3xs);
   padding: 0.25rem 0.5rem;
   border-radius: 2px;
   letter-spacing: 0.05em;
@@ -815,7 +824,7 @@ body::after {
 }
 
 .boost-badge {
-  font-size: 0.6rem;
+  font-size: var(--fs-md);
   padding: 0.15rem 0.4rem;
   border-radius: 2px;
   font-weight: 600;
@@ -831,7 +840,7 @@ body::after {
 }
 
 .revealed-moves-title {
-  font-size: 0.58rem;
+  font-size: var(--fs-sm);
   color: var(--text-muted);
   margin-bottom: 0.4rem;
   letter-spacing: 0.08em;
@@ -839,7 +848,7 @@ body::after {
 }
 
 .revealed-move-item {
-  font-size: 0.68rem;
+  font-size: var(--fs-lg);
   color: var(--text-dim);
   padding: 0.15rem 0;
 }
@@ -859,7 +868,7 @@ body::after {
 }
 
 .hp-text {
-  font-size: 0.6rem;
+  font-size: var(--fs-md);
   color: var(--text-dim);
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -867,7 +876,7 @@ body::after {
 
 .hp-pct {
   font-family: var(--font-pixel);
-  font-size: 0.5rem;
+  font-size: var(--fs-xs);
   transition: color var(--transition);
 }
 .hp-pct.high  { color: var(--hp-high); }
@@ -944,13 +953,13 @@ body::after {
 
 .battle-log-title {
   font-family: var(--font-pixel);
-  font-size: 0.45rem;
+  font-size: var(--fs-2xs);
   color: var(--accent-cyan);
   letter-spacing: 0.15em;
 }
 
 .log-count {
-  font-size: 0.65rem;
+  font-size: var(--fs-lg);
   color: var(--text-muted);
 }
 
@@ -968,7 +977,7 @@ body::after {
 
 .log-entry {
   padding: 0.45rem 1rem;
-  font-size: 0.72rem;
+  font-size: var(--fs-xl);
   line-height: 1.5;
   border-left: 2px solid transparent;
   animation: log-in 0.2s ease;
@@ -986,7 +995,7 @@ body::after {
 
 .log-turn-num {
   font-family: var(--font-pixel);
-  font-size: 0.4rem;
+  font-size: var(--fs-3xs);
   color: var(--text-muted);
   margin-right: 0.5rem;
 }
@@ -1018,7 +1027,7 @@ body::after {
   cursor: pointer;
   color: var(--text-dim);
   font-family: var(--font-pixel);
-  font-size: 0.42rem;
+  font-size: var(--fs-2xs);
   letter-spacing: 0.12em;
   transition: color var(--transition);
   text-align: left;
@@ -1028,7 +1037,7 @@ body::after {
 
 .drawer-chevron {
   transition: transform var(--transition);
-  font-size: 0.7rem;
+  font-size: var(--fs-xl);
 }
 .drawer-chevron.open { transform: rotate(180deg); }
 
@@ -1044,7 +1053,7 @@ body::after {
    drawer stable instead of letting it vanish mid-battle (#157). */
 .heuristic-content--empty {
   color: var(--text-muted);
-  font-size: var(--fs-xs);
+  font-size: var(--fs-md);
   font-style: italic;
 }
 
@@ -1052,7 +1061,7 @@ body::after {
   display: grid;
   grid-template-columns: 130px 110px 1fr;
   gap: 0.5rem;
-  font-size: 0.7rem;
+  font-size: var(--fs-xl);
   padding: 0.35rem 0;
   border-bottom: 1px solid rgba(30,58,95,0.3);
   align-items: start;
@@ -1061,10 +1070,10 @@ body::after {
 .heuristic-move:last-child { border-bottom: none; }
 
 .hmove-name { color: var(--text-primary); font-weight: 500; }
-.hmove-effectiveness { color: var(--text-dim); font-size: 0.65rem; }
+.hmove-effectiveness { color: var(--text-dim); font-size: var(--fs-lg); }
 .hmove-effectiveness.super    { color: #ff8f00; }
 .hmove-effectiveness.immune   { color: var(--text-muted); }
-.hmove-notes { color: var(--text-dim); font-size: 0.65rem; }
+.hmove-notes { color: var(--text-dim); font-size: var(--fs-lg); }
 
 /* ============================================================
    WINNER BANNER
@@ -1097,7 +1106,7 @@ body::after {
 
 .winner-label {
   font-family: var(--font-pixel);
-  font-size: 0.5rem;
+  font-size: var(--fs-xs);
   color: var(--text-dim);
   letter-spacing: 0.2em;
   margin-bottom: 1.5rem;
@@ -1105,7 +1114,7 @@ body::after {
 
 .winner-name {
   font-family: var(--font-pixel);
-  font-size: 1rem;
+  font-size: var(--fs-4xl);
   color: var(--accent-amber);
   text-shadow: 0 0 20px rgba(255,204,0,0.6);
   line-height: 1.5;
@@ -1113,14 +1122,14 @@ body::after {
 }
 
 .winner-turns {
-  font-size: 0.8rem;
+  font-size: var(--fs-2xl);
   color: var(--text-dim);
   margin-bottom: 2rem;
 }
 
 .btn-dismiss {
   font-family: var(--font-pixel);
-  font-size: 0.45rem;
+  font-size: var(--fs-2xs);
   padding: 0.75rem 1.5rem;
   background: none;
   border: 1px solid var(--text-muted);
@@ -1139,7 +1148,7 @@ body::after {
   padding: 2rem;
   text-align: center;
   color: var(--text-muted);
-  font-size: 0.75rem;
+  font-size: var(--fs-2xl);
 }
 
 /* Shared onboarding / no-data placeholder (EmptyState.jsx) */
@@ -1156,20 +1165,20 @@ body::after {
   padding: var(--space-lg) var(--space-md);
 }
 .empty-state-icon {
-  font-size: var(--fs-2xl);
+  font-size: var(--fs-5xl);
   line-height: 1;
   opacity: 0.45;
   filter: grayscale(0.3);
 }
 .empty-state-title {
   font-family: var(--font-pixel);
-  font-size: var(--fs-sm);
+  font-size: var(--fs-lg);
   color: var(--text-primary);
   letter-spacing: 0.04em;
 }
 .empty-state-hint {
   font-family: var(--font-mono);
-  font-size: var(--fs-xs);
+  font-size: var(--fs-md);
   color: var(--text-muted);
   max-width: 32ch;
   line-height: 1.6;
@@ -1245,7 +1254,7 @@ body::after {
 
 .btn-analyze {
   font-family: var(--font-pixel);
-  font-size: 0.55rem;
+  font-size: var(--fs-sm);
   padding: 3px 7px;
   background: transparent;
   border: 1px solid var(--border-bright);
@@ -1273,7 +1282,7 @@ body::after {
 .analysis-error,
 .analysis-no-data {
   padding: 0.75rem;
-  font-size: 0.7rem;
+  font-size: var(--fs-xl);
   color: var(--text-dim);
   text-align: center;
 }
@@ -1295,7 +1304,7 @@ body::after {
 
 .analysis-player-label {
   font-family: var(--font-pixel);
-  font-size: 0.6rem;
+  font-size: var(--fs-md);
   color: var(--accent-cyan);
   margin-bottom: 0.4rem;
 }
@@ -1303,7 +1312,7 @@ body::after {
 .analysis-stat-row {
   display: flex;
   gap: 1rem;
-  font-size: 0.65rem;
+  font-size: var(--fs-lg);
   color: var(--text-dim);
   margin-bottom: 0.5rem;
 }
@@ -1321,7 +1330,7 @@ body::after {
   transition: width 0.4s ease;
 }
 .quality-bar-empty {
-  font-size: 0.65rem;
+  font-size: var(--fs-lg);
   color: var(--text-muted);
   padding: 0.3rem 0;
 }
@@ -1329,7 +1338,7 @@ body::after {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem 0.75rem;
-  font-size: 0.6rem;
+  font-size: var(--fs-md);
 }
 .legend-item {
   display: flex;
@@ -1347,7 +1356,7 @@ body::after {
   margin-left: auto;
   color: var(--accent-green);
   font-family: var(--font-pixel);
-  font-size: 0.55rem;
+  font-size: var(--fs-sm);
 }
 
 /* ---- Turn log ---- */
@@ -1364,7 +1373,7 @@ body::after {
   align-items: center;
   padding: 0.5rem 0.75rem;
   font-family: var(--font-pixel);
-  font-size: 0.55rem;
+  font-size: var(--fs-sm);
   color: var(--text-dim);
   cursor: pointer;
   background: var(--bg-raised);
@@ -1379,7 +1388,7 @@ body::after {
   align-items: center;
   gap: 0.5rem;
   padding: 0.35rem 0.75rem;
-  font-size: 0.65rem;
+  font-size: var(--fs-lg);
   border-bottom: 1px solid var(--bg-raised);
   flex-wrap: wrap;
 }
@@ -1387,21 +1396,21 @@ body::after {
 
 .turn-num {
   font-family: var(--font-pixel);
-  font-size: 0.5rem;
+  font-size: var(--fs-xs);
   color: var(--text-muted);
   width: 2rem;
   flex-shrink: 0;
 }
 .turn-role {
   font-family: var(--font-pixel);
-  font-size: 0.5rem;
+  font-size: var(--fs-xs);
   color: var(--text-dim);
   width: 2rem;
   flex-shrink: 0;
 }
 .turn-quality-badge {
   font-family: var(--font-pixel);
-  font-size: 0.45rem;
+  font-size: var(--fs-2xs);
   padding: 2px 5px;
   border-radius: 2px;
   color: #000;
@@ -1413,7 +1422,7 @@ body::after {
 }
 .turn-notes {
   color: var(--text-dim);
-  font-size: 0.6rem;
+  font-size: var(--fs-md);
   flex: 1;
   min-width: 0;
   overflow: hidden;
@@ -1423,7 +1432,7 @@ body::after {
 
 .turn-show-more {
   padding: 0.4rem 0.75rem;
-  font-size: 0.6rem;
+  font-size: var(--fs-md);
   color: var(--accent-cyan);
   cursor: pointer;
   text-align: center;
@@ -1471,12 +1480,12 @@ body::after {
 
 .card-empty-label {
   color: var(--text-muted);
-  font-size: 0.7rem;
+  font-size: var(--fs-xl);
 }
 
 .mon-item {
   margin-top: 0.4rem;
-  font-size: 0.65rem;
+  font-size: var(--fs-lg);
   color: var(--text-dim);
 }
 
@@ -1555,7 +1564,7 @@ body::after {
 }
 
 .thinking-badge-icon {
-  font-size: 0.9rem;
+  font-size: var(--fs-3xl);
   line-height: 1;
 }
 
@@ -1610,7 +1619,7 @@ body::after {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.5rem;
+  font-size: var(--fs-xs);
   background: var(--bg-raised);
   border: 1px solid var(--border);
   border-radius: 2px;
@@ -1668,7 +1677,7 @@ body::after {
 
 .preset-chip {
   font-family: var(--font-pixel);
-  font-size: 0.38rem;
+  font-size: var(--fs-3xs);
   padding: 0.25rem 0.55rem;
   background: var(--bg-deep);
   border: 1px solid var(--border);
@@ -1692,7 +1701,7 @@ body::after {
 }
 
 .model-presets-status {
-  font-size: 0.6rem;
+  font-size: var(--fs-md);
   color: var(--text-muted);
   padding: 0.2rem 0;
   font-style: italic;
@@ -1718,7 +1727,7 @@ body::after {
 
 .coach-selector-label {
   font-family: var(--font-pixel);
-  font-size: 0.42rem;
+  font-size: var(--fs-2xs);
   letter-spacing: 0.08em;
   color: rgba(0, 220, 180, 0.75);
   text-transform: uppercase;
@@ -1738,7 +1747,7 @@ body::after {
 
 .personality-selector-label {
   font-family: var(--font-pixel);
-  font-size: 0.42rem;
+  font-size: var(--fs-2xs);
   letter-spacing: 0.08em;
   color: rgba(255, 200, 80, 0.75);
   text-transform: uppercase;
@@ -1763,7 +1772,7 @@ body::after {
   border-bottom: 2px solid transparent;
   color: var(--text-dim);
   font-family: 'Press Start 2P', monospace;
-  font-size: 0.6rem;
+  font-size: var(--fs-md);
   padding: 0.5rem 1rem 0.6rem;
   cursor: pointer;
   transition: color 0.15s, border-color 0.15s;
@@ -1789,7 +1798,7 @@ body::after {
   border: 1px solid var(--border-bright);
   color: var(--accent-cyan);
   font-family: 'Press Start 2P', monospace;
-  font-size: 0.55rem;
+  font-size: var(--fs-sm);
   padding: 0.3rem 0.6rem;
   cursor: pointer;
   border-radius: 2px;
@@ -1803,7 +1812,7 @@ body::after {
   border-bottom: 1px solid rgba(30,58,95,0.35);
 }
 .tournament-player-label {
-  font-size: 0.6rem;
+  font-size: var(--fs-md);
   color: var(--text-dim);
   margin-bottom: 0.35rem;
   display: flex;
@@ -1815,7 +1824,7 @@ body::after {
   border: none;
   color: var(--text-muted);
   cursor: pointer;
-  font-size: 0.6rem;
+  font-size: var(--fs-md);
   padding: 0;
   line-height: 1;
   transition: color 0.15s;
@@ -1826,7 +1835,7 @@ body::after {
   gap: 0.5rem;
 }
 .tournament-battle-count {
-  font-size: 0.6rem;
+  font-size: var(--fs-md);
   color: var(--accent-amber);
   margin-top: 0.3rem;
   opacity: 0.8;
@@ -1844,20 +1853,20 @@ body::after {
   display: flex;
   align-items: center;
   gap: 1rem;
-  font-size: 0.6rem;
+  font-size: var(--fs-md);
   margin-bottom: 0.35rem;
 }
 .tournament-bar-label {
   color: var(--accent-cyan);
   font-family: 'Press Start 2P', monospace;
-  font-size: 0.55rem;
+  font-size: var(--fs-sm);
 }
 .tournament-bar-progress { color: var(--text-dim); }
 .tournament-bar-matchup  { color: var(--text-primary); }
 .tournament-bar-cancelled {
   color: var(--accent-red);
   font-family: 'Press Start 2P', monospace;
-  font-size: 0.55rem;
+  font-size: var(--fs-sm);
 }
 .tournament-progress-track {
   height: 3px;
@@ -1887,7 +1896,7 @@ body::after {
   border: 1px solid rgba(255,68,85,0.35);
   color: var(--accent-red);
   font-family: 'Press Start 2P', monospace;
-  font-size: 0.5rem;
+  font-size: var(--fs-xs);
   padding: 0.25rem 0.5rem;
   cursor: pointer;
   border-radius: 2px;
@@ -1914,11 +1923,11 @@ body::after {
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  font-size: 0.65rem;
+  font-size: var(--fs-lg);
   padding: 0.3rem 0;
   border-bottom: 1px solid rgba(30,58,95,0.4);
 }
-.tlb-medal { font-size: 1rem; min-width: 1.5rem; }
+.tlb-medal { font-size: var(--fs-4xl); min-width: 1.5rem; }
 .tlb-name  { flex: 1; color: var(--text-primary); }
 .tlb-elo   { color: var(--accent-amber); font-family: 'IBM Plex Mono', monospace; min-width: 3rem; text-align: right; }
 .tlb-wlt   { color: var(--text-dim); min-width: 5rem; text-align: right; }
@@ -1931,7 +1940,7 @@ body::after {
   background: var(--accent-amber);
   color: var(--bg-deep);
   font-family: 'IBM Plex Mono', monospace;
-  font-size: 0.5rem;
+  font-size: var(--fs-xs);
   font-weight: 600;
   padding: 0.1rem 0.3rem;
   border-radius: 2px;
@@ -1947,7 +1956,7 @@ body::after {
   border: 1px solid rgba(0,230,255,0.3);
   color: var(--accent-cyan);
   font-family: 'Press Start 2P', monospace;
-  font-size: 0.45rem;
+  font-size: var(--fs-2xs);
   padding: 0.2rem 0.45rem;
   cursor: pointer;
   border-radius: 2px;
@@ -1990,13 +1999,13 @@ body::after {
 }
 .replay-title {
   font-family: 'Press Start 2P', monospace;
-  font-size: 0.65rem;
+  font-size: var(--fs-lg);
   color: var(--accent-cyan);
   letter-spacing: 0.08em;
 }
 .replay-battle-id {
   font-family: 'IBM Plex Mono', monospace;
-  font-size: 0.65rem;
+  font-size: var(--fs-lg);
   color: var(--text-dim);
 }
 .replay-matchup {
@@ -2004,17 +2013,17 @@ body::after {
   align-items: center;
   gap: 0.5rem;
   font-family: 'IBM Plex Mono', monospace;
-  font-size: 0.7rem;
+  font-size: var(--fs-xl);
 }
 .replay-p1  { color: var(--accent-cyan); }
 .replay-p2  { color: var(--accent-amber); }
-.replay-vs  { color: var(--text-dim); font-size: 0.6rem; }
+.replay-vs  { color: var(--text-dim); font-size: var(--fs-md); }
 .replay-winner-badge {
   background: rgba(0,230,255,0.08);
   border: 1px solid rgba(0,230,255,0.2);
   color: var(--accent-cyan);
   font-family: 'IBM Plex Mono', monospace;
-  font-size: 0.6rem;
+  font-size: var(--fs-md);
   padding: 0.2rem 0.5rem;
   border-radius: 2px;
 }
@@ -2023,7 +2032,7 @@ body::after {
   border: 1px solid rgba(255,68,85,0.3);
   color: var(--accent-red);
   font-family: 'Press Start 2P', monospace;
-  font-size: 0.5rem;
+  font-size: var(--fs-xs);
   padding: 0.3rem 0.6rem;
   cursor: pointer;
   border-radius: 2px;
@@ -2040,7 +2049,7 @@ body::after {
 .replay-weather {
   text-align: center;
   font-family: 'IBM Plex Mono', monospace;
-  font-size: 0.65rem;
+  font-size: var(--fs-lg);
   color: var(--text-dim);
   margin-bottom: 0.5rem;
 }
@@ -2057,13 +2066,13 @@ body::after {
   gap: 1rem;
   margin-bottom: 0.4rem;
   font-family: 'IBM Plex Mono', monospace;
-  font-size: 0.6rem;
+  font-size: var(--fs-md);
 }
 .htl-p1 { color: var(--accent-cyan); }
 .htl-p2 { color: var(--accent-amber); }
 .htl-axis-note {
   color: var(--text-dim);
-  font-size: 0.55rem;
+  font-size: var(--fs-sm);
   margin-left: auto;
 }
 .hp-timeline-svg {
@@ -2093,7 +2102,7 @@ body::after {
   border: 1px solid var(--border);
   color: var(--text-primary);
   font-family: 'Press Start 2P', monospace;
-  font-size: 0.6rem;
+  font-size: var(--fs-md);
   padding: 0.4rem 0.7rem;
   cursor: pointer;
   border-radius: 3px;
@@ -2128,7 +2137,7 @@ body::after {
 }
 .replay-turn-label {
   font-family: 'Press Start 2P', monospace;
-  font-size: 0.45rem;
+  font-size: var(--fs-2xs);
   color: var(--text-dim);
   white-space: nowrap;
 }
@@ -2162,7 +2171,7 @@ body::after {
 }
 .replay-turn-counter {
   font-family: 'IBM Plex Mono', monospace;
-  font-size: 0.7rem;
+  font-size: var(--fs-xl);
   color: var(--accent-cyan);
   white-space: nowrap;
   min-width: 4.5rem;
@@ -2171,7 +2180,7 @@ body::after {
 .replay-kbd-hint {
   text-align: center;
   font-family: 'IBM Plex Mono', monospace;
-  font-size: 0.55rem;
+  font-size: var(--fs-sm);
   color: var(--text-dim);
   opacity: 0.6;
 }
@@ -2184,7 +2193,7 @@ body::after {
 }
 .tap-title {
   font-family: 'Press Start 2P', monospace;
-  font-size: 0.45rem;
+  font-size: var(--fs-2xs);
   color: var(--text-dim);
   margin-bottom: 0.6rem;
   letter-spacing: 0.06em;
@@ -2196,19 +2205,19 @@ body::after {
   padding: 0.3rem 0;
   border-bottom: 1px solid rgba(30,58,95,0.25);
   font-family: 'IBM Plex Mono', monospace;
-  font-size: 0.7rem;
+  font-size: var(--fs-xl);
 }
 .tap-row:last-child { border-bottom: none; }
 .tap-player {
   font-weight: 600;
   white-space: nowrap;
-  font-size: 0.65rem;
+  font-size: var(--fs-lg);
   min-width: 8rem;
 }
 .tap-player.p1 { color: var(--accent-cyan); }
 .tap-player.p2 { color: var(--accent-amber); }
 .tap-action { color: var(--text-primary); }
-.tap-fallback { color: var(--accent-red); font-size: 0.6rem; }
+.tap-fallback { color: var(--accent-red); font-size: var(--fs-md); }
 
 .tap-row-wrap {
   border-bottom: 1px solid rgba(30,58,95,0.25);
@@ -2222,7 +2231,7 @@ body::after {
   border: 1px solid rgba(0, 220, 180, 0.25);
   border-radius: 2px;
   color: rgba(0, 220, 180, 0.7);
-  font-size: 0.55rem;
+  font-size: var(--fs-sm);
   padding: 0.15rem 0.4rem;
   cursor: pointer;
   font-family: inherit;
@@ -2244,7 +2253,7 @@ body::after {
 .tap-coach-label {
   display: block;
   font-family: var(--font-pixel);
-  font-size: 0.38rem;
+  font-size: var(--fs-3xs);
   letter-spacing: 0.08em;
   color: rgba(0, 220, 180, 0.65);
   margin-bottom: 0.35rem;
@@ -2252,7 +2261,7 @@ body::after {
 .tap-coach-text {
   margin: 0;
   font-family: 'IBM Plex Mono', monospace;
-  font-size: 0.68rem;
+  font-size: var(--fs-lg);
   color: var(--text-dim);
   line-height: 1.55;
 }
@@ -2271,7 +2280,7 @@ body::after {
   align-items: center;
   gap: 0.3rem;
   font-family: 'Press Start 2P', monospace;
-  font-size: 0.55rem;
+  font-size: var(--fs-sm);
   color: var(--text-dim);
 }
 .replay-loading-dot {
@@ -2315,12 +2324,12 @@ body::after {
   align-items: center;
   gap: 0.75rem;
   font-family: 'IBM Plex Mono', monospace;
-  font-size: 0.6rem;
+  font-size: var(--fs-md);
   margin-bottom: 0.35rem;
 }
 .wp-p1     { color: var(--accent-cyan); }
 .wp-p2     { color: var(--accent-amber); margin-left: auto; }
-.wp-center { color: var(--text-dim); font-size: 0.5rem; letter-spacing: 0.06em; text-transform: uppercase; }
+.wp-center { color: var(--text-dim); font-size: var(--fs-xs); letter-spacing: 0.06em; text-transform: uppercase; }
 .wp-svg {
   display: block;
   width: 100%;
@@ -2330,7 +2339,7 @@ body::after {
 .wp-turning-point {
   margin-top: 0.3rem;
   font-family: 'IBM Plex Mono', monospace;
-  font-size: 0.58rem;
+  font-size: var(--fs-sm);
   color: var(--accent-amber);
   opacity: 0.8;
 }
@@ -2345,7 +2354,7 @@ body::after {
 }
 .blunders-title {
   font-family: 'Press Start 2P', monospace;
-  font-size: 0.45rem;
+  font-size: var(--fs-2xs);
   color: var(--accent-amber);
   margin-bottom: 0.5rem;
   letter-spacing: 0.06em;
@@ -2357,15 +2366,15 @@ body::after {
   padding: 0.25rem 0;
   border-bottom: 1px solid rgba(255,170,0,0.12);
   font-family: 'IBM Plex Mono', monospace;
-  font-size: 0.65rem;
+  font-size: var(--fs-lg);
 }
 .blunder-row:last-child { border-bottom: none; }
-.blunder-player { font-weight: 600; white-space: nowrap; min-width: 5rem; font-size: 0.6rem; }
+.blunder-player { font-weight: 600; white-space: nowrap; min-width: 5rem; font-size: var(--fs-md); }
 .blunder-player.p1 { color: var(--accent-cyan); }
 .blunder-player.p2 { color: var(--accent-amber); }
 .blunder-turn { color: var(--text-dim); white-space: nowrap; }
-.blunder-gap  { color: var(--accent-amber); white-space: nowrap; font-size: 0.6rem; }
-.blunder-note { color: var(--text-secondary); font-size: 0.6rem; }
+.blunder-gap  { color: var(--accent-amber); white-space: nowrap; font-size: var(--fs-md); }
+.blunder-note { color: var(--text-secondary); font-size: var(--fs-md); }
 
 /* ---- Turn log RNG / blunder enhancements ---- */
 .turn-row-blunder {
@@ -2374,12 +2383,12 @@ body::after {
 }
 .turn-blunder-tag {
   color: var(--accent-amber);
-  font-size: 0.7rem;
+  font-size: var(--fs-xl);
   flex-shrink: 0;
 }
 .turn-rng-badge {
   font-family: 'IBM Plex Mono', monospace;
-  font-size: 0.55rem;
+  font-size: var(--fs-sm);
   padding: 0.1rem 0.3rem;
   border-radius: 2px;
   flex-shrink: 0;
@@ -2398,7 +2407,7 @@ body::after {
 /* ---- Replay: turn actions with quality + RNG ---- */
 .tap-quality {
   font-family: 'Press Start 2P', monospace;
-  font-size: 0.4rem;
+  font-size: var(--fs-3xs);
   padding: 0.15rem 0.35rem;
   border-radius: 2px;
   flex-shrink: 0;
@@ -2410,17 +2419,17 @@ body::after {
 .tap-q-switch     { background: var(--clr-switch);     color: #000; }
 .tap-rng {
   font-family: 'IBM Plex Mono', monospace;
-  font-size: 0.58rem;
+  font-size: var(--fs-sm);
   flex-shrink: 0;
 }
 .tap-rng.rng-crit { color: #ffd700; }
 .tap-rng.rng-miss { color: var(--text-dim); }
 
 /* ---- HP timeline enhancements in replay ---- */
-.htl-wp { color: rgba(255,255,255,0.45); font-size: 0.58rem; }
+.htl-wp { color: rgba(255,255,255,0.45); font-size: var(--fs-sm); }
 .htl-turning-point {
   font-family: 'IBM Plex Mono', monospace;
-  font-size: 0.58rem;
+  font-size: var(--fs-sm);
   color: var(--accent-amber);
   margin-top: 0.3rem;
   opacity: 0.85;
@@ -2431,7 +2440,7 @@ body::after {
    ============================================================ */
 .btn-stats {
   font-family: var(--font-pixel);
-  font-size: 0.38rem;
+  font-size: var(--fs-3xs);
   padding: 0.3rem 0.55rem;
   background: transparent;
   border: 1px solid var(--border-bright);
@@ -2469,7 +2478,7 @@ body::after {
 .stats-back {
   align-self: flex-start;
   font-family: var(--font-pixel);
-  font-size: 0.45rem;
+  font-size: var(--fs-2xs);
   padding: 0.4rem 0.75rem;
   background: transparent;
   border: 1px solid var(--border);
@@ -2503,7 +2512,7 @@ body::after {
 
 .stats-model-name {
   font-family: var(--font-pixel);
-  font-size: 0.7rem;
+  font-size: var(--fs-xl);
   color: var(--text-primary);
   letter-spacing: 0.08em;
   margin-bottom: 0.4rem;
@@ -2527,13 +2536,13 @@ body::after {
 
 .kpi-value {
   font-family: var(--font-pixel);
-  font-size: 0.85rem;
+  font-size: var(--fs-3xl);
   letter-spacing: 0.04em;
   margin-bottom: 0.3rem;
 }
 
 .kpi-label {
-  font-size: 0.62rem;
+  font-size: var(--fs-md);
   color: var(--text-dim);
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -2552,7 +2561,7 @@ body::after {
 
 .ms-export-btn {
   font-family: var(--font-pixel);
-  font-size: 0.45rem;
+  font-size: var(--fs-2xs);
   letter-spacing: 0.08em;
   padding: 0.35rem 0.65rem;
   background: rgba(255, 255, 255, 0.04);
@@ -2572,7 +2581,7 @@ body::after {
 .ms-h2h-loading,
 .ms-h2h-empty {
   padding: 0.75rem 0.5rem;
-  font-size: 0.65rem;
+  font-size: var(--fs-lg);
   color: var(--text-muted);
   font-style: italic;
 }
@@ -2580,13 +2589,13 @@ body::after {
 .ms-h2h-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.62rem;
+  font-size: var(--fs-md);
   margin-top: 0.5rem;
 }
 .ms-h2h-table th {
   text-align: left;
   padding: 0.3rem 0.5rem;
-  font-size: 0.5rem;
+  font-size: var(--fs-xs);
   letter-spacing: 0.07em;
   color: var(--text-dim);
   border-bottom: 1px solid var(--border);
@@ -2607,7 +2616,7 @@ body::after {
 
 .panel-subtitle {
   font-family: var(--font-mono);
-  font-size: 0.65rem;
+  font-size: var(--fs-lg);
   color: var(--text-muted);
   font-weight: 400;
   margin-left: 0.75rem;
@@ -2620,7 +2629,7 @@ body::after {
   padding: 3rem;
   text-align: center;
   color: var(--text-dim);
-  font-size: 0.75rem;
+  font-size: var(--fs-2xl);
 }
 .stats-error { color: var(--accent-red); }
 
@@ -2649,14 +2658,14 @@ body::after {
 
 .sparkline-label {
   font-family: var(--font-pixel);
-  font-size: 0.42rem;
+  font-size: var(--fs-2xs);
   color: var(--accent-cyan);
   letter-spacing: 0.12em;
 }
 
 .sparkline-delta {
   font-family: var(--font-mono);
-  font-size: 0.65rem;
+  font-size: var(--fs-lg);
   font-weight: 600;
 }
 .sparkline-delta.elo-delta-up   { color: var(--accent-green); }
@@ -2670,7 +2679,7 @@ body::after {
 
 .sparkline-empty {
   color: var(--text-muted);
-  font-size: 0.7rem;
+  font-size: var(--fs-xl);
   padding: 1rem 0;
   text-align: center;
 }
@@ -2686,7 +2695,7 @@ body::after {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: 0.7rem;
+  font-size: var(--fs-xl);
 }
 
 .quality-label { color: var(--text-dim); }
@@ -2694,7 +2703,7 @@ body::after {
 
 .quality-bar-empty {
   color: var(--text-muted);
-  font-size: 0.7rem;
+  font-size: var(--fs-xl);
   padding: 0.5rem 0;
 }
 
@@ -2723,7 +2732,7 @@ body::after {
 .parse-bar-legend {
   display: flex;
   gap: 1rem;
-  font-size: 0.6rem;
+  font-size: var(--fs-md);
   color: var(--text-muted);
   margin-top: 0.25rem;
 }
@@ -2734,12 +2743,12 @@ body::after {
 .stats-battle-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.7rem;
+  font-size: var(--fs-xl);
 }
 
 .stats-battle-table th {
   font-family: var(--font-pixel);
-  font-size: 0.36rem;
+  font-size: var(--fs-3xs);
   color: var(--text-muted);
   letter-spacing: 0.1em;
   padding: 0.4rem 0.5rem;
@@ -2755,7 +2764,7 @@ body::after {
 
 .result-badge {
   font-family: var(--font-pixel);
-  font-size: 0.38rem;
+  font-size: var(--fs-3xs);
   padding: 0.2rem 0.45rem;
   border-radius: 2px;
   letter-spacing: 0.06em;
@@ -2766,7 +2775,7 @@ body::after {
 
 .opponent-cell {
   color: var(--text-dim);
-  font-size: 0.65rem;
+  font-size: var(--fs-lg);
   max-width: 120px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -2774,17 +2783,17 @@ body::after {
 }
 
 .turns-cell { color: var(--text-dim); text-align: right; }
-.date-cell  { color: var(--text-muted); font-size: 0.62rem; }
+.date-cell  { color: var(--text-muted); font-size: var(--fs-md); }
 
 .btn-replay-sm {
-  font-size: 0.55rem;
+  font-size: var(--fs-sm);
   padding: 0.2rem 0.4rem;
 }
 
 /* ---- Lessons log ---- */
 .lessons-empty {
   color: var(--text-muted);
-  font-size: 0.68rem;
+  font-size: var(--fs-lg);
   line-height: 1.6;
   padding: 0.5rem 0;
 }
@@ -2818,13 +2827,13 @@ body::after {
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  font-size: 0.6rem;
+  font-size: var(--fs-md);
   margin-bottom: 0.35rem;
 }
 
 .lesson-num {
   font-family: var(--font-pixel);
-  font-size: 0.38rem;
+  font-size: var(--fs-3xs);
   color: var(--accent-cyan);
 }
 
@@ -2835,17 +2844,17 @@ body::after {
 
 .lesson-expand {
   color: var(--text-muted);
-  font-size: 0.5rem;
+  font-size: var(--fs-xs);
 }
 
 .lesson-preview {
-  font-size: 0.68rem;
+  font-size: var(--fs-lg);
   color: var(--text-dim);
   line-height: 1.5;
 }
 
 .lesson-body {
-  font-size: 0.72rem;
+  font-size: var(--fs-xl);
   color: var(--text-primary);
   line-height: 1.65;
   white-space: pre-wrap;
@@ -2874,7 +2883,7 @@ body::after {
   border: none;
   color: var(--text-primary);
   font-family: var(--font-mono);
-  font-size: 0.65rem;
+  font-size: var(--fs-lg);
   letter-spacing: 0.08em;
   cursor: pointer;
   text-align: left;
@@ -2888,7 +2897,7 @@ body::after {
   color: #fff;
   border-radius: 3px;
   padding: 1px 6px;
-  font-size: 0.58rem;
+  font-size: var(--fs-sm);
   font-weight: 700;
   letter-spacing: 0.04em;
 }
@@ -2908,7 +2917,7 @@ body::after {
 .aq-title,
 .km-title {
   font-family: var(--font-mono);
-  font-size: 0.58rem;
+  font-size: var(--fs-sm);
   letter-spacing: 0.1em;
   color: var(--text-muted);
   margin-bottom: 0.5rem;
@@ -2922,7 +2931,7 @@ body::after {
 
 .aq-vs {
   font-family: var(--font-mono);
-  font-size: 0.55rem;
+  font-size: var(--fs-sm);
   color: var(--text-muted);
   padding-top: 1.25rem;
   flex-shrink: 0;
@@ -2935,7 +2944,7 @@ body::after {
 
 .aq-player-label {
   font-family: var(--font-mono);
-  font-size: 0.6rem;
+  font-size: var(--fs-md);
   color: var(--text-dim);
   margin-bottom: 0.3rem;
   white-space: nowrap;
@@ -2974,7 +2983,7 @@ body::after {
   justify-content: space-between;
   align-items: center;
   font-family: var(--font-mono);
-  font-size: 0.6rem;
+  font-size: var(--fs-md);
 }
 
 .aq-stat-blunder .aq-stat-label,
@@ -2994,7 +3003,7 @@ body::after {
 
 .aq-stat-label::before {
   content: '■';
-  font-size: 0.45rem;
+  font-size: var(--fs-2xs);
 }
 
 .aq-optimal::before  { color: var(--accent-green); }
@@ -3020,7 +3029,7 @@ body::after {
 
 .aq-legend-item {
   font-family: var(--font-mono);
-  font-size: 0.52rem;
+  font-size: var(--fs-xs);
   color: var(--text-muted);
 }
 
@@ -3040,7 +3049,7 @@ body::after {
   align-items: baseline;
   gap: 0.4rem;
   font-family: var(--font-mono);
-  font-size: 0.62rem;
+  font-size: var(--fs-md);
   padding: 0.3rem 0.4rem;
   border-radius: 3px;
   border-left: 2px solid transparent;
@@ -3061,7 +3070,7 @@ body::after {
 
 .km-icon {
   flex-shrink: 0;
-  font-size: 0.7rem;
+  font-size: var(--fs-xl);
   line-height: 1;
 }
 
@@ -3073,7 +3082,7 @@ body::after {
 
 .km-player {
   flex-shrink: 0;
-  font-size: 0.55rem;
+  font-size: var(--fs-sm);
   letter-spacing: 0.04em;
   padding: 1px 4px;
   border-radius: 2px;
@@ -3091,7 +3100,7 @@ body::after {
 .km-goto {
   flex-shrink: 0;
   color: var(--text-muted);
-  font-size: 0.55rem;
+  font-size: var(--fs-sm);
   opacity: 0;
   transition: opacity 0.15s;
 }
@@ -3104,7 +3113,7 @@ body::after {
 
 .tournament-bar-scores-hint {
   margin-left: auto;
-  font-size: 0.55rem;
+  font-size: var(--fs-sm);
   color: var(--accent-cyan);
   letter-spacing: 0.08em;
   opacity: 0.75;
@@ -3144,7 +3153,7 @@ body::after {
 }
 
 .th-status {
-  font-size: 0.7rem;
+  font-size: var(--fs-xl);
   flex-shrink: 0;
 }
 
@@ -3159,14 +3168,14 @@ body::after {
 }
 
 .th-id {
-  font-size: 0.62rem;
+  font-size: var(--fs-md);
   color: var(--text-primary);
   font-weight: 700;
 }
 
 .th-players,
 .th-progress {
-  font-size: 0.57rem;
+  font-size: var(--fs-sm);
   color: var(--text-muted);
 }
 
@@ -3178,7 +3187,7 @@ body::after {
 }
 
 .th-date {
-  font-size: 0.55rem;
+  font-size: var(--fs-sm);
   color: var(--text-muted);
 }
 
@@ -3199,7 +3208,7 @@ body::after {
 .ts-error {
   text-align: center;
   font-family: var(--font-mono);
-  font-size: 0.72rem;
+  font-size: var(--fs-xl);
   color: var(--text-muted);
   padding: 3rem 0;
 }
@@ -3211,7 +3220,7 @@ body::after {
   border: 1px solid var(--border);
   color: var(--text-muted);
   font-family: var(--font-mono);
-  font-size: 0.6rem;
+  font-size: var(--fs-md);
   letter-spacing: 0.08em;
   padding: 0.3rem 0.6rem;
   border-radius: 3px;
@@ -3242,7 +3251,7 @@ body::after {
 
 .ts-title {
   font-family: var(--font-mono);
-  font-size: 1rem;
+  font-size: var(--fs-4xl);
   font-weight: 700;
   letter-spacing: 0.1em;
   color: var(--text-primary);
@@ -3252,7 +3261,7 @@ body::after {
 
 .ts-badge {
   font-family: var(--font-mono);
-  font-size: 0.55rem;
+  font-size: var(--fs-sm);
   letter-spacing: 0.1em;
   padding: 2px 7px;
   border-radius: 3px;
@@ -3268,7 +3277,7 @@ body::after {
   align-items: center;
   gap: 0.35rem;
   font-family: var(--font-mono);
-  font-size: 0.6rem;
+  font-size: var(--fs-md);
   color: var(--text-muted);
   margin-left: auto;
 }
@@ -3295,7 +3304,7 @@ body::after {
   color: var(--bg-deep);
   border: none;
   font-family: var(--font-mono);
-  font-size: 0.62rem;
+  font-size: var(--fs-md);
   font-weight: 700;
   letter-spacing: 0.08em;
   padding: 0.35rem 0.75rem;
@@ -3320,7 +3329,7 @@ body::after {
   border: 1px solid rgba(0, 200, 255, 0.3);
   border-radius: 4px;
   font-family: var(--font-mono);
-  font-size: 0.65rem;
+  font-size: var(--fs-lg);
 }
 
 .ts-now-dot {
@@ -3333,7 +3342,7 @@ body::after {
 }
 
 .ts-now-label {
-  font-size: 0.55rem;
+  font-size: var(--fs-sm);
   letter-spacing: 0.12em;
   color: var(--accent-cyan);
   font-weight: 700;
@@ -3347,12 +3356,12 @@ body::after {
 
 .ts-now-p1 { color: var(--accent-cyan); }
 .ts-now-p2 { color: var(--accent-amber); }
-.ts-now-vs { color: var(--text-muted); font-size: 0.55rem; }
+.ts-now-vs { color: var(--text-muted); font-size: var(--fs-sm); }
 
 .ts-now-counter {
   margin-left: auto;
   color: var(--text-muted);
-  font-size: 0.58rem;
+  font-size: var(--fs-sm);
 }
 
 /* Tabs */
@@ -3370,7 +3379,7 @@ body::after {
   border-bottom: 2px solid transparent;
   color: var(--text-muted);
   font-family: var(--font-mono);
-  font-size: 0.62rem;
+  font-size: var(--fs-md);
   letter-spacing: 0.08em;
   padding: 0.4rem 0.75rem;
   cursor: pointer;
@@ -3398,13 +3407,13 @@ body::after {
   width: 100%;
   border-collapse: collapse;
   font-family: var(--font-mono);
-  font-size: 0.65rem;
+  font-size: var(--fs-lg);
 }
 
 .ts-standings-table th {
   text-align: left;
   padding: 0.35rem 0.5rem;
-  font-size: 0.55rem;
+  font-size: var(--fs-sm);
   letter-spacing: 0.1em;
   color: var(--text-muted);
   border-bottom: 1px solid var(--border);
@@ -3419,7 +3428,7 @@ body::after {
 .ts-leader-row td { background: rgba(0, 200, 255, 0.04); }
 
 .ts-rank {
-  font-size: 0.75rem;
+  font-size: var(--fs-2xl);
   text-align: center;
   width: 2rem;
 }
@@ -3436,7 +3445,7 @@ body::after {
 }
 
 .ts-provider-tag {
-  font-size: 0.55rem;
+  font-size: var(--fs-sm);
   color: var(--text-muted);
 }
 
@@ -3482,14 +3491,14 @@ body::after {
 
 .ts-pts-note {
   font-family: var(--font-mono);
-  font-size: 0.55rem;
+  font-size: var(--fs-sm);
   color: var(--text-muted);
   text-align: right;
 }
 
 .ts-empty {
   font-family: var(--font-mono);
-  font-size: 0.65rem;
+  font-size: var(--fs-lg);
   color: var(--text-muted);
   padding: 1.5rem 0;
   text-align: center;
@@ -3501,13 +3510,13 @@ body::after {
   width: 100%;
   border-collapse: collapse;
   font-family: var(--font-mono);
-  font-size: 0.63rem;
+  font-size: var(--fs-md);
 }
 
 .ts-battle-table th {
   text-align: left;
   padding: 0.3rem 0.5rem;
-  font-size: 0.55rem;
+  font-size: var(--fs-sm);
   letter-spacing: 0.09em;
   color: var(--text-muted);
   border-bottom: 1px solid var(--border);
@@ -3542,7 +3551,7 @@ body::after {
 }
 
 .ts-bprov {
-  font-size: 0.53rem;
+  font-size: var(--fs-xs);
   color: var(--text-muted);
 }
 
@@ -3556,7 +3565,7 @@ body::after {
 
 .ts-result-badge {
   font-family: var(--font-mono);
-  font-size: 0.55rem;
+  font-size: var(--fs-sm);
   letter-spacing: 0.08em;
   padding: 2px 6px;
   border-radius: 2px;
@@ -3599,7 +3608,7 @@ body::after {
 
 .dp-title {
   font-family: var(--font-display);
-  font-size: 2rem;
+  font-size: var(--fs-7xl);
   letter-spacing: 0.1em;
   color: var(--text-primary);
   display: flex;
@@ -3609,7 +3618,7 @@ body::after {
 }
 
 .dp-tier-badge {
-  font-size: 0.75rem;
+  font-size: var(--fs-2xl);
   padding: 3px 10px;
   border: 1px solid var(--accent-cyan);
   color: var(--accent-cyan);
@@ -3621,7 +3630,7 @@ body::after {
   margin-top: 0.5rem;
   color: var(--accent-cyan);
   font-family: var(--font-mono);
-  font-size: 0.8rem;
+  font-size: var(--fs-2xl);
   letter-spacing: 0.06em;
   animation: dp-pulse 1.2s ease-in-out infinite;
 }
@@ -3644,7 +3653,7 @@ body::after {
   align-items: center;
   color: var(--text-muted);
   font-family: var(--font-display);
-  font-size: 1.4rem;
+  font-size: var(--fs-5xl);
   padding-top: 3rem;
 }
 
@@ -3666,21 +3675,21 @@ body::after {
 
 .dp-column-role {
   font-family: var(--font-mono);
-  font-size: 0.7rem;
+  font-size: var(--fs-xl);
   letter-spacing: 0.1em;
   color: var(--text-muted);
 }
 
 .dp-done-badge {
   font-family: var(--font-mono);
-  font-size: 0.65rem;
+  font-size: var(--fs-lg);
   color: #4ade80;
   letter-spacing: 0.08em;
 }
 
 .dp-picking-badge {
   font-family: var(--font-mono);
-  font-size: 0.65rem;
+  font-size: var(--fs-lg);
   color: var(--text-muted);
   display: flex;
   align-items: center;
@@ -3732,7 +3741,7 @@ body::after {
 
 .dp-pick-num {
   font-family: var(--font-mono);
-  font-size: 0.65rem;
+  font-size: var(--fs-lg);
   color: var(--text-muted);
   width: 16px;
   text-align: right;
@@ -3741,14 +3750,14 @@ body::after {
 
 .dp-pick-species {
   font-family: var(--font-display);
-  font-size: 0.85rem;
+  font-size: var(--fs-3xl);
   color: var(--text-primary);
   flex: 1;
 }
 
 .dp-empty-label {
   color: rgba(255,255,255,0.12);
-  font-size: 0.75rem;
+  font-size: var(--fs-2xl);
 }
 
 .dp-pick-types {
@@ -3757,7 +3766,7 @@ body::after {
 }
 
 .dp-type-badge {
-  font-size: 0.5rem;
+  font-size: var(--fs-xs);
   padding: 2px 5px;
   border-radius: 2px;
   color: #fff;
@@ -3769,7 +3778,7 @@ body::after {
   margin-top: 2rem;
   color: var(--text-muted);
   font-family: var(--font-mono);
-  font-size: 0.7rem;
+  font-size: var(--fs-xl);
   letter-spacing: 0.06em;
   text-align: center;
 }
@@ -3798,7 +3807,7 @@ body::after {
   padding: 2px 7px;
   border-radius: 3px;
   font-family: var(--font-mono);
-  font-size: 0.6rem;
+  font-size: var(--fs-md);
   font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -3819,7 +3828,7 @@ body::after {
   padding: 2px 6px;
   border-radius: 3px;
   font-family: var(--font-mono);
-  font-size: 0.58rem;
+  font-size: var(--fs-sm);
   font-weight: 700;
   letter-spacing: 0.08em;
   background: #1a3020;
@@ -3856,7 +3865,7 @@ body::after {
 }
 
 .winner-team-label {
-  font-size: 0.58rem;
+  font-size: var(--fs-sm);
   color: var(--text-muted);
   letter-spacing: 0.08em;
   margin-bottom: 0.35rem;
@@ -3874,7 +3883,7 @@ body::after {
 
 .winner-team-mon {
   font-family: var(--font-mono);
-  font-size: 0.6rem;
+  font-size: var(--fs-md);
   padding: 2px 6px;
   background: rgba(255,255,255,0.07);
   border-radius: 3px;
@@ -3904,7 +3913,7 @@ body::after {
   padding: 1px 5px;
   border-radius: 2px;
   font-family: var(--font-mono);
-  font-size: 0.52rem;
+  font-size: var(--fs-xs);
   font-weight: 700;
   letter-spacing: 0.06em;
   background: #1a3020;
@@ -3969,7 +3978,7 @@ body::after {
   border-radius: 3px;
   padding: 3px 8px;
   font-family: var(--font-mono);
-  font-size: 0.58rem;
+  font-size: var(--fs-sm);
   font-weight: 700;
   letter-spacing: 0.06em;
   color: var(--text-muted);
@@ -3994,7 +4003,7 @@ body::after {
   padding: 1px 5px;
   border-radius: 2px;
   font-family: var(--font-mono);
-  font-size: 0.52rem;
+  font-size: var(--fs-xs);
   font-weight: 700;
   letter-spacing: 0.06em;
   background: #1a3020;
@@ -4013,7 +4022,7 @@ body::after {
 
 .vr-title {
   font-family: var(--font-mono);
-  font-size: 0.55rem;
+  font-size: var(--fs-sm);
   font-weight: 700;
   letter-spacing: 0.12em;
   color: var(--text-muted);
@@ -4022,7 +4031,7 @@ body::after {
 
 .vr-verdict {
   font-family: var(--font-mono);
-  font-size: 0.65rem;
+  font-size: var(--fs-lg);
   color: var(--text-primary);
   margin: 0 0 8px;
   line-height: 1.4;
@@ -4042,7 +4051,7 @@ body::after {
 
 .vr-count-label {
   font-family: var(--font-mono);
-  font-size: 0.52rem;
+  font-size: var(--fs-xs);
   font-weight: 700;
   color: var(--text-muted);
   letter-spacing: 0.06em;
@@ -4053,7 +4062,7 @@ body::after {
 
 .vr-count-val {
   font-family: var(--font-mono);
-  font-size: 0.58rem;
+  font-size: var(--fs-sm);
   color: var(--text-dim);
 }
 
@@ -4071,7 +4080,7 @@ body::after {
   align-items: baseline;
   gap: 6px;
   font-family: var(--font-mono);
-  font-size: 0.6rem;
+  font-size: var(--fs-md);
   padding: 2px 4px;
   border-radius: 3px;
   transition: background 0.1s;
@@ -4083,7 +4092,7 @@ body::after {
 }
 
 .vr-event-icon {
-  font-size: 0.65rem;
+  font-size: var(--fs-lg);
   min-width: 14px;
 }
 
@@ -4108,7 +4117,7 @@ body::after {
 
 .dc-title {
   font-family: var(--font-mono);
-  font-size: 0.55rem;
+  font-size: var(--fs-sm);
   font-weight: 700;
   letter-spacing: 0.12em;
   color: var(--text-muted);
@@ -4138,7 +4147,7 @@ body::after {
 
 .dc-player-label {
   font-family: var(--font-mono);
-  font-size: 0.6rem;
+  font-size: var(--fs-md);
   font-weight: 700;
   color: var(--text-primary);
   letter-spacing: 0.06em;
@@ -4152,7 +4161,7 @@ body::after {
 
 .dc-species {
   font-family: var(--font-mono);
-  font-size: 0.55rem;
+  font-size: var(--fs-sm);
   color: var(--text-dim);
   background: rgba(255,255,255,0.04);
   border: 1px solid var(--border);
@@ -4170,7 +4179,7 @@ body::after {
 
 .dc-field-label {
   font-family: var(--font-mono);
-  font-size: 0.5rem;
+  font-size: var(--fs-xs);
   color: var(--text-muted);
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -4185,7 +4194,7 @@ body::after {
 .dc-type-chip {
   display: inline-block;
   font-family: var(--font-mono);
-  font-size: 0.5rem;
+  font-size: var(--fs-xs);
   font-weight: 700;
   color: #fff;
   padding: 1px 5px;
@@ -4203,7 +4212,7 @@ body::after {
 
 .dc-exec-item {
   font-family: var(--font-mono);
-  font-size: 0.58rem;
+  font-size: var(--fs-sm);
   color: var(--text-muted);
 }
 
@@ -4226,7 +4235,7 @@ body::after {
 
 .format-chip {
   font-family: var(--font-pixel);
-  font-size: 0.38rem;
+  font-size: var(--fs-3xs);
   padding: 0.3rem 0.7rem;
   background: var(--bg-deep);
   border: 1px solid var(--border);
@@ -4256,7 +4265,7 @@ body::after {
 
 .bracket-section-label {
   font-family: var(--font-pixel);
-  font-size: 0.45rem;
+  font-size: var(--fs-2xs);
   letter-spacing: 0.1em;
   color: var(--accent-cyan);
   padding: 0.6rem 0 0.4rem;
@@ -4291,7 +4300,7 @@ body::after {
 
 .bracket-round-label {
   font-family: var(--font-pixel);
-  font-size: 0.38rem;
+  font-size: var(--fs-3xs);
   letter-spacing: 0.08em;
   color: var(--text-muted);
   text-align: center;
@@ -4312,7 +4321,7 @@ body::after {
   background: var(--bg-card);
   overflow: hidden;
   font-family: var(--font-mono);
-  font-size: 0.65rem;
+  font-size: var(--fs-lg);
   min-width: 140px;
   transition: border-color var(--transition);
 }
@@ -4356,7 +4365,7 @@ body::after {
 }
 
 .bm-seed {
-  font-size: 0.5rem;
+  font-size: var(--fs-xs);
   color: var(--text-muted);
   min-width: 1.2rem;
   text-align: right;
@@ -4366,11 +4375,11 @@ body::after {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 0.62rem;
+  font-size: var(--fs-md);
 }
 .bm-crown {
   color: var(--accent-green);
-  font-size: 0.7rem;
+  font-size: var(--fs-xl);
   line-height: 1;
 }
 
@@ -4383,7 +4392,7 @@ body::after {
 }
 
 .bm-id {
-  font-size: 0.42rem;
+  font-size: var(--fs-2xs);
   color: var(--text-muted);
   letter-spacing: 0.06em;
   flex: 1;
@@ -4399,7 +4408,7 @@ body::after {
 }
 
 .bm-replay-btn {
-  font-size: 0.48rem;
+  font-size: var(--fs-2xs);
   background: none;
   border: 1px solid var(--border);
   border-radius: 2px;
@@ -4429,18 +4438,18 @@ body::after {
 }
 
 .bracket-champion-icon {
-  font-size: 1.6rem;
+  font-size: var(--fs-6xl);
   line-height: 1;
 }
 .bracket-champion-name {
   font-family: var(--font-mono);
-  font-size: 0.8rem;
+  font-size: var(--fs-2xl);
   color: var(--accent-amber);
   font-weight: 600;
 }
 .bracket-champion-label {
   font-family: var(--font-pixel);
-  font-size: 0.38rem;
+  font-size: var(--fs-3xs);
   color: var(--text-muted);
   letter-spacing: 0.1em;
 }
@@ -4454,7 +4463,7 @@ body::after {
 }
 .bracket-empty-msg {
   font-family: var(--font-pixel);
-  font-size: 0.5rem;
+  font-size: var(--fs-xs);
   color: var(--text-muted);
   letter-spacing: 0.06em;
 }
@@ -4474,7 +4483,7 @@ body::after {
   border: none;
   color: var(--text-dim);
   font-family: var(--font-pixel);
-  font-size: 0.42rem;
+  font-size: var(--fs-2xs);
   letter-spacing: 0.12em;
   padding: 0.6rem 0.75rem;
   text-align: left;
@@ -4492,7 +4501,7 @@ body::after {
 .mm-loading,
 .mm-empty {
   color: var(--text-dim);
-  font-size: 0.78rem;
+  font-size: var(--fs-2xl);
   padding: 0.5rem 0;
 }
 
@@ -4503,7 +4512,7 @@ body::after {
 
 .mm-table {
   border-collapse: collapse;
-  font-size: 0.72rem;
+  font-size: var(--fs-xl);
   white-space: nowrap;
 }
 
@@ -4513,7 +4522,7 @@ body::after {
 
 .mm-th-col {
   font-family: var(--font-pixel);
-  font-size: 0.38rem;
+  font-size: var(--fs-3xs);
   letter-spacing: 0.06em;
   color: var(--text-dim);
   text-align: center;
@@ -4532,7 +4541,7 @@ body::after {
 
 .mm-td-row {
   font-family: var(--font-pixel);
-  font-size: 0.38rem;
+  font-size: var(--fs-3xs);
   letter-spacing: 0.06em;
   color: var(--text-dim);
   padding: 0.4rem 0.75rem 0.4rem 0;
@@ -4558,12 +4567,12 @@ body::after {
 
 .mm-cell-empty {
   color: rgba(120,140,165,0.4);
-  font-size: 0.7rem;
+  font-size: var(--fs-xl);
 }
 
 .mm-cell-record {
   font-weight: 600;
-  font-size: 0.72rem;
+  font-size: var(--fs-xl);
   letter-spacing: 0.02em;
   padding: 0.1rem 0.3rem;
   border-radius: 3px;
@@ -4595,13 +4604,13 @@ body::after {
 }
 
 .mm-legend-item {
-  font-size: 0.65rem;
+  font-size: var(--fs-lg);
   padding: 0.15rem 0.45rem;
   border-radius: 3px;
 }
 
 .mm-legend-note {
-  font-size: 0.62rem;
+  font-size: var(--fs-md);
   color: var(--text-dim);
   margin-left: auto;
 }
@@ -4624,7 +4633,7 @@ body::after {
 }
 
 .season-title {
-  font-size: 1.25rem;
+  font-size: var(--fs-5xl);
   font-weight: 700;
   color: var(--text-bright);
   letter-spacing: 0.04em;
@@ -4639,7 +4648,7 @@ body::after {
 }
 
 .season-status {
-  font-size: 0.7rem;
+  font-size: var(--fs-xl);
   font-weight: 700;
   letter-spacing: 0.08em;
   padding: 0.15rem 0.5rem;
@@ -4680,14 +4689,14 @@ body::after {
 }
 
 .season-progress-label {
-  font-size: 0.68rem;
+  font-size: var(--fs-lg);
   color: var(--text-dim);
   white-space: nowrap;
 }
 
 /* Standings table note */
 .season-elo-note {
-  font-size: 0.65rem;
+  font-size: var(--fs-lg);
   color: var(--text-dim);
   margin-bottom: 0.75rem;
   font-style: italic;
@@ -4718,7 +4727,7 @@ body::after {
 }
 
 .season-pending-tag {
-  font-size: 0.62rem;
+  font-size: var(--fs-md);
   color: var(--text-dim);
   letter-spacing: 0.06em;
 }
@@ -4731,7 +4740,7 @@ body::after {
 .season-history-name {
   font-weight: 600;
   color: var(--text-bright);
-  font-size: 0.8rem;
+  font-size: var(--fs-2xl);
 }
 
 /* ---- Battle Story (LLM narrative) ---- */
@@ -4746,7 +4755,7 @@ body::after {
 
 .battle-story-title {
   font-family: 'IBM Plex Mono', monospace;
-  font-size: 0.62rem;
+  font-size: var(--fs-md);
   letter-spacing: 0.1em;
   color: var(--accent-cyan);
   text-transform: uppercase;
@@ -4754,7 +4763,7 @@ body::after {
 }
 
 .battle-story-text {
-  font-size: 0.82rem;
+  font-size: var(--fs-2xl);
   color: var(--text-secondary);
   line-height: 1.6;
   margin: 0;
@@ -4782,7 +4791,7 @@ body::after {
 
 .variance-title {
   font-family: 'IBM Plex Mono', monospace;
-  font-size: 0.62rem;
+  font-size: var(--fs-md);
   letter-spacing: 0.1em;
   color: var(--text-dim);
   text-transform: uppercase;
@@ -4793,7 +4802,7 @@ body::after {
 .variance-panel.variance-some  .variance-title { color: var(--accent-amber); }
 
 .variance-verdict {
-  font-size: 0.78rem;
+  font-size: var(--fs-2xl);
   color: var(--text-secondary);
   margin-bottom: 0.4rem;
 }
@@ -4803,7 +4812,7 @@ body::after {
   flex-wrap: wrap;
   align-items: center;
   gap: 0.4rem;
-  font-size: 0.68rem;
+  font-size: var(--fs-lg);
   margin-top: 0.25rem;
 }
 
@@ -4843,7 +4852,7 @@ body::after {
 
 .player-label-provider {
   font-family: 'IBM Plex Mono', monospace;
-  font-size: 0.52rem;
+  font-size: var(--fs-xs);
   color: var(--text-muted);
   letter-spacing: 0.05em;
   text-transform: uppercase;
@@ -4851,7 +4860,7 @@ body::after {
 
 .player-label-name {
   font-family: 'IBM Plex Mono', monospace;
-  font-size: 0.65rem;
+  font-size: var(--fs-lg);
   color: var(--text-secondary);
   font-weight: 500;
   white-space: nowrap;
@@ -4873,13 +4882,13 @@ body::after {
   background: rgba(255, 200, 80, 0.07);
   border: 1px solid rgba(255, 200, 80, 0.2);
   font-family: 'IBM Plex Mono', monospace;
-  font-size: 0.5rem;
+  font-size: var(--fs-xs);
   letter-spacing: 0.06em;
   color: rgba(255, 200, 80, 0.75);
   text-transform: uppercase;
   white-space: nowrap;
 }
-.personality-chip-emoji { font-size: 0.65rem; }
+.personality-chip-emoji { font-size: var(--fs-lg); }
 
 /* ---- Preset badge (in-battle chip) ---- */
 .preset-badge {
@@ -4891,13 +4900,13 @@ body::after {
   background: rgba(120, 200, 255, 0.07);
   border: 1px solid rgba(120, 200, 255, 0.2);
   font-family: 'IBM Plex Mono', monospace;
-  font-size: 0.5rem;
+  font-size: var(--fs-xs);
   letter-spacing: 0.06em;
   color: rgba(120, 200, 255, 0.75);
   text-transform: uppercase;
   white-space: nowrap;
 }
-.preset-badge-emoji { font-size: 0.65rem; }
+.preset-badge-emoji { font-size: var(--fs-lg); }
 .preset-badge-name {}
 
 /* ---- Preset selector (battle form) ---- */
@@ -4909,7 +4918,7 @@ body::after {
 }
 .preset-selector-label {
   font-family: 'IBM Plex Mono', monospace;
-  font-size: 0.6rem;
+  font-size: var(--fs-md);
   letter-spacing: 0.08em;
   color: rgba(120, 200, 255, 0.7);
   text-transform: uppercase;
@@ -4927,14 +4936,14 @@ body::after {
   gap: 0.2rem;
 }
 .preset-preview-flavour {
-  font-size: 0.65rem;
+  font-size: var(--fs-lg);
   font-style: italic;
   color: rgba(200, 220, 255, 0.7);
   line-height: 1.4;
 }
 .preset-preview-mons {
   font-family: 'IBM Plex Mono', monospace;
-  font-size: 0.58rem;
+  font-size: var(--fs-sm);
   letter-spacing: 0.04em;
   color: rgba(120, 200, 255, 0.6);
 }
@@ -4951,7 +4960,7 @@ body::after {
   display: flex;
   align-items: center;
   gap: 0.35rem;
-  font-size: 0.62rem;
+  font-size: var(--fs-md);
   color: var(--text-secondary);
   padding: 0.12rem 0;
 }
@@ -4968,7 +4977,7 @@ body::after {
 .own-move-name {
   flex: 1;
   text-transform: capitalize;
-  font-size: 0.63rem;
+  font-size: var(--fs-md);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -4976,7 +4985,7 @@ body::after {
 
 .own-move-meta {
   font-family: 'IBM Plex Mono', monospace;
-  font-size: 0.58rem;
+  font-size: var(--fs-sm);
   color: var(--text-muted);
   white-space: nowrap;
 }
@@ -4998,7 +5007,7 @@ body::after {
   align-items: center;
   padding: 0 0.5rem;
   color: var(--text-muted);
-  font-size: 0.7rem;
+  font-size: var(--fs-xl);
   font-style: italic;
 }
 
@@ -5043,7 +5052,7 @@ body::after {
 }
 
 .tt-species {
-  font-size: 0.7rem;
+  font-size: var(--fs-xl);
   font-weight: 600;
   color: #e8e8f0;
   letter-spacing: 0.03em;
@@ -5056,7 +5065,7 @@ body::after {
 }
 
 .tt-header-type {
-  font-size: 0.52rem;
+  font-size: var(--fs-xs);
   font-weight: 600;
   letter-spacing: 0.04em;
   padding: 0.1rem 0.3rem;
@@ -5077,7 +5086,7 @@ body::after {
 }
 
 .tt-section-title {
-  font-size: 0.5rem;
+  font-size: var(--fs-xs);
   letter-spacing: 0.1em;
   color: rgba(255, 255, 255, 0.3);
   margin-bottom: 0.35rem;
@@ -5096,7 +5105,7 @@ body::after {
 .tt-stat-row:last-child { margin-bottom: 0; }
 
 .tt-stat-label {
-  font-size: 0.55rem;
+  font-size: var(--fs-sm);
   color: rgba(255, 255, 255, 0.45);
   text-align: right;
   letter-spacing: 0.02em;
@@ -5116,7 +5125,7 @@ body::after {
 }
 
 .tt-stat-value {
-  font-size: 0.6rem;
+  font-size: var(--fs-md);
   font-weight: 600;
   text-align: right;
 }
@@ -5132,7 +5141,7 @@ body::after {
 .tt-matchup-row:last-child { margin-bottom: 0; }
 
 .tt-mult-label {
-  font-size: 0.55rem;
+  font-size: var(--fs-sm);
   font-weight: 700;
   width: 1.6rem;
   text-align: right;
@@ -5153,7 +5162,7 @@ body::after {
 }
 
 .tt-type-pill {
-  font-size: 0.48rem;
+  font-size: var(--fs-2xs);
   font-weight: 600;
   letter-spacing: 0.04em;
   padding: 0.1rem 0.28rem;
@@ -5171,7 +5180,7 @@ body::after {
 }
 
 .tt-detail {
-  font-size: 0.58rem;
+  font-size: var(--fs-sm);
   color: rgba(255, 255, 255, 0.6);
   display: flex;
   align-items: center;
@@ -5180,7 +5189,7 @@ body::after {
 }
 
 .tt-detail-label {
-  font-size: 0.48rem;
+  font-size: var(--fs-2xs);
   letter-spacing: 0.08em;
   color: rgba(255, 255, 255, 0.28);
   font-weight: 600;
@@ -5212,7 +5221,7 @@ body::after {
 }
 
 .gs-kpi-value {
-  font-size: 1.6rem;
+  font-size: var(--fs-6xl);
   font-weight: 700;
   color: var(--accent-cyan);
   line-height: 1;
@@ -5220,7 +5229,7 @@ body::after {
 }
 
 .gs-kpi-label {
-  font-size: 0.52rem;
+  font-size: var(--fs-xs);
   letter-spacing: 0.08em;
   color: var(--text-muted);
   margin-top: 0.35rem;
@@ -5246,7 +5255,7 @@ body::after {
 }
 
 .gs-tier-label {
-  font-size: 0.6rem;
+  font-size: var(--fs-md);
   font-weight: 700;
   letter-spacing: 0.05em;
   text-align: right;
@@ -5266,13 +5275,13 @@ body::after {
 }
 
 .gs-tier-count {
-  font-size: 0.62rem;
+  font-size: var(--fs-md);
   color: var(--text-muted);
   text-align: right;
 }
 
 .gs-tier-avg {
-  font-size: 0.55rem;
+  font-size: var(--fs-sm);
   color: var(--text-muted);
   opacity: 0.7;
   text-align: right;
@@ -5307,7 +5316,7 @@ body::after {
 .gs-type-name {
   position: relative;
   z-index: 1;
-  font-size: 0.45rem;
+  font-size: var(--fs-2xs);
   font-weight: 700;
   letter-spacing: 0.06em;
   color: rgba(255,255,255,0.9);
@@ -5317,7 +5326,7 @@ body::after {
 .gs-type-cnt {
   position: relative;
   z-index: 1;
-  font-size: 0.55rem;
+  font-size: var(--fs-sm);
   color: rgba(255,255,255,0.75);
   margin-top: 0.1rem;
   text-shadow: 0 1px 2px rgba(0,0,0,0.6);
@@ -5356,7 +5365,7 @@ body::after {
   position: absolute;
   top: 0.3rem;
   left: 0.4rem;
-  font-size: 0.5rem;
+  font-size: var(--fs-xs);
   color: var(--text-muted);
   font-weight: 600;
 }
@@ -5368,7 +5377,7 @@ body::after {
 }
 
 .gs-pokemon-name {
-  font-size: 0.6rem;
+  font-size: var(--fs-md);
   color: var(--text-primary);
   text-align: center;
   font-weight: 600;
@@ -5390,7 +5399,7 @@ body::after {
 }
 
 .gs-pokemon-cnt {
-  font-size: 0.5rem;
+  font-size: var(--fs-xs);
   color: var(--text-muted);
 }
 
@@ -5409,13 +5418,13 @@ body::after {
 }
 
 .gs-move-rank {
-  font-size: 0.55rem;
+  font-size: var(--fs-sm);
   color: var(--text-muted);
   text-align: right;
 }
 
 .gs-move-name {
-  font-size: 0.62rem;
+  font-size: var(--fs-md);
   color: var(--text-primary);
   text-transform: capitalize;
   white-space: nowrap;
@@ -5437,7 +5446,7 @@ body::after {
 }
 
 .gs-move-cnt {
-  font-size: 0.6rem;
+  font-size: var(--fs-md);
   color: var(--text-muted);
   text-align: right;
 }
@@ -5461,13 +5470,13 @@ body::after {
 .gs-recent-row:last-child { border-bottom: none; }
 
 .gs-recent-tier {
-  font-size: 0.55rem;
+  font-size: var(--fs-sm);
   font-weight: 700;
   letter-spacing: 0.05em;
 }
 
 .gs-recent-matchup {
-  font-size: 0.62rem;
+  font-size: var(--fs-md);
   display: flex;
   align-items: center;
   gap: 0.3rem;
@@ -5488,24 +5497,24 @@ body::after {
 
 .gs-vs {
   color: var(--text-muted) !important;
-  font-size: 0.5rem;
+  font-size: var(--fs-xs);
   flex-shrink: 0;
 }
 
 .gs-recent-turns {
-  font-size: 0.58rem;
+  font-size: var(--fs-sm);
   color: var(--text-muted);
   text-align: right;
 }
 
 .gs-recent-date {
-  font-size: 0.55rem;
+  font-size: var(--fs-sm);
   color: var(--text-muted);
 }
 
 .gs-empty {
   color: var(--text-muted);
-  font-size: 0.65rem;
+  font-size: var(--fs-lg);
   font-style: italic;
   padding: 0.5rem 0;
 }
@@ -5536,7 +5545,7 @@ body::after {
 }
 
 .usage-rank {
-  font-size: 0.52rem;
+  font-size: var(--fs-xs);
   color: var(--text-muted);
   text-align: right;
 }
@@ -5548,7 +5557,7 @@ body::after {
 }
 
 .usage-species {
-  font-size: 0.62rem;
+  font-size: var(--fs-md);
   color: var(--text-primary);
   text-transform: capitalize;
   white-space: nowrap;
@@ -5557,7 +5566,7 @@ body::after {
 }
 
 .usage-move-name {
-  font-size: 0.62rem;
+  font-size: var(--fs-md);
   color: var(--text-primary);
   text-transform: capitalize;
   white-space: nowrap;
@@ -5581,7 +5590,7 @@ body::after {
 .usage-bar--move    { background: #ab47bc; }
 
 .usage-cnt {
-  font-size: 0.58rem;
+  font-size: var(--fs-sm);
   color: var(--text-muted);
   text-align: right;
 }
@@ -5627,20 +5636,20 @@ body::after {
 }
 
 .action-legend-label {
-  font-size: 0.62rem;
+  font-size: var(--fs-md);
   color: var(--text-primary);
   min-width: 4.5rem;
 }
 
 .action-legend-pct {
-  font-size: 0.65rem;
+  font-size: var(--fs-lg);
   font-weight: 700;
   color: var(--text-primary);
   min-width: 3rem;
 }
 
 .action-legend-cnt {
-  font-size: 0.58rem;
+  font-size: var(--fs-sm);
   color: var(--text-muted);
 }
 
@@ -5659,7 +5668,7 @@ body::after {
 }
 
 .tier-wr-label {
-  font-size: 0.6rem;
+  font-size: var(--fs-md);
   font-weight: 700;
   letter-spacing: 0.05em;
   text-align: right;
@@ -5679,13 +5688,13 @@ body::after {
 }
 
 .tier-wr-pct {
-  font-size: 0.65rem;
+  font-size: var(--fs-lg);
   font-weight: 700;
   text-align: right;
 }
 
 .tier-wr-record {
-  font-size: 0.58rem;
+  font-size: var(--fs-sm);
   color: var(--text-muted);
   text-align: right;
 }
@@ -5712,7 +5721,7 @@ body::after {
 }
 
 .hmove-pp {
-  font-size: 0.5rem;
+  font-size: var(--fs-xs);
   font-family: var(--font-mono);
   color: var(--text-muted);
   background: rgba(255,255,255,0.05);
@@ -5749,7 +5758,7 @@ body::after {
   border-radius: 4px;
   color: var(--text-primary);
   font-family: var(--font-mono);
-  font-size: 0.62rem;
+  font-size: var(--fs-md);
   padding: 0.35rem 0.6rem;
   outline: none;
   transition: border-color 0.15s;
@@ -5767,7 +5776,7 @@ body::after {
   border: none;
   color: var(--text-muted);
   cursor: pointer;
-  font-size: 0.65rem;
+  font-size: var(--fs-lg);
   padding: 0.2rem 0.4rem;
   border-radius: 3px;
 }
@@ -5787,7 +5796,7 @@ body::after {
   border: 1px solid transparent;
   color: var(--text-muted);
   cursor: pointer;
-  font-size: 0.7rem;
+  font-size: var(--fs-xl);
   padding: 1px 4px;
   border-radius: 3px;
   line-height: 1;
@@ -5811,7 +5820,7 @@ body::after {
 
 .streak-badge {
   display: inline-block;
-  font-size: 0.62rem;
+  font-size: var(--fs-md);
   font-weight: 700;
   font-family: var(--font-mono);
   padding: 2px 6px;
@@ -5857,7 +5866,7 @@ body::after {
   border-radius: 4px;
   color: var(--text-primary);
   font-family: var(--font-mono);
-  font-size: 0.58rem;
+  font-size: var(--fs-sm);
   padding: 0.25rem 0.5rem;
   outline: none;
   transition: border-color 0.15s;
@@ -5871,7 +5880,7 @@ body::after {
   border: none;
   color: var(--text-muted);
   cursor: pointer;
-  font-size: 0.6rem;
+  font-size: var(--fs-md);
   padding: 0.15rem 0.35rem;
   border-radius: 3px;
 }
@@ -5915,7 +5924,7 @@ body::after {
 
 .srs-title {
   font-family: var(--font-pixel);
-  font-size: 0.7rem;
+  font-size: var(--fs-xl);
   color: var(--text-primary);
   margin: 0;
   letter-spacing: 0.05em;
@@ -5923,7 +5932,7 @@ body::after {
 
 .srs-subtitle {
   font-family: var(--font-mono);
-  font-size: 0.65rem;
+  font-size: var(--fs-lg);
   color: var(--text-muted);
   margin: 0;
   flex: 1;
@@ -5931,7 +5940,7 @@ body::after {
 
 .srs-badge {
   font-family: var(--font-pixel);
-  font-size: 0.5rem;
+  font-size: var(--fs-xs);
   padding: 0.25rem 0.5rem;
   border-radius: 3px;
   letter-spacing: 0.1em;
@@ -5962,21 +5971,21 @@ body::after {
   overflow-y: auto;
   padding: 0.5rem;
   font-family: var(--font-mono);
-  font-size: 0.65rem;
+  font-size: var(--fs-lg);
   color: var(--text-secondary);
 }
 
 .srs-loading {
   margin-top: 1rem;
   font-family: var(--font-mono);
-  font-size: 0.65rem;
+  font-size: var(--fs-lg);
   color: var(--text-muted);
   text-align: center;
 }
 
 .srs-error {
   font-family: var(--font-mono);
-  font-size: 0.65rem;
+  font-size: var(--fs-lg);
   color: #ff4444;
   background: rgba(255,60,60,0.08);
   border: 1px solid rgba(255,60,60,0.25);
@@ -5992,7 +6001,7 @@ body::after {
   border-radius: 4px;
   padding: 1rem;
   font-family: var(--font-mono);
-  font-size: 0.65rem;
+  font-size: var(--fs-lg);
 }
 
 /* ================================================================
@@ -6035,7 +6044,7 @@ body::after {
 
 .sbs-won-tag {
   font-family: var(--font-pixel);
-  font-size: var(--fs-2xs);
+  font-size: var(--fs-xs);
   letter-spacing: 0.06em;
   color: var(--accent-green);
 }
@@ -6051,7 +6060,7 @@ body::after {
 
 .sbs-status-chip {
   font-family: var(--font-pixel);
-  font-size: var(--fs-2xs);
+  font-size: var(--fs-xs);
   letter-spacing: 0.08em;
   color: var(--text-dim);
   flex-shrink: 0;
@@ -6109,7 +6118,7 @@ body::after {
   overflow-y: auto;
   padding: 0.5rem 0.75rem;
   font-family: var(--font-mono);
-  font-size: 0.65rem;
+  font-size: var(--fs-lg);
   color: var(--text-secondary);
   line-height: 1.5;
 }
@@ -6136,7 +6145,7 @@ body::after {
   padding: 2rem;
   text-align: center;
   font-family: var(--font-mono);
-  font-size: 0.65rem;
+  font-size: var(--fs-lg);
   color: var(--text-muted);
   border: 1px solid var(--border);
   border-radius: 6px;
@@ -6149,7 +6158,7 @@ body::after {
   align-items: center;
   justify-content: center;
   font-family: var(--font-pixel);
-  font-size: 0.55rem;
+  font-size: var(--fs-sm);
   letter-spacing: 0.08em;
   pointer-events: none;
   background: rgba(10, 10, 20, 0.75);
@@ -6172,7 +6181,7 @@ body::after {
 
 .bvt-btn {
   font-family: var(--font-pixel);
-  font-size: 0.5rem;
+  font-size: var(--fs-xs);
   padding: 0.35rem 0.9rem;
   background: transparent;
   border: 1px solid var(--border);
@@ -6226,13 +6235,13 @@ body::after {
 }
 
 .badge-emoji {
-  font-size: 2rem;
+  font-size: var(--fs-7xl);
   line-height: 1;
 }
 
 .badge-name {
   font-family: var(--font-pixel);
-  font-size: 0.5rem;
+  font-size: var(--fs-xs);
   color: #ffc800;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -6240,14 +6249,14 @@ body::after {
 
 .badge-desc {
   font-family: var(--font-mono);
-  font-size: 0.6rem;
+  font-size: var(--fs-md);
   color: var(--text-muted);
   line-height: 1.4;
 }
 
 .badge-date {
   font-family: var(--font-mono);
-  font-size: 0.55rem;
+  font-size: var(--fs-sm);
   color: var(--text-dim);
   margin-top: 0.1rem;
 }
@@ -6286,7 +6295,7 @@ body::after {
 }
 
 .badge-toast-emoji {
-  font-size: 1.75rem;
+  font-size: var(--fs-6xl);
   line-height: 1;
   flex-shrink: 0;
 }
@@ -6298,7 +6307,7 @@ body::after {
 
 .badge-toast-title {
   font-family: var(--font-pixel);
-  font-size: 0.45rem;
+  font-size: var(--fs-2xs);
   color: #ffc800;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -6307,7 +6316,7 @@ body::after {
 
 .badge-toast-name {
   font-family: var(--font-pixel);
-  font-size: 0.55rem;
+  font-size: var(--fs-sm);
   color: var(--text-bright);
   letter-spacing: 0.05em;
   margin-bottom: 0.15rem;
@@ -6315,7 +6324,7 @@ body::after {
 
 .badge-toast-desc {
   font-family: var(--font-mono);
-  font-size: 0.6rem;
+  font-size: var(--fs-md);
   color: var(--text-muted);
   line-height: 1.3;
 }
@@ -6325,7 +6334,7 @@ body::after {
   border: none;
   color: var(--text-dim);
   cursor: pointer;
-  font-size: 0.65rem;
+  font-size: var(--fs-lg);
   padding: 0;
   line-height: 1;
   flex-shrink: 0;
@@ -6388,7 +6397,7 @@ body::after {
 /* ---- Phone ---- */
 @media (max-width: 480px) {
   .app-shell { padding: 0 0.75rem 2.5rem; }
-  .app-logo { font-size: 0.72rem; }
+  .app-logo { font-size: var(--fs-xl); }
   .nav-btn { padding: 0.5rem 0.7rem; }
   .panel { padding: 0.85rem; }
 
@@ -6400,3 +6409,22 @@ body::after {
 
 /* The Showdown scroll wrapper is full-width so its inner fixed stage can scroll. */
 .sbs-stage-scroll { width: 100%; }
+
+/* ============================================================
+   REDUCED MOTION — Phase 3 of the UI/UX overhaul
+   The visualizer leans on motion (hit flash, sprite shake, heal pulse, faint
+   fade, thinking pulse, scanlines, win-prob transitions). Honour the OS
+   "reduce motion" setting: near-instant transitions, no looping/keyframe
+   animations, and no smooth-scroll. Functional state changes still apply —
+   only the motion is removed.
+   ============================================================ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
