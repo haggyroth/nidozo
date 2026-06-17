@@ -29,7 +29,7 @@ import asyncio
 import logging
 from collections.abc import Callable
 from time import perf_counter
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any
 
 from poke_env.battle import AbstractBattle
 from poke_env.player.battle_order import BattleOrder
