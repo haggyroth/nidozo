@@ -126,15 +126,6 @@ function MatchupMatrix({ lbTier }) {
 
 const PROVIDERS = ['random', 'anthropic', 'openai', 'lmstudio']
 const COACH_PROVIDERS = ['none', 'anthropic', 'openai', 'lmstudio']
-const PERSONALITIES = [
-  { id: 'none',        label: '— none —',              emoji: '' },
-  { id: 'aggressive',  label: 'All-out Attacker',       emoji: '⚔️' },
-  { id: 'defensive',   label: 'Bulwark',                emoji: '🛡️' },
-  { id: 'balanced',    label: 'Adaptive',               emoji: '⚖️' },
-  { id: 'trickster',   label: 'Mindgame Specialist',    emoji: '🎭' },
-  { id: 'momentum',    label: 'Tempo Player',           emoji: '💨' },
-]
-
 const TIERS = [
   { id: 'random',     label: 'Random Battle' },
   { id: 'ou',         label: 'OverUsed (OU)' },
@@ -347,7 +338,7 @@ function PresetSelector({ label, value, onChange, presets }) {
   )
 }
 
-function PersonalitySelector({ value, onChange }) {
+function PersonalitySelector({ value, onChange, personalities }) {
   return (
     <div className="personality-selector">
       <label className="personality-selector-label">🎭 PLAY STYLE</label>
@@ -356,12 +347,19 @@ function PersonalitySelector({ value, onChange }) {
         value={value}
         onChange={e => onChange(e.target.value === 'none' ? null : e.target.value)}
       >
-        {PERSONALITIES.map(p => (
-          <option key={p.id} value={p.id}>
-            {p.emoji ? `${p.emoji} ${p.label}` : p.label}
+        <option value="none">— none —</option>
+        {personalities.map(p => (
+          <option key={p.slug} value={p.slug}>
+            {p.emoji ? `${p.emoji} ${p.display_name}` : p.display_name}
           </option>
         ))}
       </select>
+      {value && value !== 'none' && (() => {
+        const p = personalities.find(x => x.slug === value)
+        return p ? (
+          <div className="personality-description">{p.description}</div>
+        ) : null
+      })()}
     </div>
   )
 }
@@ -374,6 +372,7 @@ function BattleForm({ onBattleStarted, lmModels, lmLoading }) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [presets, setPresets] = useState([])
+  const [personalities, setPersonalities] = useState([])
   const [form, setForm] = useState({
     p1_provider: 'lmstudio', p2_provider: 'lmstudio',
     p1_model: '', p2_model: '',
@@ -390,6 +389,7 @@ function BattleForm({ onBattleStarted, lmModels, lmLoading }) {
 
   useEffect(() => {
     fetch('/api/presets').then(r => r.json()).then(setPresets).catch(() => {})
+    fetch('/api/personalities').then(r => r.json()).then(setPersonalities).catch(() => {})
   }, [])
 
   // Auto-fill with first two LM Studio models once they load.
@@ -463,6 +463,7 @@ function BattleForm({ onBattleStarted, lmModels, lmLoading }) {
       <PersonalitySelector
         value={form.p1_personality ?? 'none'}
         onChange={v => setForm(f => ({ ...f, p1_personality: v }))}
+        personalities={personalities}
       />
       <PresetSelector
         label="P1"
@@ -487,6 +488,7 @@ function BattleForm({ onBattleStarted, lmModels, lmLoading }) {
       <PersonalitySelector
         value={form.p2_personality ?? 'none'}
         onChange={v => setForm(f => ({ ...f, p2_personality: v }))}
+        personalities={personalities}
       />
       <PresetSelector
         label="P2"

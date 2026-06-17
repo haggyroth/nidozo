@@ -167,3 +167,59 @@ def test_force_switch_text_appears() -> None:
     builder = PromptBuilder()
     content = builder.build_turn(state)["content"]
     assert "must switch" in content
+
+
+# ---------------------------------------------------------------------------
+# Personality injection
+# ---------------------------------------------------------------------------
+
+def test_build_system_injects_personality_block() -> None:
+    builder = PromptBuilder()
+    content = builder.build_system(personality="aggressive")["content"]
+    assert "All-out Attacker" in content
+    assert "Attack" in content
+
+
+def test_build_system_personality_appended_after_base() -> None:
+    builder = PromptBuilder()
+    base = builder.build_system()["content"]
+    with_persona = builder.build_system(personality="defensive")["content"]
+    assert with_persona.startswith(base)
+    assert "Bulwark" in with_persona[len(base):]
+
+
+def test_build_system_no_personality_unchanged() -> None:
+    builder = PromptBuilder()
+    base = builder.build_system()["content"]
+    no_persona = builder.build_system(personality=None)["content"]
+    assert base == no_persona
+
+
+def test_build_system_unknown_personality_unchanged() -> None:
+    builder = PromptBuilder()
+    base = builder.build_system()["content"]
+    unknown = builder.build_system(personality="does_not_exist")["content"]
+    assert base == unknown
+
+
+def test_personality_before_lessons_in_system() -> None:
+    builder = PromptBuilder()
+    content = builder.build_system(
+        personality="momentum", lessons=["switch early"]
+    )["content"]
+    persona_pos = content.index("Tempo Player")
+    lesson_pos  = content.index("Battle Memory")
+    assert persona_pos < lesson_pos, "personality block should appear before lessons"
+
+
+@pytest.mark.parametrize("slug", ["aggressive", "defensive", "balanced", "trickster", "momentum"])
+def test_build_messages_with_each_personality(slug: str) -> None:
+    builder = PromptBuilder()
+    messages = builder.build_messages(_MINIMAL_STATE, personality=slug)
+    assert len(messages) == 2
+    assert messages[0]["role"] == "system"
+    # Each persona block starts with its own heading
+    from nidozo.battle.personalities import get_personality
+    persona = get_personality(slug)
+    assert persona is not None
+    assert persona.display_name in messages[0]["content"]

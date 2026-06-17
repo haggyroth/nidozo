@@ -1114,6 +1114,49 @@ class BattleStore:
             "recent_battles": [dict(r) for r in recent_rows],
         }
 
+    def get_personality_stats(self) -> list[dict[str, Any]]:
+        """Win/loss/tie breakdown per personality slug across all completed battles.
+
+        Each row in the result covers battles where the personality was used by
+        *either* player (as-player perspective), giving an overall picture of
+        how each play style performs. Battles with no personality set are excluded.
+        """
+        rows = self._conn.execute(
+            """
+            SELECT personality,
+                   COUNT(*) AS total,
+                   SUM(CASE WHEN result = 'win'  THEN 1 ELSE 0 END) AS wins,
+                   SUM(CASE WHEN result = 'loss' THEN 1 ELSE 0 END) AS losses,
+                   SUM(CASE WHEN result = 'tie'  THEN 1 ELSE 0 END) AS ties
+            FROM (
+                SELECT b.p1_personality AS personality,
+                       CASE WHEN b.winner = 1 THEN 'win'
+                            WHEN b.winner = 2 THEN 'loss'
+                            ELSE 'tie' END AS result
+                FROM battles b
+                WHERE b.p1_personality IS NOT NULL
+                  AND b.finished_at IS NOT NULL AND b.status = 'completed'
+                UNION ALL
+                SELECT b.p2_personality AS personality,
+                       CASE WHEN b.winner = 2 THEN 'win'
+                            WHEN b.winner = 1 THEN 'loss'
+                            ELSE 'tie' END AS result
+                FROM battles b
+                WHERE b.p2_personality IS NOT NULL
+                  AND b.finished_at IS NOT NULL AND b.status = 'completed'
+            )
+            GROUP BY personality
+            ORDER BY wins DESC, total DESC
+            """
+        ).fetchall()
+        return [
+            {
+                **dict(r),
+                "win_rate": round(r["wins"] / r["total"] * 100, 1) if r["total"] else None,
+            }
+            for r in rows
+        ]
+
     # ------------------------------------------------------------------
     # Teams & Draft Sessions
     # ------------------------------------------------------------------
