@@ -1,0 +1,155 @@
+=== Turn {{ turn }} | {{ format }} ===
+{% if weather %}Weather: {{ weather }}{% endif %}
+{% if fields %}Field effects: {{ fields | join(", ") }}{% endif %}
+{% if my_side_conditions %}Your side hazards: {{ my_side_conditions | join(", ") }} ← chip damage shown per switch candidate below{% endif %}
+{% if opponent_side_conditions %}Opponent's side hazards: {{ opponent_side_conditions | join(", ") }}{% endif %}
+
+{% if recent_events %}
+--- WHAT HAPPENED (last {{ recent_events | length }} turn{% if recent_events | length != 1 %}s{% endif %}) ---
+{% for event in recent_events %}
+Turn {{ event.turn }}:
+{% for line in event.lines %}
+  · {{ line }}
+{% endfor %}
+{% endfor %}
+{% endif %}
+
+--- YOUR ACTIVE POKÉMON ---
+{% if my_active %}
+{{ my_active.species | title }} ({{ my_active.types | join("/") }})  HP: {{ (my_active.hp_fraction * 100) | round(1) }}%{% if my_active.status %}  |  Status: {{ my_active.status }}{% endif %}{% if my_active.is_terastallized %}  |  ◈ TERASTALLIZED ({{ my_active.tera_type }}){% endif %}
+{% if my_active.tera_type and not my_active.is_terastallized %}  Tera type: {{ my_active.tera_type }}{% endif %}
+{% if my_active.item %}  Item: {{ my_active.item }}{% endif %}{% if my_active.ability %}  |  Ability: {{ my_active.ability }}{% endif %}
+{% if my_active.actual_stats %}  Stats: Spe {{ my_active.actual_stats.get('spe', '?') }}  Atk {{ my_active.actual_stats.get('atk', '?') }}  SpA {{ my_active.actual_stats.get('spa', '?') }}  Def {{ my_active.actual_stats.get('def', '?') }}  SpD {{ my_active.actual_stats.get('spd', '?') }}{% endif %}
+{% if my_active.boosts %}  Stat stages: {% for stat, val in my_active.boosts.items() %}{{ stat }} {{ "%+d" | format(val) }}  {% endfor %}{% endif %}
+{% if my_active.last_move %}  Last move used: {{ my_active.last_move.id | replace("_", " ") | title }}{% endif %}
+
+  Moves:
+{% for name, move in my_active.moves.items() %}
+  {{ loop.index }}. {{ move.id | replace("_", " ") | title }} ({{ move.type }}, {{ move.category }}, {{ move.base_power }} BP, {{ move.pp }}/{{ move.max_pp }} PP)
+{% endfor %}
+{% else %}
+(no active Pokémon)
+{% endif %}
+
+--- YOUR BENCH ---
+{% if my_team %}
+{% for mon in my_team %}
+{% set _ss = (heuristics.switch_scores | selectattr('species', 'equalto', mon.species) | list) if heuristics and heuristics.switch_scores else [] %}
+{% set _spd = _ss[0].speed_vs_opp if _ss else None %}
+  · {{ mon.species | title }} ({{ mon.types | join("/") }})  HP: {{ (mon.hp_fraction * 100) | round(1) }}%{% if mon.fainted %}  [FAINTED]{% elif mon.status %}  | {{ mon.status }}{% endif %}{% if mon.tera_type %}  [Tera: {{ mon.tera_type }}]{% endif %}{% if _spd %}  | {{ _spd }}{% endif %}
+{% if mon.item %}    Item: {{ mon.item }}{% endif %}{% if mon.ability %}  Ability: {{ mon.ability }}{% endif %}
+{% endfor %}
+{% else %}
+  (none)
+{% endif %}
+
+--- OPPONENT'S ACTIVE POKÉMON ---
+{% if opponent_active %}
+{{ opponent_active.species | title }} ({{ opponent_active.types | join("/") }})  HP: ~{{ (opponent_active.hp_fraction * 100) | round(1) }}%{% if opponent_active.status %}  |  Status: {{ opponent_active.status }}{% endif %}{% if opponent_active.is_terastallized %}  |  ◈ TERASTALLIZED ({{ opponent_active.tera_type }}){% endif %}
+{% if opponent_active.item %}  Revealed item: {{ opponent_active.item }}{% endif %}{% if opponent_active.ability %}  |  Revealed ability: {{ opponent_active.ability }}{% endif %}
+{% if opponent_active.boosts %}  Stat stages: {% for stat, val in opponent_active.boosts.items() %}{{ stat }} {{ "%+d" | format(val) }}  {% endfor %}{% endif %}
+{% if opponent_active.last_move %}  Last move used: {{ opponent_active.last_move.id | replace("_", " ") | title }} ({{ opponent_active.last_move.type }}, {{ opponent_active.last_move.category }}, {{ opponent_active.last_move.base_power }} BP){% endif %}
+
+  Moves ({{ opponent_active.moves_revealed }}/4 revealed):
+{% if opponent_active.revealed_moves %}
+{% for name, move in opponent_active.revealed_moves.items() %}
+  · {{ move.id | replace("_", " ") | title }} ({{ move.type }}, {{ move.category }}, {{ move.base_power }} BP)
+{% endfor %}
+{% if opponent_active.moves_revealed < 4 %}
+  · {{ 4 - opponent_active.moves_revealed }} move{% if (4 - opponent_active.moves_revealed) != 1 %}s{% endif %} unrevealed — treat as potential threats
+{% endif %}
+{% else %}
+  · No moves revealed yet
+{% endif %}
+{% else %}
+(no opponent active)
+{% endif %}
+
+--- OPPONENT'S BENCH ({{ opponent_team_size_seen }} Pokémon seen) ---
+{% if opponent_team %}
+{% for mon in opponent_team %}
+  · {{ mon.species | title }} ({{ mon.types | join("/") }})  HP: ~{{ (mon.hp_fraction * 100) | round(1) }}%{% if mon.fainted %}  [FAINTED]{% elif mon.status %}  | {{ mon.status }}{% endif %}{% if mon.is_terastallized %}  [◈ Terastallized: {{ mon.tera_type }}]{% endif %}
+    Moves: {{ mon.moves_revealed }}/4 revealed{% if mon.revealed_moves %}: {{ mon.revealed_moves.values() | map(attribute='id') | map('replace', '_', ' ') | map('title') | join(", ") }}{% endif %}
+{% endfor %}
+{% else %}
+  (none revealed yet)
+{% endif %}
+
+{% if opponent_threat_map %}
+--- OPPONENT THREAT ANALYSIS ---
+{% for entry in opponent_threat_map %}
+{% if entry.threatens or entry.resists %}
+{{ entry.species | title }}:
+{% if entry.threatens %}
+  ⚠ Threatens (type advantage): {{ entry.threatens | map('title') | join(", ") }}
+{% endif %}
+{% if entry.resists %}
+  ✓ Resists your: {{ entry.resists | map('title') | join(", ") }}
+{% endif %}
+{% endif %}
+{% endfor %}
+{% endif %}
+
+--- AVAILABLE ACTIONS ---
+{% if force_switch %}
+⚠ You must switch — your active Pokémon fainted or was forced out.
+{% endif %}
+{% for move in available_moves %}
+  move {{ loop.index }}: {{ move.id | replace("_", " ") | title }} ({{ move.type }}, {{ move.category }}, {{ move.base_power }} BP, {{ move.pp }}/{{ move.max_pp }} PP)
+{% endfor %}
+{% if can_tera %}
+  (Terastallize is available this turn — use action_type "tera_move" with any move above)
+{% endif %}
+{% for species in available_switches %}
+  switch {{ loop.index }}: {{ species | title }}
+{% endfor %}
+
+--- HEURISTIC ADVISORY (informational — not binding) ---
+{% if heuristics.battle_context %}
+{% set ctx = heuristics.battle_context %}
+{% if ctx.ko_risk_note %}
+{{ ctx.ko_risk_note }}
+
+{% endif %}
+{% if ctx.tera_note %}
+{{ ctx.tera_note }}
+
+{% endif %}
+Situation:
+{% if ctx.speed %}
+  Speed: {{ ctx.speed.note }}
+{% endif %}
+{% if ctx.active_matchup %}
+  Matchup: {{ ctx.active_matchup }}{% if ctx.active_matchup == "favorable" %} — your types have the edge{% elif ctx.active_matchup == "disadvantaged" %} — consider switching{% elif ctx.active_matchup == "double-edged" %} — both sides hit super effectively{% endif %}
+
+{% endif %}
+{% if ctx.phase %}
+  Phase: {{ ctx.phase | replace("_", " ") }}{% if ctx.own_remaining != None %} (you: {{ ctx.own_remaining }}, opponent: {{ ctx.opp_remaining }} remaining){% endif %}
+
+{% endif %}
+{% if ctx.own_status_impact %}
+  ⚠ Your status: {{ ctx.own_status_impact }}
+{% endif %}
+{% if ctx.opp_status_impact %}
+  Opponent status: {{ ctx.opp_status_impact }}
+{% endif %}
+{% if ctx.weather_note %}
+  {{ ctx.weather_note }}
+{% endif %}
+{% endif %}
+{% if heuristics.move_scores %}
+Moves:
+{% for ms in heuristics.move_scores %}
+  {{ loop.index }}. {{ ms.move_id | replace("_", " ") | title }}:{% if ms.is_status %} [STATUS]{% else %} {{ ms.effectiveness_label }}{% if ms.estimated_damage_pct %}, est. {{ ms.estimated_damage_pct }}{% if ms.accuracy_adjusted_pct and ms.accuracy_adjusted_pct != ms.estimated_damage_pct %} ({{ ms.accuracy_adjusted_pct }} accuracy-adj.){% endif %}{% endif %}{% endif %}{% if ms.low_pp %}  ⚠ LOW PP{% endif %}
+{% if ms.notes %}     → {{ ms.notes | join("  |  ") }}{% endif %}
+{% endfor %}
+{% endif %}
+{% if heuristics.switch_scores %}
+Switches (entry hazard costs included in notes below):
+{% for ss in heuristics.switch_scores %}
+  {{ loop.index }}. {{ ss.species | title }} ({{ (ss.hp_fraction * 100) | round(1) }}%{% if ss.quality_label %}, {{ ss.quality_label }}{% endif %}):
+     Defense vs current opponent: {{ ss.defensive_vs_opp }}{% if ss.speed_vs_opp %}  |  Speed: {{ ss.speed_vs_opp }}{% endif %}
+
+{% if ss.notes %}     → {{ ss.notes | join("  |  ") }}{% endif %}
+{% endfor %}
+{% endif %}
