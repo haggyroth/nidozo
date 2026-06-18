@@ -220,6 +220,13 @@
 - **`PlayerHeuristicPanels`** shared helper in `battleShared.jsx` keeps both views in sync; `.doubles-heuristic-stack` CSS container keeps per-slot drawers in a single grid cell
 - 939 tests green
 
+### v0.38 — Prompt v9: Speed Tier in Bench Summary (#200)
+- **Bench section annotated with speed vs opponent** — each bench mon in `--- YOUR BENCH ---` now shows `| faster (X vs ~Y)` / `slower` / `similar speed` inline when the opponent's speed is known; previously this was only visible in the lower HEURISTIC ADVISORY section
+- **Jinja `selectattr` lookup** — no Python changes; the turn template looks up `heuristics.switch_scores.speed_vs_opp` by species and renders it gracefully (silent when empty or no match)
+- **v9 system prompt** — new "Reading your bench" paragraph explaining the annotation; all v8 entry hazard + decision framework content retained
+- **Default changed from v8 → v9** for all singles endpoints (doubles keeps v7)
+- 8 new tests in `test_prompt_v9.py`; 1021 tests green
+
 ### v0.37 — Doubles Extensions (#199)
 - **Drafted/preset teams now work with `doubles=True`** — removed the erroneous "team builders are singles-only" constraint; draft output is format-agnostic and works in NatDex Doubles
 - **Correct Showdown format stored for drafted doubles** — `run_draft()` now accepts a `doubles` flag and calls `resolve_format()` so the DB records `gen9nationaldexdoubles` (not a singles format)
@@ -289,7 +296,7 @@
 **Doubles Battles — extensions** ✅ shipped (v0.37)
 
 **Deeper Competitive Features**
-- Speed tier display: annotate whether each switch candidate moves before/after the opponent (extend existing speed note from heuristic advisory into the bench summary)
+- Speed tier display ✅ shipped (v0.38)
 
 ---
 
