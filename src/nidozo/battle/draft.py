@@ -28,7 +28,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from nidozo.battle.team_builder import build_team_string, get_pool_info, load_movesets
-from nidozo.battle.tiers import TIER_DISPLAY, TIER_TO_FORMAT, get_pool
+from nidozo.battle.tiers import TIER_DISPLAY, get_pool
 from nidozo.llm.backend import Message, ModelBackend
 
 if TYPE_CHECKING:
@@ -133,6 +133,7 @@ async def run_draft(
     player_role: str = "p1",
     prompt_version: str = "v3",
     team_size: int = 6,
+    doubles: bool = False,
 ) -> DraftResult:
     """Run the draft for one player, picking *team_size* Pokémon.
 
@@ -158,8 +159,10 @@ async def run_draft(
     movesets = load_movesets()
     pool_ids = get_pool(tier, set(movesets.keys()))
     pool_info = get_pool_info(pool_ids, movesets)  # [{species_id, species, types}]
+    from nidozo.battle.tiers import resolve_format
+
     tier_display = TIER_DISPLAY.get(tier, tier.upper())
-    showdown_format = TIER_TO_FORMAT.get(tier, "gen9nationaldexag")
+    showdown_format = resolve_format(tier, doubles=doubles, team_size=team_size)
 
     # Load system prompt
     system_path = Path(__file__).parent.parent / "llm" / "prompts" / "v3" / "draft_system.txt"

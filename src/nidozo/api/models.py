@@ -37,7 +37,7 @@ class StartBattleRequest(BaseModel):
     draft: bool = False    # If True and tier != "random", run LLM draft phase first
     # Doubles (2v2 per turn): when True, uses a Showdown doubles format.
     # Random tier → gen9randomdoublesbattle; non-random → NatDex Doubles.
-    # Presets are singles-only and force doubles=False.
+    # Draft and preset teams are format-agnostic and work with doubles.
     doubles: bool = False
     # Team size: how many Pokémon each player brings. 6=standard, 3=3v3 singles,
     # 4=4v4 doubles (bring 4, use 2 per turn — VGC-style). 3v3/4v4 require custom

@@ -102,14 +102,11 @@ async def run_battles(
     from nidozo.battle.tiers import resolve_format
 
     use_preset = bool(req.p1_preset or req.p2_preset)
-    # Doubles is incompatible with drafted/preset teams in this cut (those team
-    # builders are singles-only), so doubles takes priority and disables draft.
-    doubles = bool(getattr(req, "doubles", False)) and not use_preset
+    doubles = bool(getattr(req, "doubles", False))
     team_size: int = getattr(req, "team_size", 6)
     has_human = req.p1_provider == "human" or req.p2_provider == "human"
     do_draft = (
-        not doubles
-        and not has_human
+        not has_human
         and req.tier != "random"
         and req.draft
         and not use_preset
@@ -162,7 +159,7 @@ async def run_battles(
                     "battle_id": battle_id,
                 })
                 p1_backend = _build_backend(req.p1_provider, p1_model)
-                p1_draft = await run_draft_phase(p1_backend, p1_id, req.tier, store, bus, "p1", team_size=team_size)
+                p1_draft = await run_draft_phase(p1_backend, p1_id, req.tier, store, bus, "p1", team_size=team_size, doubles=doubles)
                 p1_team = p1_draft["team_string"]
                 p1_team_id = p1_draft["team_id"]
 
@@ -174,7 +171,7 @@ async def run_battles(
                     "battle_id": battle_id,
                 })
                 p2_backend = _build_backend(req.p2_provider, p2_model)
-                p2_draft = await run_draft_phase(p2_backend, p2_id, req.tier, store, bus, "p2", team_size=team_size)
+                p2_draft = await run_draft_phase(p2_backend, p2_id, req.tier, store, bus, "p2", team_size=team_size, doubles=doubles)
                 p2_team = p2_draft["team_string"]
                 p2_team_id = p2_draft["team_id"]
 
@@ -301,7 +298,7 @@ async def run_tournament(
         PRESET_FORMAT if any_preset
         else resolve_format(req.tier, doubles=doubles, team_size=team_size)
     )
-    effective_prompt = "v3" if do_draft else req.prompt_version
+    effective_prompt = "v7" if doubles else ("v3" if do_draft else req.prompt_version)
     cfg = LocalhostServerConfiguration
 
     total = len(battle_ids)
@@ -411,7 +408,7 @@ async def run_tournament(
                 })
                 p1_backend = _build_backend(t_p1_prov, battle_info["p1_model"])
                 p1_draft_r = await run_draft_phase(
-                    p1_backend, t_p1_id, req.tier, store, bus, "p1", team_size=team_size
+                    p1_backend, t_p1_id, req.tier, store, bus, "p1", team_size=team_size, doubles=doubles
                 )
                 t_p1_team = p1_draft_r["team_string"]
                 t_p1_team_id = p1_draft_r["team_id"]
@@ -426,7 +423,7 @@ async def run_tournament(
                 })
                 p2_backend = _build_backend(t_p2_prov, battle_info["p2_model"])
                 p2_draft_r = await run_draft_phase(
-                    p2_backend, t_p2_id, req.tier, store, bus, "p2", team_size=team_size
+                    p2_backend, t_p2_id, req.tier, store, bus, "p2", team_size=team_size, doubles=doubles
                 )
                 t_p2_team = p2_draft_r["team_string"]
                 t_p2_team_id = p2_draft_r["team_id"]
@@ -565,6 +562,7 @@ async def run_draft_phase(
     bus: Any,
     player_role: str,
     team_size: int = 6,
+    doubles: bool = False,
 ) -> dict[str, Any]:
     """Run the draft for one player and return {team_string, team_id}."""
     from nidozo.battle.draft import run_draft
@@ -578,6 +576,7 @@ async def run_draft_phase(
         player_role=player_role,
         prompt_version="v3",
         team_size=team_size,
+        doubles=doubles,
     )
     return {"team_string": result.team_string, "team_id": result.team_id}
 
@@ -731,7 +730,7 @@ async def run_bracket_tournament(
     """
     from poke_env import LocalhostServerConfiguration
 
-    from nidozo.battle.tiers import TIER_TO_FORMAT
+    from nidozo.battle.tiers import resolve_format
     from nidozo.tournament.bracket import (
         build_bracket,
         get_pending_matches,
@@ -740,13 +739,14 @@ async def run_bracket_tournament(
     )
 
     any_preset = any(ps.get("preset") for ps in player_specs)
+    team_size: int = getattr(req, "team_size", 6)
+    doubles: bool = getattr(req, "doubles", False)
     do_draft = req.tier != "random" and req.draft and not any_preset
     showdown_format = (
         PRESET_FORMAT if any_preset
-        else "gen9randombattle" if req.tier == "random"
-        else TIER_TO_FORMAT.get(req.tier, "gen9nationaldexag")
+        else resolve_format(req.tier, doubles=doubles, team_size=team_size)
     )
-    effective_prompt = "v3" if do_draft else req.prompt_version
+    effective_prompt = "v7" if doubles else ("v3" if do_draft else req.prompt_version)
     cfg = LocalhostServerConfiguration
 
     # Build initial bracket state
@@ -1064,7 +1064,7 @@ async def run_season(
         PRESET_FORMAT if any_preset
         else resolve_format(req.tier, doubles=doubles, team_size=team_size)
     )
-    effective_prompt = "v3" if do_draft else req.prompt_version
+    effective_prompt = "v7" if doubles else ("v3" if do_draft else req.prompt_version)
     cfg = LocalhostServerConfiguration
 
     total = len(battle_ids)
@@ -1174,7 +1174,7 @@ async def run_season(
                 })
                 p1_backend = _build_backend(s_p1_prov, battle_info["p1_model"])
                 p1_draft_r = await run_draft_phase(
-                    p1_backend, s_p1_id, req.tier, store, bus, "p1", team_size=team_size
+                    p1_backend, s_p1_id, req.tier, store, bus, "p1", team_size=team_size, doubles=doubles
                 )
                 s_p1_team = p1_draft_r["team_string"]
                 s_p1_team_id = p1_draft_r["team_id"]
@@ -1189,7 +1189,7 @@ async def run_season(
                 })
                 p2_backend = _build_backend(s_p2_prov, battle_info["p2_model"])
                 p2_draft_r = await run_draft_phase(
-                    p2_backend, s_p2_id, req.tier, store, bus, "p2", team_size=team_size
+                    p2_backend, s_p2_id, req.tier, store, bus, "p2", team_size=team_size, doubles=doubles
                 )
                 s_p2_team = p2_draft_r["team_string"]
                 s_p2_team_id = p2_draft_r["team_id"]

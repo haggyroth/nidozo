@@ -427,6 +427,8 @@ def create_router(
         # players (min_length=2), tier, tournament_format, prompt_version and
         # providers are all validated by the Pydantic model (Literal / Field
         # constraints → 422 on bad input), so no manual checks are needed here.
+        if any(p.provider == "human" for p in req.players):
+            raise HTTPException(status_code=422, detail="Tournaments cannot include the 'human' provider")
         showdown_format = resolve_format(req.tier, doubles=req.doubles, team_size=req.team_size)
         effective_prompt = "v3" if (req.tier != "random" and req.draft) else req.prompt_version
 
@@ -535,6 +537,8 @@ def create_router(
         # players (min_length=2), tier, prompt_version and providers are validated
         # by the Pydantic model (Literal / Field constraints → 422), so no manual
         # checks are needed here.
+        if any(p.provider == "human" for p in req.players):
+            raise HTTPException(status_code=422, detail="Seasons cannot include the 'human' provider")
         showdown_format = resolve_format(req.tier, doubles=req.doubles, team_size=req.team_size)
         effective_prompt = "v3" if (req.tier != "random" and req.draft) else req.prompt_version
 
