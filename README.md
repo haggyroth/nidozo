@@ -16,7 +16,7 @@ Sibling project to [Nimzo](https://github.com/haggyroth/nimzo) (the LLM chess ar
 - **6 tier formats** — Random / OU / UU / LC / Ubers / Freeforall; all backed by `gen9nationaldex*` Showdown formats; tier badges throughout the UI
 - **Doubles battles (2v2)** — opt-in `doubles=true` runs a Showdown doubles format with full target selection (`foe_1`/`foe_2`/`ally`/`self`); prompt v7, action parser, and heuristic engine handle spread moves and partner synergy
 - **Drafted teams** — LLM snake-drafts a 6-mon team from 513 Pokémon with Gen 9 NatDex competitive sets (sourced from Showdown's factory data + synthesised randbat sets); DraftPhase UI with animated pick reveal
-- **Pluggable LLM backends** — Anthropic, OpenAI, or any local model via LM Studio
+- **Pluggable LLM backends** — Anthropic, OpenAI, local model via LM Studio, or **human player** (select `human` as provider to play one side yourself from the browser — a move/switch picker overlays the battle stage on your turn)
 - **JSON structured outputs** (v2 prompt) — models respond with `{"reasoning":"…","action_type":"move","identifier":"thunderbolt"}`; grammar-sampled on OpenAI/LM Studio backends for near-certain parse reliability
 - **Heuristic advisory** — type effectiveness, estimated damage (accuracy-adjusted), speed-tier awareness, weather modifiers, switch quality scoring, low-PP warnings, battle-context block — all surfaced as advisory context (non-binding)
 - **Hidden-information enforcement** — each model sees only what a human player would legitimately know

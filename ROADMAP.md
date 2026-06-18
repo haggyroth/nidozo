@@ -220,6 +220,14 @@
 - **`PlayerHeuristicPanels`** shared helper in `battleShared.jsx` keeps both views in sync; `.doubles-heuristic-stack` CSS container keeps per-slot drawers in a single grid cell
 - 939 tests green
 
+### v0.35 — Human Player Mode (#197)
+- **`StreamingHumanPlayer`** — poke-env Player whose moves arrive from the browser; registers an `asyncio.Future` each turn and awaits resolution via the API; falls back to random on timeout (configurable via `NIDOZO_HUMAN_TIMEOUT`, default 300 s)
+- **`POST /api/battles/{id}/human-action`** — endpoint that resolves the pending Future with the human's chosen move or switch
+- **`HumanActionPicker`** — overlay panel that appears over the Showdown stage when it's the human's turn; shows all legal moves (type badge, BP, PP, heuristic score) and switches (sprite, types, HP bar); one click submits the action
+- **Human provider** added to the Leaderboard battle form ("🎮 You play!" label, no model dropdown); human skips draft, lessons, and narrative generation
+- **17 new tests** in `test_human_player.py`: registry helpers + API endpoint validation
+- 984 tests green
+
 ### v0.34 — Personality Profiles: Gap Fill (#196)
 - **`GET /api/personalities`** — backend is now the single source of truth for persona metadata; `emoji` field added to `Personality` dataclass
 - **`GET /api/stats/personalities`** — per-slug win/loss/tie counts and win-rate % across all completed battles
@@ -241,11 +249,6 @@
 ## Upcoming
 
 ### Player Experience
-
-**Human Player Mode**
-- Allow a human to take one side of a battle via the browser
-- Move/switch selection UI replaces the model selector for the human slot
-- Useful for testing heuristics and experiencing battles directly
 
 ---
 
