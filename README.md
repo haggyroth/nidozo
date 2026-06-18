@@ -31,7 +31,39 @@ Sibling project to [Nimzo](https://github.com/haggyroth/nimzo) (the LLM chess ar
 
 ---
 
-## Prerequisites
+## Quick start — Docker (recommended for servers)
+
+The entire stack runs with a single command. Docker is the recommended way to run Nidozo on a server (e.g. a headless Linux/Windows+WSL2 machine).
+
+```bash
+git clone https://github.com/haggyroth/nidozo.git
+cd nidozo
+docker compose up -d
+```
+
+Open `http://<host>:5001` — the React SPA is served directly by FastAPI.
+
+- **Showdown** runs on port `8000` (exposed for cockpit view and debugging).
+- **API + frontend** runs on port `5001`.
+- **SQLite** data persists on a named Docker volume (`nidozo-data`) and survives container restarts.
+
+To stop and remove containers (data preserved):
+
+```bash
+docker compose down
+```
+
+To also wipe the database volume:
+
+```bash
+docker compose down -v
+```
+
+> **First build** takes a few minutes — the Showdown `npm ci` and Python dependency install only run once; subsequent restarts are fast.
+
+---
+
+## Prerequisites (local / dev setup)
 
 | Tool | Version | Install |
 |------|---------|---------|
@@ -41,7 +73,7 @@ Sibling project to [Nimzo](https://github.com/haggyroth/nimzo) (the LLM chess ar
 
 ---
 
-## Setup
+## Local / dev setup
 
 ### 1. Clone the repo and install Python dependencies
 
@@ -52,32 +84,15 @@ uv venv --python 3.12
 uv pip install -e ".[dev]"
 ```
 
-### 2. Set up the local Pokémon Showdown server
+### 2. Install Showdown dependencies
 
-The Showdown server is **not** included in this repo (it's in `.gitignore`). Clone and set it up once:
-
-```bash
-git clone https://github.com/smogon/pokemon-showdown.git showdown
-cd showdown
-npm install
-cp config/config-example.js config/config.js
-```
-
-> **Why `--no-security`?** poke-env connects as bots with generated usernames. `--no-security` disables the login challenge so bots can connect freely to the local server.
-
-#### Start the server
+The Showdown server source is vendored in `showdown/`. Install its Node dependencies once:
 
 ```bash
-# From the repo root
-./scripts/start_showdown.sh
+cd showdown && npm install && cd ..
 ```
 
-You should see:
-```
-Worker 1 now listening on 0.0.0.0:8000
-```
-
-Leave this terminal running.
+> **Why `--no-security`?** poke-env connects as bots with generated usernames. `--no-security` disables the login challenge so bots can connect freely to the local server. The startup script passes this flag automatically.
 
 ### 3. (Optional) Set up LM Studio for local models
 
@@ -85,9 +100,7 @@ Install [LM Studio](https://lmstudio.ai/), load a model, and start the local ser
 
 ---
 
-## Running battles
-
-### Live visualizer (recommended)
+## Running battles (local dev)
 
 ```bash
 # Terminal 1 — Showdown server
@@ -187,7 +200,7 @@ All prompts use **Gen 9 NatDex** mechanics. Pass `--prompt-version v2` (or `v1`)
 ## Troubleshooting
 
 **`ConnectionRefusedError` when running a battle**
-Showdown isn't running. Start it: `./scripts/start_showdown.sh`
+Showdown isn't running. Start it: `./scripts/start_showdown.sh` (local dev) or `docker compose up showdown` (Docker).
 
 **`ModuleNotFoundError: nidozo`**
 Run `uv pip install --reinstall-package nidozo -e ".[dev]"` to regenerate the editable install `.pth` file.

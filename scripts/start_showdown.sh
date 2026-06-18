@@ -1,15 +1,20 @@
 #!/usr/bin/env bash
-# Start the local Pokémon Showdown server.
+# Start the local Pokémon Showdown server (local / dev use).
 # Run this in a separate terminal before any battle scripts.
-# Requires `showdown/` to be cloned and `npm install` run inside it.
-# See README.md for full setup steps.
+# Requires node_modules: run `cd showdown && npm install` once after cloning.
+# For production, use `docker compose up` instead.
 set -euo pipefail
 
 SHOWDOWN_DIR="$(dirname "$0")/../showdown"
 
-if [ ! -d "$SHOWDOWN_DIR" ]; then
-  echo "Error: showdown/ directory not found."
-  echo "Clone it first: git clone https://github.com/smogon/pokemon-showdown.git showdown"
+if [ ! -f "$SHOWDOWN_DIR/pokemon-showdown" ]; then
+  echo "Error: showdown/pokemon-showdown not found."
+  echo "Run: cd showdown && npm install"
+  exit 1
+fi
+
+if [ ! -d "$SHOWDOWN_DIR/node_modules" ]; then
+  echo "Error: showdown/node_modules missing. Run: cd showdown && npm install"
   exit 1
 fi
 
