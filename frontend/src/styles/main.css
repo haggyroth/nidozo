@@ -6456,3 +6456,251 @@ body::after {
     scroll-behavior: auto !important;
   }
 }
+
+/* ============================================================
+   HUMAN ACTION PICKER — move/switch selector for human player mode
+   ============================================================ */
+
+.hap-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 120;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(2px);
+  pointer-events: all;
+}
+
+.hap-panel {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  padding: 1.25rem 1.5rem 1.5rem;
+  width: min(540px, 94vw);
+  max-height: 85vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+
+.hap-header {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 0.75rem;
+}
+
+.hap-turn-label {
+  font-size: var(--fs-xs);
+  font-family: var(--font-mono);
+  color: var(--text-dim);
+  letter-spacing: 0.06em;
+}
+
+.hap-prompt {
+  font-size: var(--fs-md);
+  font-weight: 700;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.hap-error {
+  font-size: var(--fs-sm);
+  color: var(--hp-low);
+  background: rgba(255, 23, 68, 0.08);
+  border: 1px solid var(--hp-low);
+  border-radius: 0.4rem;
+  padding: 0.4rem 0.75rem;
+}
+
+.hap-section-label {
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-dim);
+  margin-bottom: 0.5rem;
+}
+
+/* Move buttons */
+.hap-move-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.5rem;
+}
+
+@media (max-width: 480px) {
+  .hap-move-grid { grid-template-columns: 1fr; }
+}
+
+.hap-move-btn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.55rem 0.75rem;
+  background: var(--bg-inset);
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+  font-size: var(--fs-sm);
+  transition: border-color 0.12s, background 0.12s;
+  flex-wrap: wrap;
+  row-gap: 0.25rem;
+}
+
+.hap-move-btn:hover:not(:disabled) {
+  border-color: var(--accent);
+  background: var(--bg-hover);
+}
+
+.hap-move-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.hap-move-btn--pp-low { border-color: var(--hp-low); }
+
+.hap-move-hotkey {
+  font-size: var(--fs-xs);
+  font-family: var(--font-mono);
+  color: var(--text-dim);
+  min-width: 1rem;
+}
+
+.hap-type-badge {
+  font-size: var(--fs-2xs, 0.65rem);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0.1rem 0.35rem;
+  border-radius: 0.25rem;
+  color: #fff;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.hap-move-name {
+  flex: 1;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.hap-move-meta {
+  font-size: var(--fs-xs);
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+.hap-move-pp {
+  font-size: var(--fs-xs);
+  color: var(--text-dim);
+  margin-left: auto;
+}
+
+.hap-move-pp--low { color: var(--hp-low); font-weight: 700; }
+
+.hap-move-score {
+  font-size: var(--fs-xs);
+  font-family: var(--font-mono);
+  color: var(--accent);
+  background: rgba(99, 144, 240, 0.12);
+  border-radius: 0.25rem;
+  padding: 0.05rem 0.3rem;
+  white-space: nowrap;
+}
+
+/* Switch buttons */
+.hap-switch-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 0.5rem;
+}
+
+.hap-switch-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background: var(--bg-inset);
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+  font-size: var(--fs-sm);
+  transition: border-color 0.12s, background 0.12s;
+}
+
+.hap-switch-btn:hover:not(:disabled) {
+  border-color: var(--accent);
+  background: var(--bg-hover);
+}
+
+.hap-switch-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.hap-switch-sprite {
+  width: 40px;
+  height: 40px;
+  image-rendering: pixelated;
+  flex-shrink: 0;
+}
+
+.hap-switch-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.hap-switch-name {
+  font-weight: 600;
+  text-transform: capitalize;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hap-switch-types {
+  display: flex;
+  gap: 0.25rem;
+  flex-wrap: wrap;
+}
+
+.hap-switch-status {
+  font-size: var(--fs-xs);
+  color: var(--hp-low);
+  font-weight: 700;
+}
+
+.hap-hp-track {
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  overflow: hidden;
+  width: 100%;
+}
+
+.hap-hp-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.2s;
+}
+
+.hap-switch-hp {
+  font-size: var(--fs-xs);
+  color: var(--text-dim);
+}
+
+.hap-submitting {
+  text-align: center;
+  font-size: var(--fs-sm);
+  color: var(--text-dim);
+  animation: thinking-pulse 1s ease-in-out infinite;
+}

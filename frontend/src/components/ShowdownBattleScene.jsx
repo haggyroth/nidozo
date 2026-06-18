@@ -24,6 +24,7 @@ import { useShowdownBundle } from '../hooks/useShowdownBundle'
 import { WinProbBar, PlayerLabel, PlayerHeuristicPanels, ThinkingBadge, PersonalityChip, PresetBadge } from './battleShared'
 import { BattleBadges, CancelBattleButton } from './battleChrome'
 import BattleLog from './BattleLog'
+import HumanActionPicker from './HumanActionPicker'
 
 /** Strip the room-prefix line and proxy keepalive; return bare |...| lines. */
 function protocolLinesFromFrame(frame) {
@@ -32,7 +33,7 @@ function protocolLinesFromFrame(frame) {
     .filter(line => line && !line.startsWith('>') && line !== '|ping')
 }
 
-export default function ShowdownBattleScene({ room, p1State, p2State, battleInfo, battleResult, thinking, coachThinking, events = [] }) {
+export default function ShowdownBattleScene({ room, p1State, p2State, battleInfo, battleResult, thinking, coachThinking, events = [], humanActionRequired, onHumanActionDismiss }) {
   const { ready: bundleReady, error: bundleError } = useShowdownBundle()
   const frameRef  = useRef(null)
   const logRef    = useRef(null)
@@ -177,6 +178,17 @@ export default function ShowdownBattleScene({ room, p1State, p2State, battleInfo
               {status === 'ended'      && 'Battle ended.'}
               {status === 'error'      && 'Connection error — try refreshing.'}
             </div>
+          )}
+
+          {/* Human action picker — appears when it's the human player's turn. */}
+          {humanActionRequired && (
+            <HumanActionPicker
+              battleId={humanActionRequired.battle_id}
+              playerRole={humanActionRequired.player_role}
+              turn={humanActionRequired.turn}
+              state={humanActionRequired.state}
+              onDismiss={onHumanActionDismiss}
+            />
           )}
         </div>
       </div>

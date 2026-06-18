@@ -124,7 +124,7 @@ function MatchupMatrix({ lbTier }) {
   )
 }
 
-const PROVIDERS = ['random', 'anthropic', 'openai', 'lmstudio']
+const PROVIDERS = ['random', 'anthropic', 'openai', 'lmstudio', 'human']
 const COACH_PROVIDERS = ['none', 'anthropic', 'openai', 'lmstudio']
 const TIERS = [
   { id: 'random',     label: 'Random Battle' },
@@ -190,7 +190,7 @@ function ModelSelector({ label, provider, model, onProviderChange, onModelChange
     : (STATIC_PRESETS[provider] || [])
 
   // Use a dropdown when we have known options; text input as fallback
-  const useDropdown = provider !== 'random' && options.length > 0
+  const useDropdown = provider !== 'random' && provider !== 'human' && options.length > 0
 
   return (
     <div className="model-selector">
@@ -204,8 +204,10 @@ function ModelSelector({ label, provider, model, onProviderChange, onModelChange
           {PROVIDERS.map(p => <option key={p} value={p}>{p}</option>)}
         </select>
 
-        {provider === 'random' ? (
-          <span className="model-random-label">—</span>
+        {provider === 'random' || provider === 'human' ? (
+          <span className="model-random-label">
+            {provider === 'human' ? '🎮 You play!' : '—'}
+          </span>
         ) : useDropdown ? (
           <select
             className="form-select model-select"
@@ -412,8 +414,8 @@ function BattleForm({ onBattleStarted, lmModels, lmLoading }) {
     setError(null)
     try {
       const body = { ...form, n_battles: Number(form.n_battles) }
-      if (!body.p1_model || body.p1_provider === 'random') delete body.p1_model
-      if (!body.p2_model || body.p2_provider === 'random') delete body.p2_model
+      if (!body.p1_model || body.p1_provider === 'random' || body.p1_provider === 'human') delete body.p1_model
+      if (!body.p2_model || body.p2_provider === 'random' || body.p2_provider === 'human') delete body.p2_model
       // Coach — omit fields if no coach selected
       if (body.p1_coach_provider === 'none') { delete body.p1_coach_provider; delete body.p1_coach_model }
       if (body.p2_coach_provider === 'none') { delete body.p2_coach_provider; delete body.p2_coach_model }
