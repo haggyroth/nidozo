@@ -27,7 +27,7 @@ from poke_env.player.battle_order import BattleOrder
 
 from nidozo.battle.action_parser import parse_action
 from nidozo.battle.serializer import serialize_battle
-from nidozo.battle.streaming_player import _StreamingMixin, _state_event, _turn_event
+from nidozo.battle.streaming_player import _state_event, _StreamingMixin, _turn_event
 
 if TYPE_CHECKING:
     from nidozo.db.store import BattleStore
@@ -140,6 +140,8 @@ class StreamingHumanPlayer(_StreamingMixin, HumanPlayer):
         self._human_timeout = _DEFAULT_HUMAN_TIMEOUT
 
     async def choose_move(self, battle: AbstractBattle) -> BattleOrder:
+        assert self._battle_id is not None, "StreamingHumanPlayer requires a battle_id"
+
         # Recharge shortcut (same as LLMPlayer)
         if not isinstance(battle, DoubleBattle):
             moves = battle.available_moves
@@ -154,26 +156,34 @@ class StreamingHumanPlayer(_StreamingMixin, HumanPlayer):
         self._chose_during_frame = True
 
         # Signal the frontend: it's your turn.
-        await self._bus.publish({
-            "type": "human_action_required",
-            "battle_id": self._battle_id,
-            "battle_tag": battle.battle_tag,
-            "player_role": self._player_role,
-            "turn": battle.turn,
-            "state": state,
-        })
+        await self._bus.publish(
+            {
+                "type": "human_action_required",
+                "battle_id": self._battle_id,
+                "battle_tag": battle.battle_tag,
+                "player_role": self._player_role,
+                "turn": battle.turn,
+                "state": state,
+            }
+        )
 
         fut = register_pending(self._battle_id, self._player_role)
         try:
             action = await asyncio.wait_for(fut, timeout=self._human_timeout)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.warning(
                 "[%s] turn %d human timed out (%.0fs) — falling back to random",
-                self._player_role, battle.turn, self._human_timeout,
+                self._player_role,
+                battle.turn,
+                self._human_timeout,
             )
             _pending.pop((self._battle_id, self._player_role), None)
             self._log_turn(
-                battle.turn, None, False, None, state_json,
+                battle.turn,
+                None,
+                False,
+                None,
+                state_json,
                 fallback_reason="human_timeout",
             )
             order = self.choose_random_move(battle)
@@ -183,14 +193,20 @@ class StreamingHumanPlayer(_StreamingMixin, HumanPlayer):
             )
             return order
 
-        order = parse_action(action, battle, self)
-        if order is None:
+        parsed = parse_action(action, battle, self)
+        if parsed is None:
             logger.warning(
                 "[%s] turn %d human action parse failed (%r) — falling back to random",
-                self._player_role, battle.turn, action[:80] if action else "",
+                self._player_role,
+                battle.turn,
+                action[:80] if action else "",
             )
             self._log_turn(
-                battle.turn, None, False, action, state_json,
+                battle.turn,
+                None,
+                False,
+                action,
+                state_json,
                 fallback_reason="parse_failure",
             )
             order = self.choose_random_move(battle)
@@ -200,14 +216,13 @@ class StreamingHumanPlayer(_StreamingMixin, HumanPlayer):
             )
             return order
 
-        action_label = getattr(order, "message", str(order))
+        action_label = getattr(parsed, "message", str(parsed))
         self._log_turn(battle.turn, action_label, True, action, state_json)
-        await self._bus.publish(
-            _turn_event(battle, action_label, self._player_role, state)
-        )
-        return order
+        await self._bus.publish(_turn_event(battle, action_label, self._player_role, state))
+        return parsed
 
     async def terminate(self) -> None:
         """Cancel any pending human action future before closing the connection."""
-        cancel_pending(self._battle_id, self._player_role)
+        if self._battle_id is not None:
+            cancel_pending(self._battle_id, self._player_role)
         await super().terminate()

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import json
 from collections.abc import AsyncGenerator
 from pathlib import Path
@@ -11,15 +10,16 @@ from unittest.mock import MagicMock
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-
 # ---------------------------------------------------------------------------
 # Queue registry
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture(autouse=True)
 def clear_pending():
     """Ensure _pending is empty before and after each test."""
     from nidozo.battle.human_player import _pending
+
     _pending.clear()
     yield
     _pending.clear()
@@ -107,9 +107,11 @@ def test_cancel_pending_noop_when_none():
 # API endpoint — POST /api/battles/{id}/human-action
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture
 def app(tmp_path: Path):
     from nidozo.api.app import create_app
+
     return create_app(db_path=tmp_path / "test.db")
 
 
@@ -177,6 +179,7 @@ async def test_human_action_endpoint_encodes_json_correctly(client):
 # Model validation — "human" is a valid Provider
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_start_battle_accepts_human_provider(client):
     """human provider is accepted by the API without a 422."""
@@ -198,8 +201,18 @@ async def test_human_provider_excluded_from_lessons():
     store.get_battle_teams.return_value = (None, None)
 
     await generate_and_store_lessons(
-        store, 1, 1, 10, [],
-        p1_provider="human", p1_model="human", p1_id=1, p1_opponent="random/random",
-        p2_provider="random", p2_model=None, p2_id=None, p2_opponent="human/human",
+        store,
+        1,
+        1,
+        10,
+        [],
+        p1_provider="human",
+        p1_model="human",
+        p1_id=1,
+        p1_opponent="random/random",
+        p2_provider="random",
+        p2_model=None,
+        p2_id=None,
+        p2_opponent="human/human",
     )
     store.create_lesson.assert_not_called()
