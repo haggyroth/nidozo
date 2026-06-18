@@ -18,6 +18,7 @@ def _model_name(provider: str, model: str | None) -> str:
         "openai": "gpt-4o",
         "lmstudio": os.environ.get("LM_STUDIO_MODEL", "local-model"),
         "random": "random",
+        "human": "human",
     }
     return model or defaults.get(provider, provider)
 
@@ -84,6 +85,21 @@ def _build_streaming_player(
             battle_format=fmt,
             server_configuration=cfg,
         )
+
+    if provider == "human":
+        from nidozo.battle.human_player import StreamingHumanPlayer
+
+        kwargs_h: dict[str, Any] = {
+            "event_bus": bus,
+            "player_role": role,
+            "store": store,
+            "battle_id": battle_id,
+            "battle_format": fmt,
+            "server_configuration": cfg,
+        }
+        if team is not None:
+            kwargs_h["team"] = team
+        return StreamingHumanPlayer(**kwargs_h)
 
     use_json_mode = prompt_version in _JSON_OUTPUT_PROMPT_VERSIONS and provider in ("lmstudio", "openai")
     backend = _build_backend(provider, model, json_mode=use_json_mode)

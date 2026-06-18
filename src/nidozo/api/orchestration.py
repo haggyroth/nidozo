@@ -106,8 +106,10 @@ async def run_battles(
     # builders are singles-only), so doubles takes priority and disables draft.
     doubles = bool(getattr(req, "doubles", False)) and not use_preset
     team_size: int = getattr(req, "team_size", 6)
+    has_human = req.p1_provider == "human" or req.p2_provider == "human"
     do_draft = (
         not doubles
+        and not has_human
         and req.tier != "random"
         and req.draft
         and not use_preset
@@ -134,11 +136,11 @@ async def run_battles(
             p1_id, p2_id = model_ids if model_ids else (None, None)
             p1_lessons = (
                 [r["content"] for r in store.get_lessons(p1_id)]
-                if p1_id and req.p1_provider != "random" else None
+                if p1_id and req.p1_provider not in ("random", "human") else None
             )
             p2_lessons = (
                 [r["content"] for r in store.get_lessons(p2_id)]
-                if p2_id and req.p2_provider != "random" else None
+                if p2_id and req.p2_provider not in ("random", "human") else None
             )
 
             p1_team: str | None = None
@@ -626,7 +628,7 @@ async def generate_and_store_lessons(
         (p1_provider, p1_model, p1_id, "p1", p1_opponent),
         (p2_provider, p2_model, p2_id, "p2", p2_opponent),
     ):
-        if provider == "random" or model_id is None:
+        if provider in ("random", "human") or model_id is None:
             continue
         try:
             lesson_backend = _build_backend(provider, model, json_mode=False)
@@ -674,13 +676,13 @@ async def generate_and_store_narrative(
     from nidozo.analysis.analyzer import _load_species_data
     from nidozo.llm.narrator import generate_battle_narrative
 
-    # Pick a backend — prefer p1; fall back to p2; skip if both random.
-    if p1_provider != "random" and p1_model:
+    # Pick a backend — prefer p1; fall back to p2; skip if both random/human.
+    if p1_provider not in ("random", "human") and p1_model:
         narrator_provider, narrator_model = p1_provider, p1_model
-    elif p2_provider != "random" and p2_model:
+    elif p2_provider not in ("random", "human") and p2_model:
         narrator_provider, narrator_model = p2_provider, p2_model
     else:
-        return  # both random — no LLM available for narrative generation
+        return  # no LLM available for narrative generation
 
     try:
         turns_with_state = store.get_turns_with_state(battle_id)

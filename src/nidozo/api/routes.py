@@ -17,6 +17,7 @@ from fastapi.responses import JSONResponse
 from nidozo import __version__
 from nidozo.api.helpers import _model_name
 from nidozo.api.models import (
+    HumanActionRequest,
     StartBattleRequest,
     StartBattleResponse,
     StartSeasonRequest,
@@ -143,6 +144,28 @@ def create_router(
 
         await bus.publish({"type": "battle_cancelled", "battle_id": battle_id})
         return {"ok": True, "message": "Battle cancelled"}
+
+    @router.post("/api/battles/{battle_id}/human-action")
+    async def submit_human_action(battle_id: int, body: HumanActionRequest) -> dict[str, Any]:
+        """Deliver the human player's chosen action for the pending turn.
+
+        The browser sends this when the human clicks a move or switch button.
+        The future registered by StreamingHumanPlayer.choose_move is resolved,
+        which unblocks the poke-env turn and sends the action to Showdown.
+        """
+        from nidozo.battle.human_player import resolve_pending
+
+        action_json = json.dumps({
+            "action_type": body.action_type,
+            "identifier": body.identifier,
+        })
+        resolved = resolve_pending(battle_id, body.player_role, action_json)
+        if not resolved:
+            raise HTTPException(
+                status_code=409,
+                detail="No pending human action for this battle and player role",
+            )
+        return {"ok": True}
 
     @router.get("/api/lmstudio/models")
     async def get_lmstudio_models() -> list[str]:
