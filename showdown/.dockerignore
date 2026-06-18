@@ -1,0 +1,19 @@
+# Installed locally; Docker stage runs npm ci
+node_modules/
+
+# TypeScript declaration build output — not needed to run the server
+dist/
+
+# Runtime files created at server start
+logs/
+databases/chat
+databases/chatlog-access.txt
+databases/errors.txt
+databases/lastbattle.txt
+databases/logging.md
+
+# Repo noise
+.git/
+.gitignore
+test/
+tools/
