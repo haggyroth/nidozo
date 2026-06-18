@@ -18,6 +18,7 @@ export function useBattleStream() {
   const [draft, setDraft]               = useState(null)   // draft phase state
   const [showdownRoom, setShowdownRoom] = useState(null)   // OP-02: Showdown battle room id for spectating
   const [newBadges, setNewBadges]       = useState([])     // badge_earned events for live toast
+  const [humanActionRequired, setHumanActionRequired] = useState(null)  // human_action_required event
   const wsRef         = useRef(null)
   const shouldConnect = useRef(false)
   const retryDelay    = useRef(1000)
@@ -102,6 +103,11 @@ export function useBattleStream() {
         // open the spectator-proxy socket as soon as the room is available.
         if (event.type === 'showdown_room') {
           setShowdownRoom(event.room)
+          return
+        }
+
+        if (event.type === 'human_action_required') {
+          setHumanActionRequired(event)
           return
         }
 
@@ -272,6 +278,10 @@ export function useBattleStream() {
         if (event.type === 'turn') {
           setThinking(null)
           setCoachThinking(null)
+          // Clear the picker as soon as the human's turn is confirmed server-side
+          setHumanActionRequired(prev =>
+            prev?.player_role === event.player_role ? null : prev
+          )
           if (event.player_role === 'p1') setP1State(event)
           if (event.player_role === 'p2') setP2State(event)
           if (event.turn === 1) {
@@ -336,6 +346,7 @@ export function useBattleStream() {
           }
           setThinking(null)
           setCoachThinking(null)
+          setHumanActionRequired(null)
           return
         }
 
@@ -363,6 +374,7 @@ export function useBattleStream() {
           setCoachThinking(null)
           setDraft(null)
           setShowdownRoom(null)
+          setHumanActionRequired(null)
         }
 
       } catch {
@@ -394,6 +406,7 @@ export function useBattleStream() {
     setDraft(null)
     setShowdownRoom(null)
     setNewBadges([])
+    setHumanActionRequired(null)
   }, [])
 
   const clearTournament = useCallback(() => setTournament(null), [])
@@ -408,7 +421,7 @@ export function useBattleStream() {
   return {
     events, isConnected, p1State, p2State, battleInfo, battleResult,
     thinking, coachThinking, tournament, season, draft, showdownRoom,
-    newBadges, dismissBadge,
+    newBadges, dismissBadge, humanActionRequired, setHumanActionRequired,
     reset, clearTournament, clearSeason,
   }
 }

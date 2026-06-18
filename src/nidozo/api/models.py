@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field, model_validator
 # Closed enums shared across requests. Invalid values are rejected at the API
 # boundary (422) instead of silently degrading deep in a background task — e.g.
 # an unknown provider used to fall through to LM Studio, an unknown tier to AG.
-Provider = Literal["random", "anthropic", "openai", "lmstudio"]
+Provider = Literal["random", "anthropic", "openai", "lmstudio", "human"]
 # Coaches must be a real LLM backend — "random" has no coach implementation.
 CoachProvider = Literal["anthropic", "openai", "lmstudio"]
 PromptVersion = Literal["v1", "v2", "v3", "v4", "v5", "v6", "v7"]
@@ -114,3 +114,10 @@ class StartSeasonResponse(BaseModel):
     battle_ids: list[int]
     total_battles: int
     message: str
+
+
+class HumanActionRequest(BaseModel):
+    """Submitted by the browser when the human player chooses a move or switch."""
+    player_role: Literal["p1", "p2"]
+    action_type: Literal["move", "switch", "tera_move"]
+    identifier: str  # move id (e.g. "thunderbolt") or species name (e.g. "pikachu")

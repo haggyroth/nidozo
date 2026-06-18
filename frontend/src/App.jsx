@@ -25,7 +25,7 @@ function App() {
   const {
     events, isConnected, p1State, p2State, battleInfo, battleResult,
     thinking, coachThinking, tournament, season, draft, showdownRoom,
-    newBadges, dismissBadge,
+    newBadges, dismissBadge, humanActionRequired, setHumanActionRequired,
     reset, clearTournament, clearSeason,
   } = useBattleStream()
 
@@ -247,6 +247,8 @@ function App() {
                   thinking={thinking}
                   coachThinking={coachThinking}
                   events={events}
+                  humanActionRequired={humanActionRequired}
+                  onHumanActionDismiss={() => setHumanActionRequired(null)}
                 />
 
                 {/* Lifecycle overlays — shared by both stages */}
