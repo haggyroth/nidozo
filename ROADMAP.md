@@ -220,6 +220,14 @@
 - **`PlayerHeuristicPanels`** shared helper in `battleShared.jsx` keeps both views in sync; `.doubles-heuristic-stack` CSS container keeps per-slot drawers in a single grid cell
 - 939 tests green
 
+### v0.37 — Doubles Extensions (#199)
+- **Drafted/preset teams now work with `doubles=True`** — removed the erroneous "team builders are singles-only" constraint; draft output is format-agnostic and works in NatDex Doubles
+- **Correct Showdown format stored for drafted doubles** — `run_draft()` now accepts a `doubles` flag and calls `resolve_format()` so the DB records `gen9nationaldexdoubles` (not a singles format)
+- **v7 prompt auto-selected for doubles in tournament/season** — `run_tournament`, `run_season`, and `run_bracket_tournament` all now use `effective_prompt='v7'` when `doubles=True`
+- **`run_bracket_tournament` switched to `resolve_format()`** — previously used singles-only `TIER_TO_FORMAT` dict, breaking doubles bracket tournaments
+- **Human provider rejected at tournament/season boundary** — 422 returned if any player uses `"human"`; previously would hang the runner indefinitely
+- 1013 tests green
+
 ### v0.36 — Prompt v8: Entry Hazard Awareness (#198)
 - **Heuristic additions**: `_is_grounded`, `_type_effectiveness_vs`, `_hazard_switch_notes` — each switch candidate now carries exact chip damage notes (Stealth Rock %, Spikes layers, Toxic Spikes status/absorption, Sticky Web Speed drop); `_score_switch` adjusts `switch_quality` for severe SR damage and flags hazard removers (Rapid Spin/Defog/Mortal Spin/Tidy Up) with a bonus when hazards are active
 - **Prompt v8 system.txt**: new "Entry hazards" section with per-hazard mechanics; Decision Framework step 4 now explicitly factors in entry hazard cost and hazard remover value; "Common mistakes" extended
@@ -278,9 +286,7 @@
 > Gen 9 National Dex is now the canonical ruleset — see **OP-03** under Completed.
 > Configurable team size (3v3 / 4v4 / 6v6) shipped in v0.32.
 
-**Doubles Battles — extensions** (decision layer + frontend shipped — see v0.30/v0.32)
-- Doubles for drafted/preset teams (current cut is random + auto-generated NatDex Doubles teams)
-- Doubles tournaments and seasons (currently single battles only)
+**Doubles Battles — extensions** ✅ shipped (v0.37)
 
 **Deeper Competitive Features**
 - Speed tier display: annotate whether each switch candidate moves before/after the opponent (extend existing speed note from heuristic advisory into the bench summary)
