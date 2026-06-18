@@ -220,6 +220,13 @@
 - **`PlayerHeuristicPanels`** shared helper in `battleShared.jsx` keeps both views in sync; `.doubles-heuristic-stack` CSS container keeps per-slot drawers in a single grid cell
 - 939 tests green
 
+### v0.36 — Prompt v8: Entry Hazard Awareness (#198)
+- **Heuristic additions**: `_is_grounded`, `_type_effectiveness_vs`, `_hazard_switch_notes` — each switch candidate now carries exact chip damage notes (Stealth Rock %, Spikes layers, Toxic Spikes status/absorption, Sticky Web Speed drop); `_score_switch` adjusts `switch_quality` for severe SR damage and flags hazard removers (Rapid Spin/Defog/Mortal Spin/Tidy Up) with a bonus when hazards are active
+- **Prompt v8 system.txt**: new "Entry hazards" section with per-hazard mechanics; Decision Framework step 4 now explicitly factors in entry hazard cost and hazard remover value; "Common mistakes" extended
+- **Default changed from v6 → v8** for all battle and tournament requests; v7 remains for doubles
+- **Missing `_STATUS_MOVE_EFFECTS` entries filled**: `stealthrock`, `toxicspikes`, `stickyweb`, `defog`, `mortalspin`, `tidyup`
+- **29 new tests** in `test_heuristics_v8.py`; 1013 tests green
+
 ### v0.35 — Human Player Mode (#197)
 - **`StreamingHumanPlayer`** — poke-env Player whose moves arrive from the browser; registers an `asyncio.Future` each turn and awaits resolution via the API; falls back to random on timeout (configurable via `NIDOZO_HUMAN_TIMEOUT`, default 300 s)
 - **`POST /api/battles/{id}/human-action`** — endpoint that resolves the pending Future with the human's chosen move or switch
