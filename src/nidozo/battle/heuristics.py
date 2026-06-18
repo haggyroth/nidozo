@@ -128,8 +128,14 @@ _STATUS_MOVE_EFFECTS: dict[str, dict[str, Any]] = {
     "reflect":   {"screen": "atk", "note": "halves physical damage for 5 turns for your side"},
     "substitute":{"substitute": True, "note": "creates a 25% HP decoy — blocks status and chip damage"},
     "leechseed": {"inflicts": "SEED", "note": "drains 1/8 HP per turn from opponent; wasted on Grass types"},
-    "spikes":    {"hazard": True, "note": "lays entry hazard — damages grounded opponents on switch-in"},
-    "rapidspin": {"hazard": True, "note": "removes entry hazards and Leech Seed from your side"},
+    "stealthrock": {"hazard": True, "note": "sets Stealth Rock — damages all incoming opponents based on Rock-type effectiveness (12%–50%)"},
+    "spikes":      {"hazard": True, "note": "lays Spikes (up to 3 layers) — damages grounded opponents 12/17/25% on switch-in"},
+    "toxicspikes": {"hazard": True, "note": "sets Toxic Spikes (1 layer=Poison, 2=Badly Poisoned) — absorbed by Poison-type switch-ins"},
+    "stickyweb":   {"hazard": True, "note": "sets Sticky Web — reduces Speed -1 for grounded opponents on switch-in"},
+    "rapidspin":   {"hazard": True, "note": "removes entry hazards and Leech Seed from your side"},
+    "defog":       {"hazard": True, "note": "clears hazards from both sides and lowers opponent's evasion -1"},
+    "mortalspin":  {"hazard": True, "note": "removes entry hazards from your side and poisons the opponent"},
+    "tidyup":      {"hazard": True, "note": "removes Spikes/Stealth Rock/Sticky Web and Substitutes; raises your Attack and Speed +1"},
     "perishsong":{"perish": True, "note": "both active Pokémon faint in 3 turns unless switched"},
     "encore":    {"encore": True, "note": "forces opponent to repeat their last move for 3 turns"},
     "taunt":     {"taunt": True, "note": "prevents opponent from using status moves for 3 turns"},
@@ -143,6 +149,114 @@ _STATUS_MOVE_EFFECTS: dict[str, dict[str, Any]] = {
     "spite":     {"spite": True, "note": "reduces PP of opponent's last used move by 4"},
     "painsplit": {"painsplit": True, "note": "averages HP between both active Pokémon — best when opponent is high HP"},
 }
+
+
+# ---------------------------------------------------------------------------
+# Entry hazard helpers (v8+)
+# ---------------------------------------------------------------------------
+
+# Moves that clear entry hazards from the user's side.
+_HAZARD_REMOVAL_MOVES: frozenset[str] = frozenset({
+    "rapidspin", "defog", "mortalspin", "tidyup",
+})
+
+
+def _is_grounded(mon: Pokemon) -> bool:
+    """True if the Pokémon is affected by Spikes / Toxic Spikes / Sticky Web.
+
+    Approximation: Flying-type or Levitate ability are the most common
+    immunity sources. Air Balloon and Magnet Rise are not tracked here.
+    """
+    try:
+        if any(t is not None and t.name == "FLYING" for t in mon.types):
+            return False
+        ability = (mon.ability or "").lower()
+        if ability == "levitate":
+            return False
+    except Exception:  # noqa: BLE001
+        pass
+    return True
+
+
+def _type_effectiveness_vs(attacker_type_name: str, defender: Pokemon) -> float:
+    """Compute the combined type-effectiveness multiplier of one attacking type vs defender.
+
+    poke-env's type_chart is keyed as {defending_type: {attacking_type: multiplier}},
+    so we look up defender types as the outer key and the attacker as the inner key.
+    """
+    try:
+        from poke_env.data.gen_data import GenData  # noqa: PLC0415
+        gen = GenData.from_gen(9)
+        type_chart = gen.type_chart
+        mult = 1.0
+        for def_type in defender.types:
+            if def_type is None:
+                continue
+            row = type_chart.get(def_type.name.upper(), {})
+            mult *= float(row.get(attacker_type_name.upper(), 1.0))
+        return mult
+    except Exception:  # noqa: BLE001
+        return 1.0
+
+
+def _hazard_switch_notes(incoming: Pokemon, battle: AbstractBattle) -> list[str]:
+    """Return advisory notes about entry hazard chip damage for this switch-in.
+
+    Reads ``battle.side_conditions`` (our own side) and computes:
+    - Stealth Rock chip (based on Rock-type effectiveness vs incoming)
+    - Spikes chip (layers × flat %; grounded only)
+    - Toxic Spikes status (grounded only; Poison absorbs)
+    - Sticky Web Speed drop (grounded only)
+    """
+    notes: list[str] = []
+    try:
+        from poke_env.battle import SideCondition  # noqa: PLC0415
+        side_conds = battle.side_conditions
+        if not side_conds:
+            return notes
+
+        grounded = _is_grounded(incoming)
+
+        # Stealth Rock — all Pokémon, damage based on Rock effectiveness
+        if SideCondition.STEALTH_ROCK in side_conds:
+            rock_mult = _type_effectiveness_vs("ROCK", incoming)
+            chip_pct = round(rock_mult / 8.0 * 100)
+            if rock_mult >= 4.0:
+                notes.append(f"⚠ Stealth Rock: -{chip_pct}% HP on entry (4× weak to Rock!)")
+            elif rock_mult >= 2.0:
+                notes.append(f"⚠ Stealth Rock: -{chip_pct}% HP on entry (2× weak)")
+            elif rock_mult <= 0.25:
+                notes.append(f"Stealth Rock: -{chip_pct}% HP on entry (0.25× resist)")
+            elif rock_mult <= 0.5:
+                notes.append(f"Stealth Rock: -{chip_pct}% HP on entry (resist)")
+            else:
+                notes.append(f"Stealth Rock: -{chip_pct}% HP on entry")
+
+        if grounded:
+            # Spikes — 1/8 / 1/6 / 1/4 HP by layer count
+            if SideCondition.SPIKES in side_conds:
+                layers = side_conds[SideCondition.SPIKES]
+                chip_pct = {1: 12, 2: 17, 3: 25}.get(layers, 25)
+                notes.append(f"⚠ Spikes ({layers} layer{'s' if layers > 1 else ''}): ~-{chip_pct}% HP on entry")
+
+            # Toxic Spikes — Poison/Steel types immune; Poison absorbs
+            if SideCondition.TOXIC_SPIKES in side_conds:
+                is_poison = any(t is not None and t.name == "POISON" for t in incoming.types)
+                is_steel = any(t is not None and t.name == "STEEL" for t in incoming.types)
+                if is_poison:
+                    notes.append("✓ Toxic Spikes: absorbed on entry (Poison-type clears your hazard!)")
+                elif not is_steel:
+                    layers = side_conds[SideCondition.TOXIC_SPIKES]
+                    status = "Poison" if layers == 1 else "Badly Poisoned"
+                    notes.append(f"⚠ Toxic Spikes ({layers}L): inflicts {status} on entry")
+
+            # Sticky Web — Speed -1 on entry
+            if SideCondition.STICKY_WEB in side_conds:
+                notes.append("⚠ Sticky Web: Speed -1 on entry")
+
+    except Exception:  # noqa: BLE001
+        pass
+    return notes
 
 
 # ---------------------------------------------------------------------------
@@ -802,6 +916,45 @@ def _score_switch(
             score["switch_quality"] += 1
         elif status_name == "PAR":
             score["notes"].append("Active mon is paralyzed (50% speed) — switching avoids full-paralysis turns")
+
+    # Entry hazard switch costs
+    hazard_notes = _hazard_switch_notes(incoming, battle)
+    score["notes"].extend(hazard_notes)
+    # Adjust quality for severe hazard damage
+    try:
+        from poke_env.battle import SideCondition  # noqa: PLC0415
+        side_conds = battle.side_conditions
+        if side_conds:
+            if SideCondition.STEALTH_ROCK in side_conds:
+                rock_mult = _type_effectiveness_vs("ROCK", incoming)
+                if rock_mult >= 4.0:
+                    score["switch_quality"] -= 2
+                elif rock_mult >= 2.0:
+                    score["switch_quality"] -= 1
+            grounded = _is_grounded(incoming)
+            if grounded and SideCondition.TOXIC_SPIKES in side_conds:
+                is_poison = any(t is not None and t.name == "POISON" for t in incoming.types)
+                if is_poison:
+                    score["switch_quality"] += 1  # absorbs hazards — bonus
+            # Hazard removal: flag mon that can clear hazards
+            has_hazards = any(
+                sc in side_conds
+                for sc in (
+                    SideCondition.STEALTH_ROCK, SideCondition.SPIKES,
+                    SideCondition.TOXIC_SPIKES, SideCondition.STICKY_WEB,
+                )
+            )
+            if has_hazards:
+                removal_moves = [
+                    m.id for m in incoming.moves.values()
+                    if m.id in _HAZARD_REMOVAL_MOVES
+                ]
+                if removal_moves:
+                    move_names = ", ".join(m.replace("_", " ").title() for m in removal_moves)
+                    score["notes"].append(f"✓ Can clear hazards with {move_names}")
+                    score["switch_quality"] += 1
+    except Exception:  # noqa: BLE001
+        pass
 
     # Clamp switch_quality to [-3, +3]
     score["switch_quality"] = max(-3, min(3, score["switch_quality"]))
