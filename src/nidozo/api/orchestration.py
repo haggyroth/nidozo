@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import random
 from typing import Any
 
@@ -27,6 +28,22 @@ def _spawn_background(coro: Any) -> asyncio.Task[None]:
     _background_tasks.add(task)
     task.add_done_callback(_background_tasks.discard)
     return task
+
+
+def _showdown_cfg() -> Any:
+    """Build a poke-env ServerConfiguration from environment variables.
+
+    NIDOZO_SHOWDOWN_HOST defaults to 'localhost' (bare-metal dev).
+    Set it to 'showdown' inside Docker Compose so containers talk by service name.
+    """
+    from poke_env.ps_client.server_configuration import ServerConfiguration
+
+    host = os.environ.get("NIDOZO_SHOWDOWN_HOST", "localhost")
+    port = os.environ.get("NIDOZO_SHOWDOWN_PORT", "8000")
+    return ServerConfiguration(
+        websocket_url=f"ws://{host}:{port}/showdown/websocket",
+        authentication_url="https://play.pokemonshowdown.com/action.php?",
+    )
 
 
 async def _terminate_players(*players: Any) -> None:
@@ -97,8 +114,6 @@ async def run_battles(
     active_tasks: dict[int, asyncio.Task[None]],
 ) -> None:
     """Run one or more battles sequentially as a background task."""
-    from poke_env import LocalhostServerConfiguration
-
     from nidozo.battle.tiers import resolve_format
 
     use_preset = bool(req.p1_preset or req.p2_preset)
@@ -118,7 +133,7 @@ async def run_battles(
     # Doubles requires the v7 prompt (it carries the 2v2 turn template); draft
     # uses v3; otherwise honour the request.
     effective_prompt = "v7" if doubles else ("v3" if do_draft else req.prompt_version)
-    cfg = LocalhostServerConfiguration
+    cfg = _showdown_cfg()
 
     for battle_id in battle_ids:
         task = asyncio.current_task()
@@ -286,8 +301,6 @@ async def run_tournament(
     active_tasks: dict[int, asyncio.Task[None]],
 ) -> None:
     """Run all battles in a tournament sequentially as a background task."""
-    from poke_env import LocalhostServerConfiguration
-
     from nidozo.battle.tiers import resolve_format
 
     any_preset = any(ps.get("preset") for ps in player_specs)
@@ -299,7 +312,7 @@ async def run_tournament(
         else resolve_format(req.tier, doubles=doubles, team_size=team_size)
     )
     effective_prompt = "v7" if doubles else ("v3" if do_draft else req.prompt_version)
-    cfg = LocalhostServerConfiguration
+    cfg = _showdown_cfg()
 
     total = len(battle_ids)
     await bus.publish({
@@ -728,8 +741,6 @@ async def run_bracket_tournament(
     tournaments create battles lazily — we only know future matchups
     after earlier rounds resolve.
     """
-    from poke_env import LocalhostServerConfiguration
-
     from nidozo.battle.tiers import resolve_format
     from nidozo.tournament.bracket import (
         build_bracket,
@@ -747,7 +758,7 @@ async def run_bracket_tournament(
         else resolve_format(req.tier, doubles=doubles, team_size=team_size)
     )
     effective_prompt = "v7" if doubles else ("v3" if do_draft else req.prompt_version)
-    cfg = LocalhostServerConfiguration
+    cfg = _showdown_cfg()
 
     # Build initial bracket state
     bracket_state = build_bracket(player_specs, req.tournament_format)
@@ -1052,8 +1063,6 @@ async def run_season(
     active_tasks: dict[int, asyncio.Task[None]],
 ) -> None:
     """Run all battles in a season sequentially as a background task."""
-    from poke_env import LocalhostServerConfiguration
-
     from nidozo.battle.tiers import resolve_format
 
     any_preset = any(ps.get("preset") for ps in player_specs)
@@ -1065,7 +1074,7 @@ async def run_season(
         else resolve_format(req.tier, doubles=doubles, team_size=team_size)
     )
     effective_prompt = "v7" if doubles else ("v3" if do_draft else req.prompt_version)
-    cfg = LocalhostServerConfiguration
+    cfg = _showdown_cfg()
 
     total = len(battle_ids)
     store.set_season_running(season_id)

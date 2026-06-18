@@ -96,3 +96,19 @@ jobs:
 
       - name: Build
         run: npm run build
+
+  # -----------------------------------------------------------------------
+  # Docker: smoke-test that both images build without error
+  # No registry push — just validates Dockerfile syntax and dependency install
+  # -----------------------------------------------------------------------
+  docker-build:
+    name: Docker build (smoke test)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Build API image
+        run: docker build --tag nidozo-api:ci .
+
+      - name: Build Showdown image
+        run: docker build --tag nidozo-showdown:ci showdown/
