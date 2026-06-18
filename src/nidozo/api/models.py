@@ -12,7 +12,7 @@ from pydantic import BaseModel, Field, model_validator
 Provider = Literal["random", "anthropic", "openai", "lmstudio", "human"]
 # Coaches must be a real LLM backend — "random" has no coach implementation.
 CoachProvider = Literal["anthropic", "openai", "lmstudio"]
-PromptVersion = Literal["v1", "v2", "v3", "v4", "v5", "v6", "v7"]
+PromptVersion = Literal["v1", "v2", "v3", "v4", "v5", "v6", "v7", "v8"]
 # Exactly the tiers the backend supports (is_valid_tier / _TIER_POOLS + random).
 Tier = Literal["random", "ou", "ubers", "uu", "lc", "freeforall"]
 TournamentFormat = Literal["round_robin", "single_elim", "double_elim"]
@@ -31,7 +31,7 @@ class StartBattleRequest(BaseModel):
     p1_model: str | None = None
     p2_model: str | None = None
     model: str | None = None
-    prompt_version: PromptVersion = "v6"
+    prompt_version: PromptVersion = "v8"
     n_battles: int = Field(1, ge=1, le=50)
     tier: Tier = "random"
     draft: bool = False    # If True and tier != "random", run LLM draft phase first
@@ -83,7 +83,7 @@ class PlayerSpec(BaseModel):
 class StartTournamentRequest(BaseModel):
     players: list[PlayerSpec] = Field(..., min_length=2, max_length=12)
     rounds: int = Field(1, ge=1, le=10)
-    prompt_version: PromptVersion = "v6"
+    prompt_version: PromptVersion = "v8"
     tier: Tier = "random"
     draft: bool = False    # If True and tier != "random", run LLM draft phase before each battle
     tournament_format: TournamentFormat = "round_robin"
@@ -102,7 +102,7 @@ class StartSeasonRequest(BaseModel):
     name: str = Field(..., min_length=1, max_length=100)
     players: list[PlayerSpec] = Field(..., min_length=2, max_length=12)
     rounds: int = Field(1, ge=1, le=10)
-    prompt_version: PromptVersion = "v6"
+    prompt_version: PromptVersion = "v8"
     tier: Tier = "random"
     draft: bool = False
     doubles: bool = False
