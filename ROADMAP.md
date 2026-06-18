@@ -189,11 +189,6 @@
 - **Request-enum validation** (#165): `provider` / `coach_provider` / `prompt_version` / `tier` / `tournament_format` are Pydantic `Literal`s — invalid input is rejected at the boundary (422) instead of silently degrading; redundant manual route checks and dead `EventBus.publish_sync` removed
 - **Cockpit polish**: heuristic drawer stays mounted on forced-switch turns instead of vanishing (#166); per-player heuristic drawers (#156); win-probability sparkline over time in the shared `WinProbBar`, shown in both views (#167)
 
-### OP-03 — Gen 9 National Dex (single canonical ruleset, #85)
-- Adopted **Gen 9 National Dex** as the one canonical ruleset, retiring hand-maintained per-generation legality (the root cause of the Signal Beam / Iron Head / Hidden Power IV failures)
-- Formats: `gen9randombattle` (random), `gen9nationaldexag` (AG / free-for-all), `gen9nationaldex` (OU rules), `gen9nationaldexlc` (Little Cup) — Showdown validates teams; no ad-hoc legality checking
-- Full-national-dex competitive sets in `data/natdex_movesets.json` (built by `scripts/build_natdex_sets.py`); heuristics/analyzer use the authoritative Gen 9 type chart via `GenData.from_gen(9)` (Fairy included); serializer/prompts are generation-agnostic
-
 ### v0.28 — Player Experience & Tera Awareness (#172–#175)
 - **Personality profiles** (#172): named play-style personas (Aggressive, Defensive, Balanced, Trickster, Momentum) selectable per player; persona injected into system prompt to shape reasoning style; stored per model
 - **Stats page expansion** (#172): global KPIs, battles-by-tier chart, top Pokémon and move usage, recent battles feed; per-model expanded with Pokémon/move usage lists, action distribution bar, win-rate-by-tier panel
@@ -205,13 +200,23 @@
 - **Competitive event annotations** (#176): per-turn history now surfaces status applied/cured (burn, paralysis, sleep, poison, toxic, freeze — own and opponent), item consumed (own, e.g. Focus Sash activated), opponent item/ability revealed on first observation, and priority bracket note on any opponent move with non-zero priority; `_update_hp_snapshot` extended to snapshot status/item/ability alongside HP; `_build_recent_events` diffs snapshots to generate human-readable annotation lines
 - **Structured JSON logging** (#177): `configure_logging()` now called automatically in `create_app()` so logs are active on every startup; `LOG_LEVEL` env var controls verbosity (default `INFO`, set `DEBUG` for full traces); `LOG_FILE` env var mirrors all records to disk; `_JsonFormatter` emits `extra={}` fields as top-level JSON keys (structured `battle_id`, `player`, `turn`, `action`, `elapsed_s`, `prompt_tokens`, `completion_tokens`); per-turn INFO trace in `LLMPlayer` (`[p1] deciding turn 4` → `[p1] turn 4 → thunderbolt (2.3s)`); LM Studio / OpenAI backend logs token usage + latency at INFO and full prompt + response at DEBUG; `httpx`/`httpcore` loggers enabled at DEBUG to expose raw HTTP traffic to LM Studio
 
+### OP-03 — Gen 9 National Dex (single canonical ruleset, #85)
+- Adopted **Gen 9 National Dex** as the one canonical ruleset, retiring hand-maintained per-generation legality (the root cause of the Signal Beam / Iron Head / Hidden Power IV failures)
+- Formats: `gen9randombattle` (random), `gen9nationaldexag` (AG / free-for-all), `gen9nationaldex` (OU rules), `gen9nationaldexlc` (Little Cup) — Showdown validates teams; no ad-hoc legality checking
+- Full-national-dex competitive sets in `data/natdex_movesets.json` (built by `scripts/build_natdex_sets.py`); heuristics/analyzer use the authoritative Gen 9 type chart via `GenData.from_gen(9)` (Fairy included); serializer/prompts are generation-agnostic
+
 ### v0.30 — Doubles Battles (2v2, decision layer)
-- **2v2 with target selection**: `StartBattleRequest.doubles=true` runs a Showdown doubles format — random → `gen9randomdoublesbattle` (auto-generated teams), non-random tiers → NatDex Doubles via new `resolve_format()` / `TIER_TO_DOUBLES_FORMAT` in `tiers.py`. Doubles forces prompt **v7** and disables draft/preset (singles-only team builders)
+- **2v2 with target selection**: `StartBattleRequest.doubles=true` runs a Showdown doubles format — random → `gen9randomdoublesbattle` (auto-generated teams), non-random tiers → NatDex Doubles via new `resolve_format()` / `TIER_TO_DOUBLES_FORMAT` in `tiers.py`
 - **Serializer**: `serialize_battle` routes `DoubleBattle` to a doubles state shape — `my_active`/`opponent_active` are per-slot lists (with a `slot` index), `force_switch`/`can_tera` are lists, `available_moves`/`available_switches` are per-slot lists-of-lists; every state carries `is_doubles`
-- **Action parser extended for `target`**: doubles JSON is an `actions` array (one entry per active slot), each with an optional `target` (`foe_1`/`foe_2`/`ally`/`self`); resolved per slot into `SingleBattleOrder`s (validated against `get_possible_showdown_targets`) and combined into a `DoubleBattleOrder`. Handles spread/self moves (no target), `pass` for empty slots, and invalid-target fallback
+- **Action parser extended for `target`**: doubles JSON is an `actions` array (one entry per active slot), each with an optional `target` (`foe_1`/`foe_2`/`ally`/`self`); resolved per slot into `SingleBattleOrder`s (validated against `get_possible_showdown_targets`) and combined into a `DoubleBattleOrder`; handles spread/self moves (no target), `pass` for empty slots, and invalid-target fallback
 - **Heuristics for spread moves & partner synergy**: `score_doubles_actions` scores both slots and tags each move with targeting metadata (spread-foes / hits-ally-too / choose-foe / self-or-ally), flags spread moves that also hit your own ally, and notes coverage vs the second foe
 - **Prompt v7**: doubles-aware system prompt (spread moves, focus fire, partner synergy, target field) + dedicated `turn_doubles.txt.jinja`; `PromptBuilder` auto-selects it when `is_doubles`
-- 13 new doubles tests (parser/heuristics/serializer); singles unaffected (858 tests green)
+- 13 new doubles tests (parser/heuristics/serializer); 858 tests green
+
+### v0.31 — UI/UX Overhaul (phased)
+- **Phase 1 — Theme toggle**: dark/light theme toggle persisted to `localStorage`
+- **Phase 2 — Mobile-responsive layout**: stacking header/nav, wrapping tabs, horizontal-scroll data tables, scroll-wrapped Showdown stage, reduced shell/panel padding at tablet (≤768px) and phone (≤480px) breakpoints
+- **Phase 3 — Typography & motion pass**: ~329 hardcoded font sizes (26 muddy near-duplicate values) snapped onto a 13-step `--fs-*` token scale for a clean, centrally tunable hierarchy; `prefers-reduced-motion` support added across the 28 animations
 
 ### v0.32 — Configurable Team Size + Doubles Frontend (#193, #194)
 - **Configurable team size**: `team_size: Literal[3, 4, 6]` on all request types; 3v3 singles and 4v4 doubles dispatch to dedicated Showdown format strings (`TIER_TO_3V3_FORMAT`, `TIER_TO_DOUBLES_4V4_FORMAT`); draft sampling respects size; heuristics midgame threshold scales with `len(team)`; DB schema v15 adds `battles.team_size INTEGER NOT NULL DEFAULT 6`; Leaderboard form exposes doubles toggle + team-size selector
@@ -219,44 +224,6 @@
 - **Doubles-aware Showdown cockpit**: heuristic panels use `PlayerHeuristicPanels` — two per-slot drawers for doubles, one drawer for singles; win-probability bar now counts active slots + bench HP in doubles
 - **`PlayerHeuristicPanels`** shared helper in `battleShared.jsx` keeps both views in sync; `.doubles-heuristic-stack` CSS container keeps per-slot drawers in a single grid cell
 - 939 tests green
-
-### v0.38 — Prompt v9: Speed Tier in Bench Summary (#200)
-- **Bench section annotated with speed vs opponent** — each bench mon in `--- YOUR BENCH ---` now shows `| faster (X vs ~Y)` / `slower` / `similar speed` inline when the opponent's speed is known; previously this was only visible in the lower HEURISTIC ADVISORY section
-- **Jinja `selectattr` lookup** — no Python changes; the turn template looks up `heuristics.switch_scores.speed_vs_opp` by species and renders it gracefully (silent when empty or no match)
-- **v9 system prompt** — new "Reading your bench" paragraph explaining the annotation; all v8 entry hazard + decision framework content retained
-- **Default changed from v8 → v9** for all singles endpoints (doubles keeps v7)
-- 8 new tests in `test_prompt_v9.py`; 1021 tests green
-
-### v0.37 — Doubles Extensions (#199)
-- **Drafted/preset teams now work with `doubles=True`** — removed the erroneous "team builders are singles-only" constraint; draft output is format-agnostic and works in NatDex Doubles
-- **Correct Showdown format stored for drafted doubles** — `run_draft()` now accepts a `doubles` flag and calls `resolve_format()` so the DB records `gen9nationaldexdoubles` (not a singles format)
-- **v7 prompt auto-selected for doubles in tournament/season** — `run_tournament`, `run_season`, and `run_bracket_tournament` all now use `effective_prompt='v7'` when `doubles=True`
-- **`run_bracket_tournament` switched to `resolve_format()`** — previously used singles-only `TIER_TO_FORMAT` dict, breaking doubles bracket tournaments
-- **Human provider rejected at tournament/season boundary** — 422 returned if any player uses `"human"`; previously would hang the runner indefinitely
-- 1013 tests green
-
-### v0.36 — Prompt v8: Entry Hazard Awareness (#198)
-- **Heuristic additions**: `_is_grounded`, `_type_effectiveness_vs`, `_hazard_switch_notes` — each switch candidate now carries exact chip damage notes (Stealth Rock %, Spikes layers, Toxic Spikes status/absorption, Sticky Web Speed drop); `_score_switch` adjusts `switch_quality` for severe SR damage and flags hazard removers (Rapid Spin/Defog/Mortal Spin/Tidy Up) with a bonus when hazards are active
-- **Prompt v8 system.txt**: new "Entry hazards" section with per-hazard mechanics; Decision Framework step 4 now explicitly factors in entry hazard cost and hazard remover value; "Common mistakes" extended
-- **Default changed from v6 → v8** for all battle and tournament requests; v7 remains for doubles
-- **Missing `_STATUS_MOVE_EFFECTS` entries filled**: `stealthrock`, `toxicspikes`, `stickyweb`, `defog`, `mortalspin`, `tidyup`
-- **29 new tests** in `test_heuristics_v8.py`; 1013 tests green
-
-### v0.35 — Human Player Mode (#197)
-- **`StreamingHumanPlayer`** — poke-env Player whose moves arrive from the browser; registers an `asyncio.Future` each turn and awaits resolution via the API; falls back to random on timeout (configurable via `NIDOZO_HUMAN_TIMEOUT`, default 300 s)
-- **`POST /api/battles/{id}/human-action`** — endpoint that resolves the pending Future with the human's chosen move or switch
-- **`HumanActionPicker`** — overlay panel that appears over the Showdown stage when it's the human's turn; shows all legal moves (type badge, BP, PP, heuristic score) and switches (sprite, types, HP bar); one click submits the action
-- **Human provider** added to the Leaderboard battle form ("🎮 You play!" label, no model dropdown); human skips draft, lessons, and narrative generation
-- **17 new tests** in `test_human_player.py`: registry helpers + API endpoint validation
-- 984 tests green
-
-### v0.34 — Personality Profiles: Gap Fill (#196)
-- **`GET /api/personalities`** — backend is now the single source of truth for persona metadata; `emoji` field added to `Personality` dataclass
-- **`GET /api/stats/personalities`** — per-slug win/loss/tie counts and win-rate % across all completed battles
-- **GlobalStats: Play Style Win Rates panel** — W/L/T segment bar + win-rate % per persona
-- **`BattleForm`** fetches `/api/personalities` on mount; hardcoded list removed; selector shows persona description on selection
-- **25 new tests**: `test_personalities.py` (registry consistency, lookup edge cases) + 9 additions to `test_prompt_builder.py` (injection, ordering, all 5 personas parametrised)
-- 967 tests green
 
 ### v0.33 — Classic View Retirement
 - **Showdown cockpit is now the sole live battle renderer** — `BattleField.jsx` deleted; the Classic card-based arena is fully retired
@@ -266,49 +233,55 @@
 - **PokemonCard cleanup**: `compact` prop and `BenchSlot` export removed (Classic-only)
 - **CSS**: ~120 lines of Classic-only rules removed (`.battlefield-wrapper`, `.battle-header`, `.turn-counter`, `.arena-player-col`, `.doubles-pair`, `.pokemon-card.compact`, `.battle-view-toggle`, `.bvt-btn*`)
 
+### v0.34 — Personality Profiles: Gap Fill (#196)
+- **`GET /api/personalities`** — backend is now the single source of truth for persona metadata; `emoji` field added to `Personality` dataclass
+- **`GET /api/stats/personalities`** — per-slug win/loss/tie counts and win-rate % across all completed battles
+- **GlobalStats: Play Style Win Rates panel** — W/L/T segment bar + win-rate % per persona
+- **`BattleForm`** fetches `/api/personalities` on mount; hardcoded list removed; selector shows persona description on selection
+- **25 new tests**: `test_personalities.py` (registry consistency, lookup edge cases) + 9 additions to `test_prompt_builder.py` (injection, ordering, all 5 personas parametrised)
+- 967 tests green
+
+### v0.35 — Human Player Mode (#197)
+- **`StreamingHumanPlayer`** — poke-env Player whose moves arrive from the browser; registers an `asyncio.Future` each turn and awaits resolution via the API; falls back to random on timeout (configurable via `NIDOZO_HUMAN_TIMEOUT`, default 300 s)
+- **`POST /api/battles/{id}/human-action`** — endpoint that resolves the pending Future with the human's chosen move or switch
+- **`HumanActionPicker`** — overlay panel that appears over the Showdown stage when it's the human's turn; shows all legal moves (type badge, BP, PP, heuristic score) and switches (sprite, types, HP bar); one click submits the action
+- **Human provider** added to the Leaderboard battle form ("🎮 You play!" label, no model dropdown); human skips draft, lessons, and narrative generation
+- **17 new tests** in `test_human_player.py`: registry helpers + API endpoint validation
+- 984 tests green
+
+### v0.36 — Prompt v8: Entry Hazard Awareness (#198)
+- **Heuristic additions**: `_is_grounded`, `_type_effectiveness_vs`, `_hazard_switch_notes` — each switch candidate now carries exact chip damage notes (Stealth Rock %, Spikes layers, Toxic Spikes status/absorption, Sticky Web Speed drop); `_score_switch` adjusts `switch_quality` for severe SR damage and flags hazard removers (Rapid Spin/Defog/Mortal Spin/Tidy Up) with a bonus when hazards are active
+- **Prompt v8 system.txt**: new "Entry hazards" section with per-hazard mechanics; Decision Framework step 4 now explicitly factors in entry hazard cost and hazard remover value; "Common mistakes" extended
+- **Default changed from v6 → v8** for all battle and tournament requests; v7 remains for doubles
+- **Missing `_STATUS_MOVE_EFFECTS` entries filled**: `stealthrock`, `toxicspikes`, `stickyweb`, `defog`, `mortalspin`, `tidyup`
+- **29 new tests** in `test_heuristics_v8.py`; 1013 tests green
+
+### v0.37 — Doubles Extensions (#199)
+- **Drafted/preset teams now work with `doubles=True`** — removed the erroneous "team builders are singles-only" constraint; draft output is format-agnostic and works in NatDex Doubles
+- **Correct Showdown format stored for drafted doubles** — `run_draft()` now accepts a `doubles` flag and calls `resolve_format()` so the DB records `gen9nationaldexdoubles` (not a singles format)
+- **v7 prompt auto-selected for doubles in tournament/season** — `run_tournament`, `run_season`, and `run_bracket_tournament` all now use `effective_prompt='v7'` when `doubles=True`
+- **`run_bracket_tournament` switched to `resolve_format()`** — previously used singles-only `TIER_TO_FORMAT` dict, breaking doubles bracket tournaments
+- **Human provider rejected at tournament/season boundary** — 422 returned if any player uses `"human"`; previously would hang the runner indefinitely
+- 1013 tests green
+
+### v0.38 — Prompt v9: Speed Tier in Bench Summary (#200)
+- **Bench section annotated with speed vs opponent** — each bench mon in `--- YOUR BENCH ---` now shows `| faster (X vs ~Y)` / `slower` / `similar speed` inline when the opponent's speed is known; previously this was only visible in the lower HEURISTIC ADVISORY section
+- **Jinja `selectattr` lookup** — no Python changes; the turn template looks up `heuristics.switch_scores.speed_vs_opp` by species and renders it gracefully (silent when empty or no match)
+- **v9 system prompt** — new "Reading your bench" paragraph explaining the annotation; all v8 entry hazard + decision framework content retained
+- **Default changed from v8 → v9** for all singles endpoints (doubles keeps v7)
+- 8 new tests in `test_prompt_v9.py`; 1021 tests green
+
 ---
 
 ## Upcoming
 
-### Player Experience
-
----
-
-### UI & Visualisation
-
-**UI/UX Overhaul** ✅ shipped (phased — v0.31)
-- ✅ Dark/light theme toggle persisted to `localStorage` (Phase 1)
-- ✅ Mobile-responsive layout (Phase 2): stacking header/nav, wrapping tabs,
-  horizontal-scroll data tables, scroll-wrapped Showdown stage, reduced
-  shell/panel padding at tablet (≤768px) and phone (≤480px) breakpoints
-- ✅ Typography & motion pass (Phase 3): ~329 hardcoded font sizes (26 muddy
-  near-duplicate values) snapped onto a 13-step `--fs-*` token scale for a
-  clean, centrally tunable hierarchy; `prefers-reduced-motion` support added
-  across the 28 animations
-
----
-
-### Platform Expansion
-
-> Gen 9 National Dex is now the canonical ruleset — see **OP-03** under Completed.
-> Configurable team size (3v3 / 4v4 / 6v6) shipped in v0.32.
-
-**Doubles Battles — extensions** ✅ shipped (v0.37)
-
-**Deeper Competitive Features**
-- Speed tier display ✅ shipped (v0.38)
-
----
-
-### Technical Debt & Housekeeping
-
-**Containerisation**
-- `docker-compose.yml` for the full dev stack: Showdown server, FastAPI backend, Vite dev server
-- Production Dockerfile: multi-stage build, static frontend served from FastAPI
+**Containerisation** (tracked in [#201](https://github.com/haggyroth/nidozo/issues/201))
+- `docker-compose.yml` for the full stack: Showdown server, FastAPI backend, Vite dev server
+- Production Dockerfile: multi-stage build, static frontend served from FastAPI; single `docker compose up` command
+- `docker build` CI smoke test on every PR (no push/registry)
 - README updated with Docker-first quickstart
+- Target: utopiaplanitia (headless server); dev remains native on voyager
 
-**Test Coverage**
-- **Tier 3 (partial)** — `pytest.mark.integration` infrastructure is in place; `test_ws_showdown_integration.py` covers the spectator proxy. Still needed: integration tests for `battle/orchestration.py` and `llm/draft.py`; dedicated CI job that starts the Showdown server
-
-**Infrastructure**
-- ~~Dependabot for Python and npm dependency updates~~ — shipped (weekly `uv` / `npm` / `github-actions` updates via `.github/dependabot.yml`)
+**Integration Test Coverage**
+- Integration tests for `battle/orchestration.py` and `llm/draft.py`; dedicated CI job that starts the Showdown server
+- (`pytest.mark.integration` infrastructure and spectator proxy tests already in place)
