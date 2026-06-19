@@ -1,6 +1,6 @@
 [project]
 name = "nidozo"
-version = "0.39.2"
+version = "0.39.3"
 description = "LLM vs LLM Pokémon battle arena powered by Pokémon Showdown and poke-env"
 requires-python = ">=3.12"
 dependencies = [

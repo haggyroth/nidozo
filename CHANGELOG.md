@@ -7,7 +7,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
-- test(integration): live-Showdown battle suite (#191) — `tests/test_battle_integration.py` drives real random / stub-LLM / drafted / doubles battles through poke-env; the `docker-smoke` CI job now runs `pytest -m integration` against the live compose stack
+---
+
+## [0.39.3] — 2026-06-19
+
+- fix(tiers): remove 10 ND Uber/AG species from OU pool (`dragapult`, `landorus`, `urshifu`, `naganadel`, `magearna`, `alakazammega`, `gengarmega`, `salamencemega`, `metagrossmega`, `lucariomega`) — they are banned from `gen9nationaldex` and caused immediate team rejection at battle start
+- fix(tiers): correct Showdown species IDs in OU pool (`tapu-koko`→`tapukoko`, `tapu-fini`→`tapufini`, `tapu-lele`→`tapulele`, `tapu-bulu`→`tapubulu`, `slowbrotrop`→`slowbrogalar`) and UU pool (`rotomcut`→`rotommow`)
+- fix(tiers): add removed ND Uber species (`dragapult`, `landorus`, `urshifu`, `naganadel`, `magearna`) to UBERS pool so they remain available in NatDex AG battles
+- test: regression guards against ND Uber species re-entering OU, wrong Showdown IDs in pools
 
 ---
 
