@@ -31,6 +31,7 @@ from pathlib import Path
 from poke_env import LocalhostServerConfiguration
 from poke_env.player import Player
 
+from nidozo.api.helpers import _JSON_OUTPUT_PROMPT_VERSIONS as _JSON_VERSIONS
 from nidozo.battle.bots import RandomBot
 from nidozo.battle.llm_player import LLMPlayer
 from nidozo.db.store import BattleStore
@@ -41,16 +42,13 @@ logging.basicConfig(level=logging.WARNING)
 _FORMAT = "gen9randombattle"
 
 
-_JSON_VERSIONS = frozenset({"v2", "v3", "v4", "v5"})
-
-
 def _build_player(
     provider: str,
     model: str | None,
     role: str,
     store: BattleStore,
     battle_id: int,
-    prompt_version: str = "v5",
+    prompt_version: str = "v9",
 ) -> Player:
     cfg = LocalhostServerConfiguration
 
@@ -109,7 +107,7 @@ async def main(
     model: str | None,
     db_path: Path,
     n_battles: int = 1,
-    prompt_version: str = "v5",
+    prompt_version: str = "v9",
 ) -> None:
     store = BattleStore(db_path)
 
@@ -184,9 +182,9 @@ if __name__ == "__main__":
                         help="Number of battles to run (default: 1)")
     parser.add_argument("--db", default=None,
                         help="Path to SQLite DB (default: nidozo.db in repo root)")
-    parser.add_argument("--prompt-version", default="v5",
-                        choices=["v1", "v2", "v3", "v4", "v5"],
-                        help="Prompt version to use (default: v5)")
+    parser.add_argument("--prompt-version", default="v9",
+                        choices=["v1", "v2", "v3", "v4", "v5", "v6", "v7", "v8", "v9"],
+                        help="Prompt version to use (default: v9)")
     args = parser.parse_args()
 
     db_path = Path(args.db) if args.db else Path(

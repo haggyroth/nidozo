@@ -8,8 +8,11 @@ from typing import Any
 from nidozo.llm.backend import ModelBackend
 
 # Prompt versions that require structured JSON output (grammar-sampling / response_format).
+# Every version except the legacy text prompt v1 emits the same JSON action schema.
 # Update this set whenever a new JSON-output prompt version is added.
-_JSON_OUTPUT_PROMPT_VERSIONS: frozenset[str] = frozenset({"v2", "v3", "v4", "v5", "v6", "v7"})
+_JSON_OUTPUT_PROMPT_VERSIONS: frozenset[str] = frozenset(
+    {"v2", "v3", "v4", "v5", "v6", "v7", "v8", "v9"}
+)
 
 
 def _model_name(provider: str, model: str | None) -> str:

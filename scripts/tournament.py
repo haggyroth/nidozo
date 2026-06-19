@@ -35,6 +35,7 @@ from pathlib import Path
 # Ensure src/ is on the path when run directly
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
+from nidozo.api.helpers import _JSON_OUTPUT_PROMPT_VERSIONS as _JSON_VERSIONS
 from nidozo.db.store import BattleStore
 
 # ---------------------------------------------------------------------------
@@ -64,7 +65,6 @@ def _build_player(provider: str, model: str, role: str, store: BattleStore,
             battle_format=fmt, server_configuration=cfg,
         )
 
-    _JSON_VERSIONS = frozenset({"v2", "v3", "v4", "v5"})
     use_json_mode = prompt_version in _JSON_VERSIONS and provider in ("lmstudio", "openai")
 
     if provider == "anthropic":
@@ -99,7 +99,7 @@ async def run_one_battle(
     p1_provider: str, p1_model: str,
     p2_provider: str, p2_model: str,
     store: BattleStore,
-    prompt_version: str = "v5",
+    prompt_version: str = "v9",
     fmt: str = "gen9randombattle",
 ) -> dict:
     """Run one battle, persist results, return summary dict."""
@@ -152,7 +152,7 @@ async def run_tournament(
     players: list[tuple[str, str]],
     rounds: int,
     store: BattleStore,
-    prompt_version: str = "v5",
+    prompt_version: str = "v9",
 ) -> None:
     pairs = list(itertools.combinations(players, 2))
     total = len(pairs) * rounds * 2  # each pair plays both ways each round
@@ -231,8 +231,9 @@ def main() -> None:
         help="Number of rounds per matchup (each pair plays both sides). Default: 1",
     )
     parser.add_argument(
-        "--prompt-version", default="v5",
-        help="Prompt template version (v1=text, v2–v5=JSON output). Default: v5",
+        "--prompt-version", default="v9",
+        choices=["v1", "v2", "v3", "v4", "v5", "v6", "v7", "v8", "v9"],
+        help="Prompt template version (v1=text, v2–v9=JSON output). Default: v9",
     )
     parser.add_argument(
         "--db", default=None,
