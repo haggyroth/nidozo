@@ -1,5 +1,9 @@
 /config/*
 !/config/formats.ts
+# Nidozo: vendor the config template so fresh clones and Docker builds have
+# the loader's defaults. config.js itself stays ignored (generated locally /
+# in the image from this example).
+!/config/config-example.js
 /logs/**/*
 /test/modlogs
 /test/replays/*.html

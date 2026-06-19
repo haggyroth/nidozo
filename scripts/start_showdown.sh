@@ -18,5 +18,11 @@ if [ ! -d "$SHOWDOWN_DIR/node_modules" ]; then
   exit 1
 fi
 
+# Showdown requires config/config.js; create it from the vendored example.
+if [ ! -f "$SHOWDOWN_DIR/config/config.js" ]; then
+  echo "Creating showdown/config/config.js from config-example.js..."
+  cp "$SHOWDOWN_DIR/config/config-example.js" "$SHOWDOWN_DIR/config/config.js"
+fi
+
 echo "Starting Pokémon Showdown on port 8000..."
 node "$SHOWDOWN_DIR/pokemon-showdown" start --no-security

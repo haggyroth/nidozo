@@ -86,10 +86,13 @@ uv pip install -e ".[dev]"
 
 ### 2. Install Showdown dependencies
 
-The Showdown server source is vendored in `showdown/`. Install its Node dependencies once:
+The Showdown server source is vendored in `showdown/`. Install its Node dependencies and create the local config once:
 
 ```bash
-cd showdown && npm install && cd ..
+cd showdown
+npm install
+cp config/config-example.js config/config.js
+cd ..
 ```
 
 > **Why `--no-security`?** poke-env connects as bots with generated usernames. `--no-security` disables the login challenge so bots can connect freely to the local server. The startup script passes this flag automatically.

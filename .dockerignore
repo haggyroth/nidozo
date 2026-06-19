@@ -20,9 +20,10 @@ frontend/dist/
 frontend/playwright-report/
 frontend/test-results/
 
-# Data and credentials
+# Credentials and the local SQLite DB (the container uses a named volume).
+# NOTE: data/ is NOT excluded — it holds movesets/presets the API reads at
+# runtime (team_builder.py, presets.py) and is COPYed into the image.
 nidozo.db
-data/
 .env
 .env.local
 *.env

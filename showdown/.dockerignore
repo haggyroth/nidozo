@@ -1,7 +1,7 @@
 # Installed locally; Docker stage runs npm ci
 node_modules/
 
-# TypeScript declaration build output — not needed to run the server
+# Compiled fresh during the image build via `node build`
 dist/
 
 # Runtime files created at server start
@@ -12,8 +12,13 @@ databases/errors.txt
 databases/lastbattle.txt
 databases/logging.md
 
+# Local config — the image generates config.js from config-example.js
+config/config.js
+
 # Repo noise
 .git/
 .gitignore
+
+# Test suite — not needed to build or run the server.
+# NOTE: tools/ is NOT excluded — `node build` requires tools/build-utils.js.
 test/
-tools/

@@ -98,17 +98,38 @@ jobs:
         run: npm run build
 
   # -----------------------------------------------------------------------
-  # Docker: smoke-test that both images build without error
-  # No registry push — just validates Dockerfile syntax and dependency install
+  # Docker: build BOTH images and verify the stack actually runs.
+  # `docker build` alone only proves the Dockerfiles parse — the real failure
+  # modes (missing dist/, missing data/, missing config.js, bad networking)
+  # only surface at runtime, so we bring the stack up and poll /healthz, which
+  # returns 200 only when the API can reach both its DB and the Showdown server.
+  # No registry push.
   # -----------------------------------------------------------------------
-  docker-build:
-    name: Docker build (smoke test)
+  docker-smoke:
+    name: Docker build + run (smoke test)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
 
-      - name: Build API image
-        run: docker build --tag nidozo-api:ci .
+      - name: Build and start the stack
+        run: docker compose up -d --build
 
-      - name: Build Showdown image
-        run: docker build --tag nidozo-showdown:ci showdown/
+      - name: Wait for the stack to become healthy
+        run: |
+          for i in $(seq 1 60); do
+            if curl -fsS http://localhost:5001/healthz; then
+              echo
+              echo "Stack healthy — API reached its DB and the Showdown server."
+              exit 0
+            fi
+            echo "Attempt $i: not ready yet, retrying in 5s..."
+            sleep 5
+          done
+          echo "::error::Stack did not become healthy within 5 minutes"
+          docker compose ps
+          docker compose logs
+          exit 1
+
+      - name: Tear down
+        if: always()
+        run: docker compose down -v
