@@ -134,3 +134,100 @@ def test_login_frames_are_not_leaked_to_browser() -> None:
     assert first == "|turn|1"
     assert not first.startswith("|challstr|")
     assert not first.startswith("|updateuser|")
+
+
+# ---------------------------------------------------------------------------
+# Idle keepalive, login timeout, and teardown branches
+# ---------------------------------------------------------------------------
+
+from nidozo.api import ws_showdown as _wsmod  # noqa: E402
+
+
+def _make_app_with(factory, created: list) -> FastAPI:
+    async def fake_connect(uri: str):
+        fake = factory()
+        created.append(fake)
+        return fake
+
+    app = FastAPI()
+    app.include_router(create_showdown_ws_router(connect_upstream=fake_connect))
+    return app
+
+
+class _SilentAfterJoinUpstream(FakeUpstream):
+    """Completes login + join but then never sends another frame (idle battle)."""
+
+    def __init__(self) -> None:
+        super().__init__(frames_after_join=[])
+
+
+def test_idle_connection_gets_keepalive_ping(monkeypatch) -> None:
+    """When upstream goes quiet, the proxy sends |ping to keep the browser alive."""
+    monkeypatch.setattr(_wsmod, "_IDLE_PING_SECS", 0.05)
+    created: list = []
+    app = _make_app_with(_SilentAfterJoinUpstream, created)
+    client = TestClient(app)
+
+    with client.websocket_connect("/ws/showdown/battle-gen3ou-1") as ws:
+        assert ws.receive_text() == "|ping"
+
+
+class _NeverNamedUpstream:
+    """Sends |challstr| but never the NAMED |updateuser|, so login never completes."""
+
+    def __init__(self) -> None:
+        self.sent: list[str] = []
+        self.closed = False
+        self._inbox: asyncio.Queue[str] = asyncio.Queue()
+        self._inbox.put_nowait("|challstr|4|TESTCHALLSTR")
+
+    async def send(self, message: str) -> None:
+        self.sent.append(message)
+        # Deliberately never enqueue an |updateuser| reply.
+
+    async def recv(self) -> str:
+        return await self._inbox.get()
+
+    async def close(self) -> None:
+        self.closed = True
+
+
+def test_login_timeout_closes_cleanly(monkeypatch) -> None:
+    """If the guest handshake never completes, the proxy times out and closes."""
+    monkeypatch.setattr(_wsmod, "_LOGIN_TIMEOUT_SECS", 0.1)
+    created: list = []
+    app = _make_app_with(_NeverNamedUpstream, created)
+    client = TestClient(app)
+
+    with pytest.raises(WebSocketDisconnect):
+        with client.websocket_connect("/ws/showdown/battle-gen3ou-2") as ws:
+            ws.receive_text()
+
+    # Upstream was dialed and torn down despite the failed login.
+    assert created and created[0].closed
+
+
+class _RaisingTeardownUpstream(FakeUpstream):
+    """Relays one frame, then raises on the best-effort /leave + close teardown."""
+
+    def __init__(self) -> None:
+        super().__init__(frames_after_join=["|turn|1"])
+
+    async def send(self, message: str) -> None:
+        if message.startswith("|/leave"):
+            raise RuntimeError("boom on leave")
+        await super().send(message)
+
+    async def close(self) -> None:
+        raise RuntimeError("boom on close")
+
+
+def test_teardown_swallows_best_effort_errors() -> None:
+    """Errors while sending /leave or closing upstream must not crash the proxy."""
+    created: list = []
+    app = _make_app_with(_RaisingTeardownUpstream, created)
+    client = TestClient(app)
+
+    # The relayed frame still arrives; the raising teardown is swallowed on exit.
+    with client.websocket_connect("/ws/showdown/battle-gen3ou-3") as ws:
+        assert ws.receive_text() == "|turn|1"

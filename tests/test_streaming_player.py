@@ -122,3 +122,78 @@ async def test_showdown_room_not_emitted_for_frameless_message() -> None:
         events.append(q.get_nowait())
 
     assert not any(e["type"] == "showdown_room" for e in events)
+
+
+# ---------------------------------------------------------------------------
+# _send_challenges — team-rejection timeout (challenge never accepted)
+# ---------------------------------------------------------------------------
+
+import asyncio  # noqa: E402
+import logging  # noqa: E402
+
+from nidozo.battle import streaming_player  # noqa: E402
+
+
+class _FakePSClient:
+    def __init__(self) -> None:
+        self.logged_in = asyncio.Event()
+        self.logged_in.set()
+        self.challenges: list[tuple] = []
+
+    async def challenge(self, opponent: str, fmt: str, team: object) -> None:
+        self.challenges.append((opponent, fmt, team))
+
+
+class _ChallengePlayer(_StreamingMixin, _FakeBase):
+    """Mixin wired with just enough surface to drive _send_challenges."""
+
+    def __init__(self, bus: EventBus, battle_id: int | None = 5) -> None:
+        self._init_streaming(bus, "p1")
+        self.ps_client = _FakePSClient()  # type: ignore[assignment]
+        self._format = "gen9randombattle"
+        self._battle_semaphore = asyncio.Semaphore(0)  # never released → timeout
+        self._battle_count_queue = asyncio.Queue()
+        self._battle_id = battle_id
+        self.logger = logging.getLogger("test.challenge")
+
+    def get_next_team(self) -> str | None:
+        return None
+
+
+@pytest.mark.asyncio
+async def test_send_challenges_times_out_and_reports_team_rejection(monkeypatch) -> None:
+    """A challenge that is never accepted (team rejected) raises and emits an error."""
+    monkeypatch.setattr(streaming_player, "_CHALLENGE_TIMEOUT_SECS", 0.05)
+    bus = EventBus()
+    q = bus.subscribe()
+    player = _ChallengePlayer(bus, battle_id=5)
+
+    with pytest.raises(RuntimeError, match="team"):
+        await player._send_challenges("opponent", 1)
+
+    # A challenge was actually sent before the wait timed out.
+    assert player.ps_client.challenges == [("opponent", "gen9randombattle", None)]
+
+    events = []
+    while not q.empty():
+        events.append(q.get_nowait())
+    errors = [e for e in events if e["type"] == "error"]
+    assert len(errors) == 1
+    assert errors[0]["battle_id"] == 5
+    assert "rejected" in errors[0]["message"].lower()
+
+
+@pytest.mark.asyncio
+async def test_handle_battle_message_tolerates_malformed_frame() -> None:
+    """A frame with an empty leading line must not raise or emit showdown_room."""
+    bus = EventBus()
+    q = bus.subscribe()
+    player = _TestPlayer(bus)
+
+    # split_messages[0][0] raises IndexError — the guard should swallow it.
+    await player._handle_battle_message([[]])
+
+    events = []
+    while not q.empty():
+        events.append(q.get_nowait())
+    assert not any(e["type"] == "showdown_room" for e in events)
