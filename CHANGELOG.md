@@ -9,6 +9,18 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.39.6] — 2026-06-19
+
+First wave of fixes from the v0.39 code-review audit:
+
+- perf(orchestration): run `analyze_battle` off the event loop via `asyncio.to_thread` in the post-battle lesson/narrative tasks — it's CPU-bound over every turn and was stalling the loop that drives the live WS stream and the next battle in a tournament/season (#207)
+- fix(db): add a `UNIQUE` index on `models(provider, model_name, prompt_version)` and make `get_or_create_model` catch `IntegrityError` + re-select — prevents duplicate model rows that would split a model's ELO/stats (#210)
+- fix(db): add `idx_teams_model` to fresh-install DDL — it was previously created only by the v6 migration, so fresh databases never had it (#209)
+- fix(draft): clamp draft pick count to `min(team_size, pool size)` to prevent an `IndexError` when `team_size` exceeds the tier pool (#211)
+- chore(db): schema version 15 → 16
+
+---
+
 ## [0.39.3] — 2026-06-19
 
 - fix(tiers): remove 10 ND Uber/AG species from OU pool (`dragapult`, `landorus`, `urshifu`, `naganadel`, `magearna`, `alakazammega`, `gengarmega`, `salamencemega`, `metagrossmega`, `lucariomega`) — they are banned from `gen9nationaldex` and caused immediate team rejection at battle start
