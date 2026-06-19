@@ -9,6 +9,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.39.1] — 2026-06-18
+
+- docs: full README revamp — refreshed Features (added seasons, brackets, human player, coach mode, personality profiles, configurable team size, theme toggle, containerisation; removed the retired Classic view), corrected the prompt-versions table (v1–v9 + coach, v9 default), updated project structure (vendored `showdown/`, `tournament/`, data files), and fixed test counts
+- docs: CONTRIBUTING — corrected test count (1021), documented all six CI gates incl. the Docker smoke test, switched merge guidance to merge commits
+- docs: CLAUDE.md — marked party presets / configurable team size / doubles / personality profiles / human mode / theme toggle / containerisation as shipped; aligned merge-strategy guidance with the git-workflow skill
+
+---
+
 ## [0.39.0] — 2026-06-18
 
 - feat(docker): `docker compose up` brings up the full stack — `showdown` (Node, vendored Pokémon Showdown v0.11.10) + `api` (multi-stage Vite SPA build served by FastAPI)
