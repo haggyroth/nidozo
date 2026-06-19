@@ -9,6 +9,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.39.2] — 2026-06-18
+
+- fix(prompts): CLI runners (`run_battle.py`, `tournament.py`) now default to `v9` and accept `v1`–`v9`; previously capped at `v5`, so they couldn't run the current default prompt
+- fix(prompts): add `v8`/`v9` to `_JSON_OUTPUT_PROMPT_VERSIONS` — grammar-sampled JSON mode now activates for the default prompt on the lmstudio/openai backends
+- refactor: CLI scripts import the canonical JSON-version set instead of redefining a stale copy; test asserts the full set to prevent future drift
+
+---
+
 ## [0.39.1] — 2026-06-18
 
 - docs: full README revamp — refreshed Features (added seasons, brackets, human player, coach mode, personality profiles, configurable team size, theme toggle, containerisation; removed the retired Classic view), corrected the prompt-versions table (v1–v9 + coach, v9 default), updated project structure (vendored `showdown/`, `tournament/`, data files), and fixed test counts
