@@ -20,7 +20,8 @@ Types: `feat`, `fix`, `chore`, `docs`, `refactor`, `test`, `style`. Keep the sub
 
 - Open a PR against `main` for every change, even small ones.
 - Describe **what**, **why**, and **how you tested it**.
-- All PRs are squash-merged.
+- Wait for CI to pass before merging.
+- Merge with a **merge commit** (`merge: <branch> (#PR)`), then delete the branch.
 
 ## Code style
 
@@ -34,13 +35,15 @@ Types: `feat`, `fix`, `chore`, `docs`, `refactor`, `test`, `style`. Keep the sub
 ```bash
 uv run ruff check src/          # lint
 uv run mypy --strict src/       # type check
-uv run pytest                          # 781 unit tests, no Showdown required
+uv run pytest                          # 1021 unit tests, no Showdown required
 uv run pytest -m integration          # 1 integration test, requires Showdown on localhost:8000
 cd frontend && npm run lint      # frontend ESLint
 cd frontend && npm run build     # frontend build
 ```
 
-CI runs all five gates in parallel on every PR.
+CI runs six gates on every PR: ruff, mypy, pytest, the frontend lint+build, and a
+Docker smoke test that brings the full stack up with `docker compose` and polls
+`/healthz` to confirm it actually runs.
 
 ## Hidden information
 

@@ -57,8 +57,8 @@ This is where the project's value lives. It should be the most fleshed-out part 
 | Dimension | Now | Future |
 |---|---|---|
 | **Generation** | Gen 9 National Dex (single canonical ruleset) | — |
-| **Teams** | Random + LLM-drafted teams; tiers (OU/UU/LC/Ubers/FFA) | Party presets, configurable team size |
-| **Mode** | Singles | Doubles |
+| **Teams** | Random + LLM-drafted teams; tiers (OU/UU/LC/Ubers/FFA); party presets; configurable team size (6v6 / 3v3 / 4v4) | — |
+| **Mode** | Singles + Doubles (2v2/4v4) | — |
 
 ---
 
@@ -87,7 +87,7 @@ Apply Kyle's git-workflow standard automatically on all repo work, without being
 - **Branching:** Never commit directly to `main`. Branch off `main` for every change. Naming: `<type>/<short-description>` using `feat`, `fix`, `chore`, `docs`, `refactor`, `test`, or `style` (lowercase, hyphenated).
 - **Commits:** Conventional Commits format — `<type>(<scope>): <description>`. Imperative, lowercase, subject under 72 chars. Commit after each discrete, self-contained unit of work — not one giant end-of-session commit, and never half-finished work.
 - **Tests:** Run the test suite before committing if one exists. Don't commit code that fails its own tests.
-- **PRs:** Open a PR for every branch, even solo. Description must cover **what / why / how tested**. **Squash-merge**, then delete the branch.
+- **PRs:** Open a PR for every branch, even solo. Description must cover **what / why / how tested**. Wait for CI to pass, then **merge with a merge commit** (`merge: <branch> (#PR)`) and delete the branch.
 - **Releases:** Tag meaningful milestones with semver (`vMAJOR.MINOR.PATCH`) and a short GitHub Release changelog.
 - **Hard rules:** Never force-push to `main`. Never commit secrets, `.env`, or credentials. Set up `.gitignore` before the first commit.
 
@@ -107,9 +107,9 @@ Apply Kyle's git-workflow standard automatically on all repo work, without being
 
 `ROADMAP.md` is the source of truth for both shipped work and planned features — keep it current.
 
-**Already shipped** (don't re-propose as new): LLM-drafted teams, Smogon-style tiers, round-robin + single/double-elim brackets, seasons, cross-battle lessons, multi-agent coach mode, full post-game analysis (RNG inference, blunders, turning points, narrative), the Showdown cockpit view (now primary), and the migration to **Gen 9 National Dex** as the single canonical ruleset (OP-03).
+**Already shipped** (don't re-propose as new): LLM-drafted teams, Smogon-style tiers, round-robin + single/double-elim brackets, seasons, cross-battle lessons, multi-agent coach mode, personality profiles, party presets, human-player mode, doubles battles (2v2/4v4), configurable team size, full post-game analysis (RNG inference, blunders, turning points, narrative), the Showdown cockpit view (now the only view — Classic was retired), mobile/responsive layout + theme toggle, containerisation (`docker compose`), and the migration to **Gen 9 National Dex** as the single canonical ruleset (OP-03).
 
-**Genuinely future** (see ROADMAP.md for detail): personality profiles, party presets, human-player mode, achievements/badges, doubles battles, configurable team size, stats-page expansion, mobile/responsive + theme toggle, containerisation.
+**Genuinely future** (see ROADMAP.md for detail): achievements/badges, stats-page expansion, and broader integration-test coverage.
 
 The project name is **Nidozo** (Nido- from the Nido family + -zo from Nimzo); repo `haggyroth/nidozo`.
 
