@@ -11,7 +11,7 @@ from nidozo.battle.team_builder import (
     get_pool_info,
     load_movesets,
 )
-from nidozo.battle.tiers import TIER_DISPLAY, TIER_TO_FORMAT, get_pool, is_valid_tier
+from nidozo.battle.tiers import OU, UU, UBERS, TIER_DISPLAY, TIER_TO_FORMAT, get_pool, is_valid_tier
 
 # ---------------------------------------------------------------------------
 # Tier helpers
@@ -85,6 +85,29 @@ class TestTierConstants:
             assert tier in TIER_TO_FORMAT
             fmt = TIER_TO_FORMAT[tier]
             assert fmt.startswith("gen9"), f"Expected gen9 format for {tier!r}, got {fmt!r}"
+
+    # ND Uber / ban-list guard — species banned from gen9nationaldex must not
+    # appear in the OU pool (they cause team rejection at battle start).
+    def test_nd_uber_banned_species_not_in_ou(self) -> None:
+        nd_ubers_in_pools = {
+            "dragapult", "landorus", "urshifu", "naganadel", "magearna",
+            "alakazammega", "gengarmega", "salamencemega", "metagrossmega", "lucariomega",
+        }
+        leaked = nd_ubers_in_pools & OU
+        assert not leaked, f"ND Uber species leaked into OU pool: {leaked}"
+
+    def test_ou_pool_uses_correct_showdown_species_ids(self) -> None:
+        bad_ids = {"tapu-koko", "tapu-fini", "tapu-lele", "tapu-bulu", "slowbrotrop"}
+        leaked = bad_ids & OU
+        assert not leaked, f"OU pool contains hyphenated/wrong Showdown IDs: {leaked}"
+
+    def test_uu_pool_uses_correct_showdown_species_ids(self) -> None:
+        assert "rotomcut" not in UU, "UU pool uses wrong ID 'rotomcut'; should be 'rotommow'"
+
+    def test_nd_uber_species_available_in_ubers_pool(self) -> None:
+        expected = {"dragapult", "landorus", "urshifu", "naganadel", "magearna"}
+        missing = expected - UBERS
+        assert not missing, f"ND Uber species missing from UBERS pool: {missing}"
 
 
 # ---------------------------------------------------------------------------
