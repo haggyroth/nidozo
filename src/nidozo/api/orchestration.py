@@ -6,6 +6,7 @@ import asyncio
 import logging
 import os
 import random
+from dataclasses import dataclass
 from typing import Any
 
 from nidozo.api.helpers import _build_backend, _build_streaming_player, _model_name
@@ -72,6 +73,96 @@ async def _battle_and_teardown(p1: Any, p2: Any) -> None:
         await p1.battle_against(p2, n_battles=1)
     finally:
         await _terminate_players(p1, p2)
+
+
+@dataclass
+class _BattleOutcome:
+    """Result of one played battle, shared by every runner's bookkeeping."""
+
+    winner: int | None       # 1=p1, 2=p2, None=tie
+    total_turns: int
+    real_tag: str            # the Showdown battle tag (or a synthetic fallback)
+    new_badges: list[dict[str, Any]]
+
+
+async def _play_battle(
+    *,
+    battle_id: int,
+    p1: Any,
+    p2: Any,
+    store: Any,
+    bus: Any,
+    p1_label: str,
+    p2_label: str,
+    start_extra: dict[str, Any] | None = None,
+    end_extra: dict[str, Any] | None = None,
+) -> _BattleOutcome:
+    """Run one fully-built battle and persist its result.
+
+    Owns the lifecycle every runner shares: mark running → publish
+    ``battle_start`` → play + teardown → derive winner/tag/turns → update the
+    battle tag → ``finish_battle`` → publish ``battle_end`` → fan out
+    ``badge_earned`` events. Returns the outcome so the caller can advance a
+    bracket, publish standings, and spawn post-battle work.
+
+    ``start_extra`` / ``end_extra`` carry the runner-specific event fields
+    (tournament_id, season_id, match_id, personality, preset, …) merged into the
+    ``battle_start`` / ``battle_end`` payloads. The winner is honest — ``None``
+    is a genuine tie (Explosion, Destiny Bond, Struggle, …).
+    """
+    store.set_battle_status(battle_id, "running")
+    await bus.publish({
+        "type": "battle_start",
+        "battle_id": battle_id,
+        "p1": p1_label,
+        "p2": p2_label,
+        **(start_extra or {}),
+    })
+
+    await _battle_and_teardown(p1, p2)
+
+    winner = 1 if p1.n_won_battles > 0 else (2 if p2.n_won_battles > 0 else None)
+    real_tag = next(iter(p1.battles), f"battle-{battle_id}")
+    battle_obj = p1.battles.get(real_tag)
+    total_turns = battle_obj.turn if battle_obj else 0
+
+    store.update_battle_tag(battle_id, real_tag)
+    new_badges = store.finish_battle(battle_id, winner, total_turns)
+
+    await bus.publish({
+        "type": "battle_end",
+        "battle_id": battle_id,
+        "battle_tag": real_tag,
+        "winner": winner,
+        "total_turns": total_turns,
+        **(end_extra or {}),
+    })
+    for badge in new_badges:
+        await bus.publish({"type": "badge_earned", "battle_id": battle_id, **badge})
+
+    return _BattleOutcome(winner, total_turns, real_tag, new_badges)
+
+
+def _spawn_post_battle(
+    *,
+    store: Any,
+    battle_id: int,
+    outcome: _BattleOutcome,
+    lessons_kwargs: dict[str, Any],
+    narrative_kwargs: dict[str, Any],
+) -> None:
+    """Spawn the fire-and-forget post-battle lesson + narrative tasks.
+
+    Kept separate from :func:`_play_battle` so each runner can slot its own
+    standings / bracket-advance step in between (the order callers rely on).
+    """
+    turns = store.get_turns_basic(battle_id)
+    _spawn_background(generate_and_store_lessons(
+        store, battle_id, outcome.winner, outcome.total_turns, turns, **lessons_kwargs
+    ))
+    _spawn_background(generate_and_store_narrative(
+        store, battle_id, outcome.winner, outcome.total_turns, **narrative_kwargs
+    ))
 
 
 def _bracket_advance_slot(
@@ -217,55 +308,36 @@ async def run_battles(
                 personality=req.p2_personality,
             )
 
-            store.set_battle_status(battle_id, "running")
-            await bus.publish({
-                "type": "battle_start",
-                "battle_id": battle_id,
-                "p1": f"{req.p1_provider}/{_model_name(req.p1_provider, p1_model)}",
-                "p2": f"{req.p2_provider}/{_model_name(req.p2_provider, p2_model)}",
-                "format": showdown_format,
-                "tier": req.tier,
-                "drafted": do_draft,
-                "p1_personality": req.p1_personality,
-                "p2_personality": req.p2_personality,
-                "p1_preset": req.p1_preset,
-                "p2_preset": req.p2_preset,
-            })
-
-            await _battle_and_teardown(p1, p2)
-
-            winner = 1 if p1.n_won_battles > 0 else (2 if p2.n_won_battles > 0 else None)
-            real_tag = next(iter(p1.battles), f"battle-{battle_id}")
-            battle_obj = p1.battles.get(real_tag)
-            total_turns = battle_obj.turn if battle_obj else 0
-
-            store.update_battle_tag(battle_id, real_tag)
-            new_badges = store.finish_battle(battle_id, winner, total_turns)
-
-            await bus.publish({
-                "type": "battle_end",
-                "battle_id": battle_id,
-                "battle_tag": real_tag,
-                "winner": winner,
-                "total_turns": total_turns,
-            })
-            for badge in new_badges:
-                await bus.publish({"type": "badge_earned", "battle_id": battle_id, **badge})
-
-            turns = store.get_turns_basic(battle_id)
-            p2_label = f"{req.p2_provider}/{_model_name(req.p2_provider, p2_model)}"
             p1_label = f"{req.p1_provider}/{_model_name(req.p1_provider, p1_model)}"
-            _spawn_background(generate_and_store_lessons(
-                store, battle_id, winner, total_turns, turns,
-                p1_provider=req.p1_provider, p1_model=p1_model, p1_id=p1_id, p1_opponent=p2_label,
-                p2_provider=req.p2_provider, p2_model=p2_model, p2_id=p2_id, p2_opponent=p1_label,
-            ))
-            _spawn_background(generate_and_store_narrative(
-                store, battle_id, winner, total_turns,
+            p2_label = f"{req.p2_provider}/{_model_name(req.p2_provider, p2_model)}"
+            outcome = await _play_battle(
+                battle_id=battle_id, p1=p1, p2=p2, store=store, bus=bus,
                 p1_label=p1_label, p2_label=p2_label,
-                p1_provider=req.p1_provider, p1_model=p1_model,
-                p2_provider=req.p2_provider, p2_model=p2_model,
-            ))
+                start_extra={
+                    "format": showdown_format,
+                    "tier": req.tier,
+                    "drafted": do_draft,
+                    "p1_personality": req.p1_personality,
+                    "p2_personality": req.p2_personality,
+                    "p1_preset": req.p1_preset,
+                    "p2_preset": req.p2_preset,
+                },
+            )
+
+            _spawn_post_battle(
+                store=store, battle_id=battle_id, outcome=outcome,
+                lessons_kwargs={
+                    "p1_provider": req.p1_provider, "p1_model": p1_model,
+                    "p1_id": p1_id, "p1_opponent": p2_label,
+                    "p2_provider": req.p2_provider, "p2_model": p2_model,
+                    "p2_id": p2_id, "p2_opponent": p1_label,
+                },
+                narrative_kwargs={
+                    "p1_label": p1_label, "p2_label": p2_label,
+                    "p1_provider": req.p1_provider, "p1_model": p1_model,
+                    "p2_provider": req.p2_provider, "p2_model": p2_model,
+                },
+            )
 
         except asyncio.CancelledError:
             logger.info("Battle %d cancelled", battle_id)
@@ -475,41 +547,21 @@ async def run_tournament(
                 personality=t_p2_personality,
             )
 
-            store.set_battle_status(battle_id, "running")
-            await bus.publish({
-                "type": "battle_start",
-                "battle_id": battle_id,
-                "tournament_id": tournament_id,
-                "p1": p1_label,
-                "p2": p2_label,
-                "format": showdown_format,
-                "tier": req.tier,
-                "drafted": do_draft,
-                "p1_personality": t_p1_personality,
-                "p2_personality": t_p2_personality,
-                "p1_preset": t_p1_preset,
-                "p2_preset": t_p2_preset,
-            })
-
-            await _battle_and_teardown(p1, p2)
-
-            winner = 1 if p1.n_won_battles > 0 else (2 if p2.n_won_battles > 0 else None)
-            real_tag = next(iter(p1.battles), f"battle-{battle_id}")
-            battle_obj = p1.battles.get(real_tag)
-            total_turns = battle_obj.turn if battle_obj else 0
-
-            store.update_battle_tag(battle_id, real_tag)
-            new_badges = store.finish_battle(battle_id, winner, total_turns)
-
-            await bus.publish({
-                "type": "battle_end",
-                "battle_id": battle_id,
-                "tournament_id": tournament_id,
-                "winner": winner,
-                "total_turns": total_turns,
-            })
-            for badge in new_badges:
-                await bus.publish({"type": "badge_earned", "battle_id": battle_id, **badge})
+            outcome = await _play_battle(
+                battle_id=battle_id, p1=p1, p2=p2, store=store, bus=bus,
+                p1_label=p1_label, p2_label=p2_label,
+                start_extra={
+                    "tournament_id": tournament_id,
+                    "format": showdown_format,
+                    "tier": req.tier,
+                    "drafted": do_draft,
+                    "p1_personality": t_p1_personality,
+                    "p2_personality": t_p2_personality,
+                    "p1_preset": t_p1_preset,
+                    "p2_preset": t_p2_preset,
+                },
+                end_extra={"tournament_id": tournament_id},
+            )
 
             standings = store.get_tournament_standings(tournament_id)
             await bus.publish({
@@ -520,20 +572,20 @@ async def run_tournament(
                 "total_battles": total,
             })
 
-            turns = store.get_turns_basic(battle_id)
-            _spawn_background(generate_and_store_lessons(
-                store, battle_id, winner, total_turns, turns,
-                p1_provider=t_p1_prov, p1_model=battle_info["p1_model"],
-                p1_id=t_p1_id, p1_opponent=p2_label,
-                p2_provider=t_p2_prov, p2_model=battle_info["p2_model"],
-                p2_id=t_p2_id, p2_opponent=p1_label,
-            ))
-            _spawn_background(generate_and_store_narrative(
-                store, battle_id, winner, total_turns,
-                p1_label=p1_label, p2_label=p2_label,
-                p1_provider=t_p1_prov, p1_model=battle_info["p1_model"],
-                p2_provider=t_p2_prov, p2_model=battle_info["p2_model"],
-            ))
+            _spawn_post_battle(
+                store=store, battle_id=battle_id, outcome=outcome,
+                lessons_kwargs={
+                    "p1_provider": t_p1_prov, "p1_model": battle_info["p1_model"],
+                    "p1_id": t_p1_id, "p1_opponent": p2_label,
+                    "p2_provider": t_p2_prov, "p2_model": battle_info["p2_model"],
+                    "p2_id": t_p2_id, "p2_opponent": p1_label,
+                },
+                narrative_kwargs={
+                    "p1_label": p1_label, "p2_label": p2_label,
+                    "p1_provider": t_p1_prov, "p1_model": battle_info["p1_model"],
+                    "p2_provider": t_p2_prov, "p2_model": battle_info["p2_model"],
+                },
+            )
 
         except asyncio.CancelledError:
             logger.info("Tournament %d cancelled at battle %d", tournament_id, battle_id)
@@ -909,49 +961,26 @@ async def run_bracket_tournament(
                         personality=personality_lookup.get((p2_prov, p2_model)),
                     )
 
-                    store.set_battle_status(battle_id, "running")
-                    await bus.publish({
-                        "type": "battle_start",
-                        "battle_id": battle_id,
-                        "tournament_id": tournament_id,
-                        "p1": p1_label,
-                        "p2": p2_label,
-                        "format": showdown_format,
-                        "tier": req.tier,
-                        "drafted": do_draft,
-                        "match_id": match_id,
-                        "p1_personality": personality_lookup.get((p1_prov, p1_model)),
-                        "p2_personality": personality_lookup.get((p2_prov, p2_model)),
-                        "p1_preset": b_p1_preset,
-                        "p2_preset": b_p2_preset,
-                    })
+                    outcome = await _play_battle(
+                        battle_id=battle_id, p1=p1, p2=p2, store=store, bus=bus,
+                        p1_label=p1_label, p2_label=p2_label,
+                        start_extra={
+                            "tournament_id": tournament_id,
+                            "format": showdown_format,
+                            "tier": req.tier,
+                            "drafted": do_draft,
+                            "match_id": match_id,
+                            "p1_personality": personality_lookup.get((p1_prov, p1_model)),
+                            "p2_personality": personality_lookup.get((p2_prov, p2_model)),
+                            "p1_preset": b_p1_preset,
+                            "p2_preset": b_p2_preset,
+                        },
+                        end_extra={"tournament_id": tournament_id, "match_id": match_id},
+                    )
+                    winner = outcome.winner
 
-                    await _battle_and_teardown(p1, p2)
-
-                    # Honest battle outcome (None = tie — possible via Explosion,
-                    # Destiny Bond, Struggle, etc.).  This is what gets persisted
-                    # and reported, so ELO treats a tie as a genuine draw.
-                    winner = 1 if p1.n_won_battles > 0 else (2 if p2.n_won_battles > 0 else None)
-                    real_tag = next(iter(p1.battles), f"battle-{battle_id}")
-                    battle_obj = p1.battles.get(real_tag)
-                    total_turns = battle_obj.turn if battle_obj else 0
-
-                    store.update_battle_tag(battle_id, real_tag)
-                    new_badges = store.finish_battle(battle_id, winner, total_turns)
-
-                    await bus.publish({
-                        "type": "battle_end",
-                        "battle_id": battle_id,
-                        "tournament_id": tournament_id,
-                        "winner": winner,
-                        "total_turns": total_turns,
-                        "match_id": match_id,
-                    })
-                    for badge in new_badges:
-                        await bus.publish({"type": "badge_earned", "battle_id": battle_id, **badge})
-
-                    # A bracket must advance someone even on a tie; this stays
-                    # honest in the recorded result above and only governs routing.
+                    # A bracket must advance someone even on a tie; the recorded
+                    # result stays honest (winner=None) and this only governs routing.
                     advance_slot = _bracket_advance_slot(winner, p1_seed, p2_seed)
                     if winner is None:
                         logger.warning(
@@ -971,23 +1000,19 @@ async def run_bracket_tournament(
                         "bracket": bracket_state,
                     })
 
-                    turns = store.get_turns_basic(battle_id)
-                    _spawn_background(
-                        generate_and_store_lessons(
-                            store, battle_id, winner, total_turns, turns,
-                            p1_provider=p1_prov, p1_model=p1_model,
-                            p1_id=t_p1_id, p1_opponent=p2_label,
-                            p2_provider=p2_prov, p2_model=p2_model,
-                            p2_id=t_p2_id, p2_opponent=p1_label,
-                        )
-                    )
-                    _spawn_background(
-                        generate_and_store_narrative(
-                            store, battle_id, winner, total_turns,
-                            p1_label=p1_label, p2_label=p2_label,
-                            p1_provider=p1_prov, p1_model=p1_model,
-                            p2_provider=p2_prov, p2_model=p2_model,
-                        )
+                    _spawn_post_battle(
+                        store=store, battle_id=battle_id, outcome=outcome,
+                        lessons_kwargs={
+                            "p1_provider": p1_prov, "p1_model": p1_model,
+                            "p1_id": t_p1_id, "p1_opponent": p2_label,
+                            "p2_provider": p2_prov, "p2_model": p2_model,
+                            "p2_id": t_p2_id, "p2_opponent": p1_label,
+                        },
+                        narrative_kwargs={
+                            "p1_label": p1_label, "p2_label": p2_label,
+                            "p1_provider": p1_prov, "p1_model": p1_model,
+                            "p2_provider": p2_prov, "p2_model": p2_model,
+                        },
                     )
 
                 except asyncio.CancelledError:
@@ -1246,41 +1271,21 @@ async def run_season(
                 personality=s_p2_personality,
             )
 
-            store.set_battle_status(battle_id, "running")
-            await bus.publish({
-                "type": "battle_start",
-                "battle_id": battle_id,
-                "season_id": season_id,
-                "p1": p1_label,
-                "p2": p2_label,
-                "format": showdown_format,
-                "tier": req.tier,
-                "drafted": do_draft,
-                "p1_personality": s_p1_personality,
-                "p2_personality": s_p2_personality,
-                "p1_preset": s_p1_preset,
-                "p2_preset": s_p2_preset,
-            })
-
-            await _battle_and_teardown(p1, p2)
-
-            winner = 1 if p1.n_won_battles > 0 else (2 if p2.n_won_battles > 0 else None)
-            real_tag = next(iter(p1.battles), f"battle-{battle_id}")
-            battle_obj = p1.battles.get(real_tag)
-            total_turns = battle_obj.turn if battle_obj else 0
-
-            store.update_battle_tag(battle_id, real_tag)
-            new_badges = store.finish_battle(battle_id, winner, total_turns)
-
-            await bus.publish({
-                "type": "battle_end",
-                "battle_id": battle_id,
-                "season_id": season_id,
-                "winner": winner,
-                "total_turns": total_turns,
-            })
-            for badge in new_badges:
-                await bus.publish({"type": "badge_earned", "battle_id": battle_id, **badge})
+            outcome = await _play_battle(
+                battle_id=battle_id, p1=p1, p2=p2, store=store, bus=bus,
+                p1_label=p1_label, p2_label=p2_label,
+                start_extra={
+                    "season_id": season_id,
+                    "format": showdown_format,
+                    "tier": req.tier,
+                    "drafted": do_draft,
+                    "p1_personality": s_p1_personality,
+                    "p2_personality": s_p2_personality,
+                    "p1_preset": s_p1_preset,
+                    "p2_preset": s_p2_preset,
+                },
+                end_extra={"season_id": season_id},
+            )
 
             standings = store.get_season_standings(season_id)
             await bus.publish({
@@ -1291,20 +1296,20 @@ async def run_season(
                 "total_battles": total,
             })
 
-            turns = store.get_turns_basic(battle_id)
-            _spawn_background(generate_and_store_lessons(
-                store, battle_id, winner, total_turns, turns,
-                p1_provider=s_p1_prov, p1_model=battle_info["p1_model"],
-                p1_id=s_p1_id, p1_opponent=p2_label,
-                p2_provider=s_p2_prov, p2_model=battle_info["p2_model"],
-                p2_id=s_p2_id, p2_opponent=p1_label,
-            ))
-            _spawn_background(generate_and_store_narrative(
-                store, battle_id, winner, total_turns,
-                p1_label=p1_label, p2_label=p2_label,
-                p1_provider=s_p1_prov, p1_model=battle_info["p1_model"],
-                p2_provider=s_p2_prov, p2_model=battle_info["p2_model"],
-            ))
+            _spawn_post_battle(
+                store=store, battle_id=battle_id, outcome=outcome,
+                lessons_kwargs={
+                    "p1_provider": s_p1_prov, "p1_model": battle_info["p1_model"],
+                    "p1_id": s_p1_id, "p1_opponent": p2_label,
+                    "p2_provider": s_p2_prov, "p2_model": battle_info["p2_model"],
+                    "p2_id": s_p2_id, "p2_opponent": p1_label,
+                },
+                narrative_kwargs={
+                    "p1_label": p1_label, "p2_label": p2_label,
+                    "p1_provider": s_p1_prov, "p1_model": battle_info["p1_model"],
+                    "p2_provider": s_p2_prov, "p2_model": battle_info["p2_model"],
+                },
+            )
 
         except asyncio.CancelledError:
             logger.info("Season %d cancelled at battle %d", season_id, battle_id)
