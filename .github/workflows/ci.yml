@@ -111,8 +111,13 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - name: Build and start the stack
-        run: docker compose up -d --build
+      - name: Build images
+        run: docker compose build
+
+      # Start without --wait so a slow/failed dependency doesn't abort the step
+      # before we can capture logs.
+      - name: Start the stack
+        run: docker compose up -d --no-deps showdown api
 
       - name: Wait for the stack to become healthy
         run: |
@@ -126,9 +131,17 @@ jobs:
             sleep 5
           done
           echo "::error::Stack did not become healthy within 5 minutes"
-          docker compose ps
-          docker compose logs
           exit 1
+
+      - name: Dump container status and logs (always)
+        if: always()
+        run: |
+          echo "===== docker compose ps ====="
+          docker compose ps
+          echo "===== showdown logs ====="
+          docker compose logs showdown
+          echo "===== api logs ====="
+          docker compose logs api
 
       - name: Tear down
         if: always()
