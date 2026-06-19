@@ -10,6 +10,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from nidozo import __version__
+from nidozo.api.auth import add_auth, get_api_token
 from nidozo.api.events import EventBus
 from nidozo.api.lifespan import create_lifespan
 from nidozo.api.logging_config import configure_logging
@@ -39,12 +40,20 @@ def create_app(db_path: Path = _DB_PATH) -> FastAPI:
     app.state.store = store
     app.state.active_tasks = active_tasks
 
+    # Optional shared-secret auth (#212). Enabled only when NIDOZO_API_TOKEN is
+    # set; otherwise a no-op with a startup warning. Read here (not at import)
+    # so tests and deployments can set the env before create_app runs.
+    api_token = get_api_token()
+
     add_cors(app)
+    add_auth(app, api_token)
     app.include_router(create_router(store, bus, active_tasks))
-    app.include_router(create_ws_router(bus))
+    app.include_router(create_ws_router(bus, auth_token=api_token))
     # OP-02 (#84): spectator-stream proxy for the Showdown battle-scene renderer.
     # Display-only and entirely separate from the /ws/battles JSON bus.
-    app.include_router(create_showdown_ws_router(showdown_host=_SHOWDOWN_HOST, showdown_port=_SHOWDOWN_PORT))
+    app.include_router(create_showdown_ws_router(
+        showdown_host=_SHOWDOWN_HOST, showdown_port=_SHOWDOWN_PORT, auth_token=api_token,
+    ))
 
     if _FRONTEND_DIST.exists():
         app.mount("/", StaticFiles(directory=str(_FRONTEND_DIST), html=True), name="static")

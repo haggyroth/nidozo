@@ -38,6 +38,18 @@ services:
       NIDOZO_SHOWDOWN_PORT: "8000"
       # SQLite path inside the named volume
       NIDOZO_DB: /data/nidozo.db
+      # Shared-secret auth (#212). Set NIDOZO_API_TOKEN in the host env (or a
+      # .env file next to this compose file) to require it on every /api/* call
+      # and WebSocket. Leave unset ONLY when the host is not reachable beyond
+      # localhost — the API spends real LLM credits.
+      NIDOZO_API_TOKEN: ${NIDOZO_API_TOKEN:-}
+      # LLM backends. Point LM_STUDIO_BASE_URL at the machine running LM Studio
+      # (e.g. http://enterprise-e:1234/v1). Cloud keys are passed through from
+      # the host env when present.
+      LM_STUDIO_BASE_URL: ${LM_STUDIO_BASE_URL:-http://localhost:1234/v1}
+      LM_STUDIO_MODEL: ${LM_STUDIO_MODEL:-local-model}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
     volumes:
       - nidozo-data:/data
 

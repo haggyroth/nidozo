@@ -135,6 +135,7 @@ def create_showdown_ws_router(
     showdown_host: str = "localhost",
     showdown_port: int = 8000,
     connect_upstream: ConnectUpstream | None = None,
+    auth_token: str | None = None,
 ) -> APIRouter:
     """Return a router exposing ``GET (ws) /ws/showdown/{room}``.
 
@@ -143,7 +144,11 @@ def create_showdown_ws_router(
         showdown_port: Port of the local Showdown server.
         connect_upstream: Optional upstream-connection factory (injected in
             tests).  Defaults to a real ``websockets`` connection.
+        auth_token: When set, the client must supply a matching ``?token=``
+            query parameter.
     """
+    from nidozo.api.auth import ws_authorized
+
     router = APIRouter()
     connect = connect_upstream or _default_connect
     uri = f"ws://{showdown_host}:{showdown_port}/showdown/websocket"
@@ -153,6 +158,10 @@ def create_showdown_ws_router(
         if not _ROOM_RE.match(room):
             # Reject before accepting so a bad client gets a clean failure.
             await ws.close(code=_CLOSE_POLICY_VIOLATION, reason="invalid room id")
+            return
+
+        if not ws_authorized(ws, auth_token):
+            await ws.close(code=_CLOSE_POLICY_VIOLATION, reason="unauthorized")
             return
 
         await ws.accept()
