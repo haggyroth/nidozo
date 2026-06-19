@@ -161,6 +161,16 @@ async def run_draft(
     pool_info = get_pool_info(pool_ids, movesets)  # [{species_id, species, types}]
     from nidozo.battle.tiers import resolve_format
 
+    # Never try to draft more Pokémon than the pool holds — each pick removes one
+    # from remaining_pool, so team_size > pool would empty it and IndexError on
+    # the fallback path. Clamp instead (Showdown accepts a short team).
+    effective_size = min(team_size, len(pool_info))
+    if effective_size < team_size:
+        logger.warning(
+            "Draft pool for tier %s has only %d mon(s); drafting %d instead of %d (role=%s)",
+            tier, len(pool_info), effective_size, team_size, player_role,
+        )
+
     tier_display = TIER_DISPLAY.get(tier, tier.upper())
     showdown_format = resolve_format(tier, doubles=doubles, team_size=team_size)
 
@@ -175,12 +185,12 @@ async def run_draft(
     # Build a mutable pool (display-name strings, to match what the model sees)
     remaining_pool = list(pool_info)  # list of dicts
 
-    for pick_num in range(1, team_size + 1):
+    for pick_num in range(1, effective_size + 1):
         available_names: set[str] = {m["species"] for m in remaining_pool}
         messages = _build_draft_messages(
             tier_display=tier_display,
             pick_num=pick_num,
-            total_picks=team_size,
+            total_picks=effective_size,
             picked=picked_info,
             pool=remaining_pool,
             system_prompt=system_prompt,
