@@ -625,8 +625,15 @@ async def generate_and_store_lessons(
     p2_ids: list[str] | None = p2_team.get("pokemon") if p2_team else None
     sd = _load_species_data() if (p1_ids or p2_ids) else None
     try:
+        # analyze_battle is pure CPU work over every turn (merge, type chart,
+        # win-prob timeline, RNG inference). Run it in a worker thread so it
+        # can't stall the event loop — which also drives the live WS stream and
+        # the next battle in a tournament/season. (#207)
         analysis: dict[str, Any] | None = (
-            analyze_battle(turns_with_state, p1_team_ids=p1_ids, p2_team_ids=p2_ids, species_data=sd)
+            await asyncio.to_thread(
+                analyze_battle, turns_with_state,
+                p1_team_ids=p1_ids, p2_team_ids=p2_ids, species_data=sd,
+            )
             if turns_with_state else None
         )
     except Exception as exc:
@@ -705,8 +712,10 @@ async def generate_and_store_narrative(
         p1_ids: list[str] | None = p1_team.get("pokemon") if p1_team else None
         p2_ids: list[str] | None = p2_team.get("pokemon") if p2_team else None
         sd = _load_species_data() if (p1_ids or p2_ids) else None
-        analysis = analyze_battle(
-            turns_with_state, p1_team_ids=p1_ids, p2_team_ids=p2_ids, species_data=sd
+        # CPU-bound — offload to a worker thread so it can't stall the loop. (#207)
+        analysis = await asyncio.to_thread(
+            analyze_battle, turns_with_state,
+            p1_team_ids=p1_ids, p2_team_ids=p2_ids, species_data=sd,
         )
 
         backend = _build_backend(narrator_provider, narrator_model, json_mode=False)
