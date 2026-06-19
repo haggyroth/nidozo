@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import './styles/main.css'
 import Leaderboard from './components/Leaderboard'
+import ApiTokenButton from './components/ApiTokenButton'
 import ThemeToggle from './components/ThemeToggle'
 import { TournamentBar, WinnerBanner, TournamentEndOverlay } from './components/battleChrome'
 import { BadgeToastStack } from './components/battleShared'
@@ -176,6 +177,7 @@ function App() {
               SCORES
             </button>
           )}
+          <ApiTokenButton />
           <ThemeToggle />
         </nav>
       </header>

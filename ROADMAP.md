@@ -289,8 +289,7 @@
 ## Upcoming
 
 _No major tracked initiatives open. Smaller follow-ups live as GitHub issues._
-_The v0.39 code-review audit filed a batch of them: the wave-1 fixes (perf, schema_
-_integrity, draft guard) shipped in v0.39.6, the orchestration-runner refactor_
-_(#208) followed, and the test-coverage backfill (#213–#218) lifted the project to_
-_~93%. Remaining: API-auth hardening (#212), gated on whether the stack is exposed_
-_beyond localhost._
+_The v0.39 code-review audit is fully cleared: the wave-1 fixes (perf, schema_
+_integrity, draft guard) shipped in v0.39.6, followed by the orchestration-runner_
+_refactor (#208), the test-coverage backfill (#213–#218, project ~93%), and_
+_optional shared-secret API authentication (#212) for multi-machine deployments._

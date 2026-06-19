@@ -68,6 +68,35 @@ docker compose down -v
 
 > **Running actual battles** needs an LLM backend reachable from the `api` container — set cloud API keys (e.g. `ANTHROPIC_API_KEY`) in the `api` service environment, or point it at an LM Studio server. Two random bots work with no backend at all.
 
+### Configuration & authentication
+
+The `api` service reads these environment variables (pass them in the host shell, or via a `.env` file next to `docker-compose.yml` — Compose loads it automatically):
+
+| Variable | Purpose | Default |
+|---|---|---|
+| `NIDOZO_API_TOKEN` | Shared-secret token. When set, **every `/api/*` request and WebSocket requires it**. When unset, auth is disabled and a warning is logged at startup. | _(unset → auth off)_ |
+| `LM_STUDIO_BASE_URL` | OpenAI-compatible URL of your LM Studio server. | `http://localhost:1234/v1` |
+| `LM_STUDIO_MODEL` | Default LM Studio model id. | `local-model` |
+| `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` | Cloud LLM keys, used only for those providers. | _(unset)_ |
+
+**Authentication (#212).** `/healthz` and the static web app always stay open (so health checks work and the page can load); everything else is gated when `NIDOZO_API_TOKEN` is set. In the browser, click the **🔑** button in the header and paste the token — it's stored in `localStorage` and attached to every request automatically (you'll also be prompted automatically on the first `401`). Programmatic clients send `Authorization: Bearer <token>` (WebSockets use a `?token=<token>` query parameter, since browsers can't set headers on a WS handshake).
+
+> ⚠️ **If you expose port `5001` beyond localhost, set `NIDOZO_API_TOKEN`.** The battle-start endpoints spend real LLM API credits, so an open, internet-reachable instance is a money-drain risk.
+
+### Example: multi-machine deployment
+
+A split setup — Nidozo on a server, LLMs on a workstation, viewed from a laptop:
+
+- **Server** (runs the container stack) — create a `.env` next to `docker-compose.yml`:
+  ```bash
+  NIDOZO_API_TOKEN=choose-a-long-random-secret
+  LM_STUDIO_BASE_URL=http://<workstation-host>:1234/v1
+  # ANTHROPIC_API_KEY=...   # only if using cloud models
+  ```
+  then `docker compose up -d`.
+- **Workstation** — run LM Studio with its server enabled and **listening on the network** (not just `127.0.0.1`) so the container can reach it.
+- **Laptop** — open `http://<server-host>:5001`, click **🔑**, and paste the same token.
+
 ---
 
 ## Prerequisites (local / dev setup)
