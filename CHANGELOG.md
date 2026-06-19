@@ -7,6 +7,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+- test(integration): live-Showdown battle suite (#191) — `tests/test_battle_integration.py` drives real random / stub-LLM / drafted / doubles battles through poke-env; the `docker-smoke` CI job now runs `pytest -m integration` against the live compose stack
+
 ---
 
 ## [0.39.2] — 2026-06-18

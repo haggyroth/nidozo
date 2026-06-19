@@ -279,10 +279,14 @@
 - **CI `docker-smoke` job** — builds both images, runs `docker compose up`, and polls `/healthz` (200 only when the api reaches both its DB and Showdown), validating the stack end-to-end rather than just that the Dockerfiles parse
 - **README Docker-first quickstart**; `config-example.js` vendored so fresh clones and images have the loader's defaults
 
+### Integration Test Coverage (#191, #205)
+- **`tests/test_battle_integration.py`** — real battles through poke-env against a live Showdown server: random singles, random doubles, stub-LLM singles (real `LLMPlayer` path, no model), and drafted-team validity (`run_draft` → team string → Showdown accepts it); plus an opt-in real-LLM smoke gated behind `NIDOZO_SHOWDOWN`/`NIDOZO_LLM_INTEGRATION`
+- **CI** — the `docker-smoke` job now runs `pytest -m integration` against the live compose stack after the health check, so CI verifies battles actually run, not just that the stack boots
+- Caught a real bug on day one: the curated `OU` draft pool contains species the ND OU Showdown format bans as Ubers (tracked separately)
+
 ---
 
 ## Upcoming
 
-**Integration Test Coverage**
-- Integration tests for `battle/orchestration.py` and `llm/draft.py`; dedicated CI job that starts the Showdown server
-- (`pytest.mark.integration` infrastructure and spectator proxy tests already in place)
+_No major tracked initiatives open. Smaller follow-ups live as GitHub issues_
+_(e.g. auditing the OU/UU draft pools against the Showdown ND OU ban list)._
