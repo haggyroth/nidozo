@@ -25,6 +25,10 @@ COPY . .
 # compile TypeScript → dist/ so the server never has to build at runtime.
 RUN cp config/config-example.js config/config.js && node build
 
+# Showdown's REPL cleanup scans logs/repl on startup (config.repl defaults on);
+# logs/ is excluded from the build context, so create the dir it expects.
+RUN mkdir -p logs/repl
+
 EXPOSE 8000
 
 # Probe the WS port — Showdown has no HTTP health endpoint

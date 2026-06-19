@@ -114,10 +114,11 @@ jobs:
       - name: Build images
         run: docker compose build
 
-      # Start without --wait so a slow/failed dependency doesn't abort the step
-      # before we can capture logs.
+      # Real path: api depends_on showdown (service_healthy), so this also
+      # validates startup ordering. If a container crashes the step fails, but
+      # the always() log-dump step below still captures why.
       - name: Start the stack
-        run: docker compose up -d --no-deps showdown api
+        run: docker compose up -d
 
       - name: Wait for the stack to become healthy
         run: |
