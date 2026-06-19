@@ -302,8 +302,10 @@ def test_build_streaming_player_no_team_key_omitted() -> None:
 
 
 def test_json_output_prompt_versions_set() -> None:
-    """Sanity-check: the known JSON-output versions are in the frozenset."""
-    assert "v2" in _JSON_OUTPUT_PROMPT_VERSIONS
-    assert "v3" in _JSON_OUTPUT_PROMPT_VERSIONS
-    assert "v4" in _JSON_OUTPUT_PROMPT_VERSIONS
+    """Every JSON-output prompt version (v2 onward) must be in the set; only the
+    legacy text prompt v1 is excluded. Guards against the set going stale when a
+    new prompt version is added (as happened with v8/v9)."""
+    assert _JSON_OUTPUT_PROMPT_VERSIONS == frozenset(
+        {"v2", "v3", "v4", "v5", "v6", "v7", "v8", "v9"}
+    )
     assert "v1" not in _JSON_OUTPUT_PROMPT_VERSIONS
