@@ -216,3 +216,178 @@ async def test_human_provider_excluded_from_lessons():
         p2_opponent="human/human",
     )
     store.create_lesson.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# StreamingHumanPlayer.choose_move — future / timeout / parse-fail cycle
+# ---------------------------------------------------------------------------
+
+import asyncio  # noqa: E402
+
+from nidozo.api.events import EventBus  # noqa: E402
+from nidozo.battle.human_player import StreamingHumanPlayer  # noqa: E402
+
+
+class _FakeOrder:
+    def __init__(self, message: str) -> None:
+        self.message = message
+
+
+class _FakeBattle:
+    battle_tag = "battle-test-1"
+    turn = 3
+    finished = False
+    available_moves: list = []  # len 0 → skip the recharge shortcut
+
+
+def _make_human_player(bus: EventBus, *, battle_id=1, store=None, timeout=5.0):
+    """Build a StreamingHumanPlayer without poke-env's networking __init__."""
+    p = StreamingHumanPlayer.__new__(StreamingHumanPlayer)
+    p._bus = bus
+    p._player_role = "p1"
+    p._battle_id = battle_id
+    p._store = store
+    p._human_timeout = timeout
+    p._chose_during_frame = False
+    # Stub the poke-env methods choose_move would otherwise call.
+    p.choose_random_move = lambda battle: _FakeOrder("randmove")  # type: ignore[method-assign]
+    p.create_order = lambda m: _FakeOrder("recharge")  # type: ignore[attr-defined]
+    return p
+
+
+def _drain(q) -> list[dict]:
+    out = []
+    while not q.empty():
+        out.append(q.get_nowait())
+    return out
+
+
+@pytest.mark.asyncio
+async def test_choose_move_times_out_to_random(monkeypatch):
+    monkeypatch.setattr("nidozo.battle.human_player.serialize_battle", lambda b, *a, **k: {})
+    bus = EventBus()
+    q = bus.subscribe()
+    player = _make_human_player(bus, battle_id=1, store=None, timeout=0.05)
+
+    order = await player.choose_move(_FakeBattle())
+
+    assert order.message == "randmove"
+    events = _drain(q)
+    assert any(e["type"] == "human_action_required" for e in events)
+    turn = next(e for e in events if e["type"] == "turn")
+    assert "timeout fallback" in turn["action"]
+
+
+@pytest.mark.asyncio
+async def test_choose_move_parse_failure_falls_back(monkeypatch):
+    monkeypatch.setattr("nidozo.battle.human_player.serialize_battle", lambda b, *a, **k: {})
+    monkeypatch.setattr("nidozo.battle.human_player.parse_action", lambda *a, **k: None)
+    from nidozo.battle.human_player import resolve_pending
+
+    bus = EventBus()
+    q = bus.subscribe()
+    player = _make_human_player(bus, battle_id=2, store=None, timeout=5.0)
+
+    task = asyncio.create_task(player.choose_move(_FakeBattle()))
+    await asyncio.sleep(0)  # let choose_move register its pending future
+    assert resolve_pending(2, "p1", '{"action_type":"move","identifier":"???"}')
+    order = await task
+
+    assert order.message == "randmove"
+    turn = next(e for e in _drain(q) if e["type"] == "turn")
+    assert "invalid input" in turn["action"]
+
+
+@pytest.mark.asyncio
+async def test_choose_move_success_returns_parsed_order(monkeypatch):
+    monkeypatch.setattr("nidozo.battle.human_player.serialize_battle", lambda b, *a, **k: {})
+    monkeypatch.setattr(
+        "nidozo.battle.human_player.parse_action",
+        lambda *a, **k: _FakeOrder("move tackle"),
+    )
+    from nidozo.battle.human_player import resolve_pending
+
+    bus = EventBus()
+    q = bus.subscribe()
+    store = MagicMock()
+    player = _make_human_player(bus, battle_id=3, store=store, timeout=5.0)
+
+    task = asyncio.create_task(player.choose_move(_FakeBattle()))
+    await asyncio.sleep(0)
+    assert resolve_pending(3, "p1", '{"action_type":"move","identifier":"tackle"}')
+    order = await task
+
+    assert order.message == "move tackle"
+    # The successful turn was logged with parse_success=True.
+    store.log_turn.assert_called_once()
+    assert store.log_turn.call_args.kwargs["parse_success"] is True
+    turn = next(e for e in _drain(q) if e["type"] == "turn")
+    assert turn["action"] == "move tackle"
+
+
+@pytest.mark.asyncio
+async def test_choose_move_recharge_shortcut(monkeypatch):
+    """A lone forced 'recharge' move skips the human prompt entirely."""
+    monkeypatch.setattr("nidozo.battle.human_player.serialize_battle", lambda b, *a, **k: {})
+    bus = EventBus()
+    q = bus.subscribe()
+    player = _make_human_player(bus, battle_id=4)
+
+    battle = _FakeBattle()
+    battle.available_moves = [type("M", (), {"id": "recharge"})()]
+    order = await player.choose_move(battle)
+
+    assert order.message == "recharge"
+    # No human_action_required is emitted on a forced recharge turn.
+    assert not any(e["type"] == "human_action_required" for e in _drain(q))
+
+
+@pytest.mark.asyncio
+async def test_terminate_cancels_pending(monkeypatch):
+    from nidozo.battle.human_player import _pending, register_pending
+
+    bus = EventBus()
+    player = _make_human_player(bus, battle_id=9)
+
+    stopped = {"called": False}
+
+    class _FakePS:
+        async def stop_listening(self):
+            stopped["called"] = True
+
+    player.ps_client = _FakePS()  # type: ignore[attr-defined]
+
+    fut = register_pending(9, "p1")
+    await player.terminate()
+
+    assert fut.cancelled()
+    assert (9, "p1") not in _pending
+    assert stopped["called"]
+
+
+# ---------------------------------------------------------------------------
+# _log_turn
+# ---------------------------------------------------------------------------
+
+def test_log_turn_writes_to_store():
+    bus = EventBus()
+    store = MagicMock()
+    player = _make_human_player(bus, battle_id=11, store=store)
+    player._log_turn(1, "move 1", True, "raw", state_json="{}")
+    store.log_turn.assert_called_once()
+    assert store.log_turn.call_args.kwargs["player_role"] == "p1"
+
+
+def test_log_turn_swallows_store_errors():
+    bus = EventBus()
+    store = MagicMock()
+    store.log_turn.side_effect = RuntimeError("db down")
+    player = _make_human_player(bus, battle_id=12, store=store)
+    # Must not raise despite the store error.
+    player._log_turn(1, "move 1", True, "raw")
+
+
+def test_log_turn_noop_without_store():
+    bus = EventBus()
+    player = _make_human_player(bus, battle_id=13, store=None)
+    player._log_turn(1, "move 1", True, "raw")  # no store → early return, no raise
