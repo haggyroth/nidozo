@@ -9,6 +9,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.39.0] — 2026-06-18
+
+- feat(docker): `docker compose up` brings up the full stack — `showdown` (Node, vendored Pokémon Showdown v0.11.10) + `api` (multi-stage Vite SPA build served by FastAPI)
+- feat(docker): env-driven Showdown addressing (`NIDOZO_SHOWDOWN_HOST`/`NIDOZO_SHOWDOWN_PORT`) replaces the hardcoded `LocalhostServerConfiguration`
+- feat(docker): SQLite persists on the `nidozo-data` named volume across container restarts
+- ci(docker): `docker-smoke` job builds both images, runs the stack, and polls `/healthz` to validate it end-to-end
+- docs: Docker-first quickstart in the README; vendored `config-example.js` for fresh-clone/image defaults
+
+---
+
 ## [0.34.0] — 2026-06-17
 
 ### Added

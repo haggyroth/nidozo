@@ -271,16 +271,17 @@
 - **Default changed from v8 → v9** for all singles endpoints (doubles keeps v7)
 - 8 new tests in `test_prompt_v9.py`; 1021 tests green
 
+### v0.39 — Containerisation (#201, #202)
+- **`docker compose up` brings up the full stack** — two containers: `showdown` (Node, vendored Pokémon Showdown source) and `api` (multi-stage: Vite SPA build → FastAPI serving the static bundle + API)
+- **Showdown source vendored into the repo** — pinned v0.11.10, compiled (`node build`) at image-build time for deterministic, network-independent builds; Node pinned to `22.12.0-slim`
+- **Env-driven Showdown addressing** — `NIDOZO_SHOWDOWN_HOST`/`NIDOZO_SHOWDOWN_PORT` replace the hardcoded `LocalhostServerConfiguration`; compose routes the api at the `showdown` service, bare-metal dev defaults to `localhost`
+- **SQLite persists on a named volume** (`nidozo-data`) across container restarts
+- **CI `docker-smoke` job** — builds both images, runs `docker compose up`, and polls `/healthz` (200 only when the api reaches both its DB and Showdown), validating the stack end-to-end rather than just that the Dockerfiles parse
+- **README Docker-first quickstart**; `config-example.js` vendored so fresh clones and images have the loader's defaults
+
 ---
 
 ## Upcoming
-
-**Containerisation** (tracked in [#201](https://github.com/haggyroth/nidozo/issues/201))
-- `docker-compose.yml` for the full stack: Showdown server, FastAPI backend, Vite dev server
-- Production Dockerfile: multi-stage build, static frontend served from FastAPI; single `docker compose up` command
-- `docker build` CI smoke test on every PR (no push/registry)
-- README updated with Docker-first quickstart
-- Target: utopiaplanitia (headless server); dev remains native on voyager
 
 **Integration Test Coverage**
 - Integration tests for `battle/orchestration.py` and `llm/draft.py`; dedicated CI job that starts the Showdown server
