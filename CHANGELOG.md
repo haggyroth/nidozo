@@ -7,6 +7,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+- feat(api): optional shared-secret authentication (#212) — when `NIDOZO_API_TOKEN` is set, every `/api/*` route and both WebSockets require the token (`Authorization: Bearer` / `X-API-Token` header, or `?token=` for WS); `/healthz` and the static SPA stay open. Auth is off by default with a startup warning. The web UI gains a 🔑 token field (stored in `localStorage`, auto-prompts on 401). `docker-compose` now passes `NIDOZO_API_TOKEN`, `LM_STUDIO_BASE_URL`/`MODEL`, and cloud keys through from the host env; README documents a multi-machine deployment
 - refactor(orchestration): extract shared `_play_battle` / `_spawn_post_battle` helpers from the four battle runners — the winner/tag/turns idiom, finish→event→badge sequence, and lesson/narrative spawn now live in one place instead of four (#208). `battle_end` events now always carry `battle_tag` (previously only single battles did)
 - test: backfill coverage for the six audit-flagged modules (#213–#218) — presets, achievements, human_player, streaming_player, ws_showdown, and orchestration; total project coverage 87% → 93%
 
