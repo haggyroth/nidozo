@@ -76,7 +76,13 @@ class BattleStore:
         model_name: str,
         prompt_version: str = "v1",
     ) -> int:
-        """Return the model id, creating the row if it doesn't exist."""
+        """Return the model id, creating the row if it doesn't exist.
+
+        The (provider, model_name, prompt_version) UNIQUE index makes this
+        race-safe: if a concurrent caller inserts the same identity between our
+        SELECT and INSERT, the INSERT raises IntegrityError and we re-select the
+        winner's row instead of creating a duplicate.
+        """
         cur = self._conn.execute(
             "SELECT id FROM models WHERE provider=? AND model_name=? AND prompt_version=?",
             (provider, model_name, prompt_version),
@@ -85,18 +91,30 @@ class BattleStore:
         if row:
             return int(row["id"])
 
-        cur = self._conn.execute(
-            "INSERT INTO models (provider, model_name, prompt_version) VALUES (?,?,?)",
-            (provider, model_name, prompt_version),
-        )
-        model_id = cur.lastrowid
-        assert model_id is not None
-        self._conn.execute(
-            "INSERT INTO elo_ratings (model_id, rating, games) VALUES (?,?,0)",
-            (model_id, DEFAULT_RATING),
-        )
-        self._conn.commit()
-        return model_id
+        try:
+            cur = self._conn.execute(
+                "INSERT INTO models (provider, model_name, prompt_version) VALUES (?,?,?)",
+                (provider, model_name, prompt_version),
+            )
+            model_id = cur.lastrowid
+            assert model_id is not None
+            self._conn.execute(
+                "INSERT INTO elo_ratings (model_id, rating, games) VALUES (?,?,0)",
+                (model_id, DEFAULT_RATING),
+            )
+            self._conn.commit()
+            return model_id
+        except sqlite3.IntegrityError:
+            # Lost the insert race (or the UNIQUE index already held this
+            # identity) — roll back our partial insert and return the existing row.
+            self._conn.rollback()
+            row = self._conn.execute(
+                "SELECT id FROM models WHERE provider=? AND model_name=? AND prompt_version=?",
+                (provider, model_name, prompt_version),
+            ).fetchone()
+            if row:
+                return int(row["id"])
+            raise
 
     # ------------------------------------------------------------------
     # Battles
