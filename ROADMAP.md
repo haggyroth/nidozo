@@ -289,6 +289,6 @@
 ## Upcoming
 
 _No major tracked initiatives open. Smaller follow-ups live as GitHub issues._
-_The v0.39 code-review audit filed a batch of them (perf, schema integrity, test_
-_coverage, API-auth hardening, and an orchestration-runner refactor); the first_
-_wave of fixes shipped in v0.39.6._
+_The v0.39 code-review audit filed a batch of them: the wave-1 fixes (perf, schema_
+_integrity, draft guard) shipped in v0.39.6, and the orchestration-runner refactor_
+_(#208) followed. Remaining: test-coverage backfill and API-auth hardening._

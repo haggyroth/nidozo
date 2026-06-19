@@ -7,6 +7,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+- refactor(orchestration): extract shared `_play_battle` / `_spawn_post_battle` helpers from the four battle runners — the winner/tag/turns idiom, finish→event→badge sequence, and lesson/narrative spawn now live in one place instead of four (#208). `battle_end` events now always carry `battle_tag` (previously only single battles did)
+
 ---
 
 ## [0.39.6] — 2026-06-19
