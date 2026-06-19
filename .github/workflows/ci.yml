@@ -98,18 +98,31 @@ jobs:
         run: npm run build
 
   # -----------------------------------------------------------------------
-  # Docker: build BOTH images and verify the stack actually runs.
+  # Docker: build BOTH images, verify the stack runs, then drive real battles.
   # `docker build` alone only proves the Dockerfiles parse — the real failure
   # modes (missing dist/, missing data/, missing config.js, bad networking)
   # only surface at runtime, so we bring the stack up and poll /healthz, which
   # returns 200 only when the API can reach both its DB and the Showdown server.
-  # No registry push.
+  # We then run the @pytest.mark.integration suite (#191) against the live
+  # Showdown container: real random / stub-LLM / drafted / doubles battles that
+  # the mocked unit tests can't cover. No registry push, no model required.
   # -----------------------------------------------------------------------
   docker-smoke:
     name: Docker build + run (smoke test)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: false
+          python-version: "3.12"
+
+      - name: Install project + dev deps (for the integration suite)
+        run: |
+          uv venv
+          uv pip install -e ".[dev]"
 
       - name: Build images
         run: docker compose build
@@ -133,6 +146,13 @@ jobs:
           done
           echo "::error::Stack did not become healthy within 5 minutes"
           exit 1
+
+      # Showdown is published on localhost:8000 by compose; the integration
+      # tests connect there (NIDOZO_SHOWDOWN_HOST/PORT default to localhost:8000).
+      # Scoped to the battle suite (#191): the older spectator-proxy integration
+      # test uses fragile hand-rolled websocket timing and stays manual-only.
+      - name: Run integration battles against live Showdown
+        run: uv run pytest -m integration tests/test_battle_integration.py -v
 
       - name: Dump container status and logs (always)
         if: always()
