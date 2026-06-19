@@ -1,0 +1,46 @@
+# Nidozo — production stack for utopiaplanitia (or any Docker host)
+# Usage: docker compose up -d
+#
+# Services:
+#   showdown  — Pokémon Showdown battle engine (Node)
+#   api       — FastAPI backend + React SPA (Python)
+#
+# SQLite data persists on the nidozo-data named volume across restarts.
+# To reset the database: docker compose down -v
+
+services:
+  showdown:
+    build:
+      context: showdown
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    # Port exposed for direct Showdown access (debugging / cockpit view)
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "8000"]
+      interval: 5s
+      timeout: 3s
+      start_period: 20s
+      retries: 12
+
+  api:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "5001:5001"
+    depends_on:
+      showdown:
+        condition: service_healthy
+    environment:
+      # Route poke-env and the WS proxy to the showdown service
+      NIDOZO_SHOWDOWN_HOST: showdown
+      NIDOZO_SHOWDOWN_PORT: "8000"
+      # SQLite path inside the named volume
+      NIDOZO_DB: /data/nidozo.db
+    volumes:
+      - nidozo-data:/data
+
+volumes:
+  nidozo-data:
+    driver: local

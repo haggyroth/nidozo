@@ -96,3 +96,54 @@ jobs:
 
       - name: Build
         run: npm run build
+
+  # -----------------------------------------------------------------------
+  # Docker: build BOTH images and verify the stack actually runs.
+  # `docker build` alone only proves the Dockerfiles parse — the real failure
+  # modes (missing dist/, missing data/, missing config.js, bad networking)
+  # only surface at runtime, so we bring the stack up and poll /healthz, which
+  # returns 200 only when the API can reach both its DB and the Showdown server.
+  # No registry push.
+  # -----------------------------------------------------------------------
+  docker-smoke:
+    name: Docker build + run (smoke test)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Build images
+        run: docker compose build
+
+      # Real path: api depends_on showdown (service_healthy), so this also
+      # validates startup ordering. If a container crashes the step fails, but
+      # the always() log-dump step below still captures why.
+      - name: Start the stack
+        run: docker compose up -d
+
+      - name: Wait for the stack to become healthy
+        run: |
+          for i in $(seq 1 60); do
+            if curl -fsS http://localhost:5001/healthz; then
+              echo
+              echo "Stack healthy — API reached its DB and the Showdown server."
+              exit 0
+            fi
+            echo "Attempt $i: not ready yet, retrying in 5s..."
+            sleep 5
+          done
+          echo "::error::Stack did not become healthy within 5 minutes"
+          exit 1
+
+      - name: Dump container status and logs (always)
+        if: always()
+        run: |
+          echo "===== docker compose ps ====="
+          docker compose ps
+          echo "===== showdown logs ====="
+          docker compose logs showdown
+          echo "===== api logs ====="
+          docker compose logs api
+
+      - name: Tear down
+        if: always()
+        run: docker compose down -v

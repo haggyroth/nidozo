@@ -21,6 +21,8 @@ from nidozo.db.store import BattleStore
 
 _DB_PATH = Path(os.environ.get("NIDOZO_DB") or os.environ.get("NIMZO_DB", "nidozo.db"))
 _FRONTEND_DIST = Path(__file__).parent.parent.parent.parent / "frontend" / "dist"
+_SHOWDOWN_HOST = os.environ.get("NIDOZO_SHOWDOWN_HOST", "localhost")
+_SHOWDOWN_PORT = int(os.environ.get("NIDOZO_SHOWDOWN_PORT", "8000"))
 
 
 def create_app(db_path: Path = _DB_PATH) -> FastAPI:
@@ -42,7 +44,7 @@ def create_app(db_path: Path = _DB_PATH) -> FastAPI:
     app.include_router(create_ws_router(bus))
     # OP-02 (#84): spectator-stream proxy for the Showdown battle-scene renderer.
     # Display-only and entirely separate from the /ws/battles JSON bus.
-    app.include_router(create_showdown_ws_router())
+    app.include_router(create_showdown_ws_router(showdown_host=_SHOWDOWN_HOST, showdown_port=_SHOWDOWN_PORT))
 
     if _FRONTEND_DIST.exists():
         app.mount("/", StaticFiles(directory=str(_FRONTEND_DIST), html=True), name="static")

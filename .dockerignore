@@ -1,0 +1,39 @@
+# Vendored Showdown server — built in its own container
+showdown/
+
+# Python artifacts
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.json
+htmlcov/
+*.egg-info/
+
+# Frontend build cache and deps — installed fresh in the Docker stage
+frontend/node_modules/
+frontend/dist/
+frontend/playwright-report/
+frontend/test-results/
+
+# Credentials and the local SQLite DB (the container uses a named volume).
+# NOTE: data/ is NOT excluded — it holds movesets/presets the API reads at
+# runtime (team_builder.py, presets.py) and is COPYed into the image.
+nidozo.db
+.env
+.env.local
+*.env
+
+# Repo and editor noise
+.git/
+.gitignore
+.github/
+docs/
+scripts/
+CLAUDE.md
+OPUS_PASS.md
+.DS_Store

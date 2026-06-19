@@ -30,8 +30,8 @@ from nidozo.db.store import BattleStore
 
 logger = logging.getLogger(__name__)
 
-_SHOWDOWN_HOST = "localhost"
-_SHOWDOWN_PORT = 8000
+_SHOWDOWN_HOST = os.environ.get("NIDOZO_SHOWDOWN_HOST", "localhost")
+_SHOWDOWN_PORT = int(os.environ.get("NIDOZO_SHOWDOWN_PORT", "8000"))
 
 
 def create_router(
