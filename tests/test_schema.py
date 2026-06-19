@@ -804,3 +804,87 @@ def test_migration_v12_fallback_reason_already_exists(tmp_path) -> None:
     version = conn.execute("SELECT version FROM schema_version").fetchone()[0]
     assert version == SCHEMA_VERSION
     conn.close()
+
+
+# ---------------------------------------------------------------------------
+# v16 — model identity uniqueness (#210) + teams index on fresh installs (#209)
+# ---------------------------------------------------------------------------
+
+def _index_names(conn: sqlite3.Connection) -> set[str]:
+    rows = conn.execute(
+        "SELECT name FROM sqlite_master WHERE type='index'"
+    ).fetchall()
+    return {r["name"] for r in rows}
+
+
+def test_fresh_install_has_teams_index_and_model_uniqueness() -> None:
+    """A fresh DB must carry idx_teams_model and the UNIQUE model-identity index."""
+    conn = _fresh_conn()
+    migrate(conn)
+    names = _index_names(conn)
+    assert "idx_teams_model" in names, "idx_teams_model missing on fresh install (#209)"
+    assert "idx_models_identity" in names, "idx_models_identity missing on fresh install (#210)"
+    # Confirm the identity index is actually UNIQUE.
+    unique = conn.execute(
+        "SELECT \"unique\" FROM pragma_index_list('models') WHERE name='idx_models_identity'"
+    ).fetchone()
+    assert unique is not None and unique[0] == 1
+    conn.close()
+
+
+def test_get_or_create_model_is_deduplicated(tmp_path) -> None:
+    """Same (provider, model_name, prompt_version) always returns one id and row."""
+    from nidozo.db.store import BattleStore
+
+    store = BattleStore(db_path=tmp_path / "dedup.db")
+    a = store.get_or_create_model("anthropic", "claude-x", "v9")
+    b = store.get_or_create_model("anthropic", "claude-x", "v9")
+    assert a == b
+    # A different prompt version is a distinct model.
+    c = store.get_or_create_model("anthropic", "claude-x", "v8")
+    assert c != a
+    count = store._conn.execute(
+        "SELECT COUNT(*) FROM models WHERE provider='anthropic' AND model_name='claude-x'"
+    ).fetchone()[0]
+    assert count == 2, "expected exactly two rows (one per prompt version)"
+    store.close()
+
+
+def test_direct_duplicate_model_insert_is_rejected(tmp_path) -> None:
+    """The UNIQUE index rejects a raw duplicate identity insert."""
+    from nidozo.db.store import BattleStore
+
+    store = BattleStore(db_path=tmp_path / "uniq.db")
+    store.get_or_create_model("openai", "gpt-4o", "v9")
+    try:
+        store._conn.execute(
+            "INSERT INTO models (provider, model_name, prompt_version) VALUES (?,?,?)",
+            ("openai", "gpt-4o", "v9"),
+        )
+        store._conn.commit()
+        raised = False
+    except sqlite3.IntegrityError:
+        store._conn.rollback()
+        raised = True
+    assert raised, "duplicate model identity should violate idx_models_identity"
+    store.close()
+
+
+def test_migration_v15_to_v16_adds_indexes(tmp_path) -> None:
+    """A v15 DB gains idx_teams_model and idx_models_identity after migrate()."""
+    db_path = tmp_path / "v15.db"
+    conn = sqlite3.connect(str(db_path))
+    conn.row_factory = sqlite3.Row
+    migrate(conn)  # fresh → current
+    # Roll back to v15 and drop the two indexes to simulate an older DB.
+    conn.execute("DROP INDEX IF EXISTS idx_teams_model")
+    conn.execute("DROP INDEX IF EXISTS idx_models_identity")
+    conn.execute("UPDATE schema_version SET version=15")
+    conn.commit()
+
+    migrate(conn)  # re-run v16 block
+    assert _version(conn) == SCHEMA_VERSION
+    names = _index_names(conn)
+    assert "idx_teams_model" in names
+    assert "idx_models_identity" in names
+    conn.close()

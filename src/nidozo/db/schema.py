@@ -1,8 +1,11 @@
 """SQLite schema — all CREATE TABLE statements and the migrate() entry point."""
 
+import logging
 import sqlite3
 
-SCHEMA_VERSION = 15
+logger = logging.getLogger(__name__)
+
+SCHEMA_VERSION = 16
 
 # Table definitions only — safe to run against any DB version via IF NOT EXISTS.
 # Indexes are kept separate because they may reference columns (e.g. tournament_id)
@@ -168,6 +171,12 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_elohist_battle ON elo_history(battle_id, m
 CREATE INDEX IF NOT EXISTS idx_lessons_model      ON lessons(model_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_battles_season     ON battles(season_id);
 CREATE INDEX IF NOT EXISTS idx_badges_model       ON badges(model_id, earned_at);
+CREATE INDEX IF NOT EXISTS idx_teams_model        ON teams(model_id, created_at);
+-- One row per distinct model configuration. The UNIQUE index also makes
+-- get_or_create_model's insert race-safe: a losing racer hits IntegrityError
+-- and re-selects the winner's row instead of creating a duplicate.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_models_identity
+    ON models(provider, model_name, prompt_version);
 """
 
 
@@ -426,4 +435,32 @@ def migrate(conn: sqlite3.Connection) -> None:
         except sqlite3.OperationalError:
             pass  # column already exists
         conn.execute("UPDATE schema_version SET version=15")
+        conn.commit()
+
+    if version < 16:
+        # #209: idx_teams_model was created only in the v6 migration block, so
+        # databases born after v6's DDL was folded into _DDL_TABLES never got it
+        # on a fresh install. Recreate idempotently here so every DB has it.
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_teams_model ON teams(model_id, created_at)"
+        )
+        # #210: enforce model identity uniqueness so get_or_create_model's
+        # non-atomic SELECT-then-INSERT can't create duplicate model rows (which
+        # would split a model's ELO/stats across two ids).
+        try:
+            conn.execute(
+                "CREATE UNIQUE INDEX IF NOT EXISTS idx_models_identity"
+                " ON models(provider, model_name, prompt_version)"
+            )
+        except sqlite3.IntegrityError:
+            # An older DB created via the racy path may already hold duplicate
+            # (provider, model_name, prompt_version) rows, which block a UNIQUE
+            # index. Leave it unenforced rather than crash startup — the
+            # duplicates are harmless beyond split stats, and fresh DBs get the
+            # constraint from _DDL_INDEXES regardless.
+            logger.warning(
+                "Could not add UNIQUE index on models(provider, model_name, "
+                "prompt_version): duplicate rows exist. Dedupe manually to enforce it."
+            )
+        conn.execute("UPDATE schema_version SET version=16")
         conn.commit()
