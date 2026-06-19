@@ -20,6 +20,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react'
+import { wsUrl } from '../api'
 import { useShowdownBundle } from '../hooks/useShowdownBundle'
 import { WinProbBar, PlayerLabel, PlayerHeuristicPanels, ThinkingBadge, PersonalityChip, PresetBadge } from './battleShared'
 import { BattleBadges, CancelBattleButton } from './battleChrome'
@@ -69,8 +70,7 @@ export default function ShowdownBattleScene({ room, p1State, p2State, battleInfo
     // replayed line (full log from the start) lands immediately.
     queueMicrotask(() => setStatus('connecting'))
 
-    const proto = location.protocol === 'https:' ? 'wss' : 'ws'
-    const ws = new WebSocket(`${proto}://${location.host}/ws/showdown/${room}`)
+    const ws = new WebSocket(wsUrl(`/ws/showdown/${room}`))
     wsRef.current = ws
 
     ws.onopen = () => setStatus('live')
