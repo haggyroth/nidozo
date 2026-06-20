@@ -329,15 +329,16 @@ class BattleStore:
         p1_personality: str | None = None,
         p2_personality: str | None = None,
         team_size: int = 6,
+        experiment_id: int | None = None,
     ) -> int:
         """Insert a battle row and return its id."""
         cur = self._conn.execute(
             """INSERT INTO battles
                (battle_tag, format, p1_model_id, p2_model_id, tournament_id, season_id,
-                p1_personality, p2_personality, team_size, status)
-               VALUES (?,?,?,?,?,?,?,?,?,'pending')""",
+                experiment_id, p1_personality, p2_personality, team_size, status)
+               VALUES (?,?,?,?,?,?,?,?,?,?,'pending')""",
             (battle_tag, format, p1_model_id, p2_model_id, tournament_id, season_id,
-             p1_personality, p2_personality, team_size),
+             experiment_id, p1_personality, p2_personality, team_size),
         )
         self._conn.commit()
         row_id = cur.lastrowid
@@ -1506,6 +1507,155 @@ class BattleStore:
                WHERE b.season_id = ?
                ORDER BY b.started_at""",
             (season_id,),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+    # ------------------------------------------------------------------
+    # Experiments (bake-offs, #226)
+    # ------------------------------------------------------------------
+
+    def create_experiment(
+        self,
+        name: str,
+        variant_a: dict[str, Any],
+        variant_b: dict[str, Any],
+        a_model_id: int,
+        b_model_id: int,
+        tier: str,
+        fmt: str,
+        n_battles: int,
+    ) -> int:
+        """Insert an experiment row and return its id."""
+        cur = self._conn.execute(
+            """INSERT INTO experiments
+               (name, variant_a, variant_b, a_model_id, b_model_id, tier, format, n_battles, status)
+               VALUES (?,?,?,?,?,?,?,?,'pending')""",
+            (name, json.dumps(variant_a), json.dumps(variant_b),
+             a_model_id, b_model_id, tier, fmt, n_battles),
+        )
+        self._conn.commit()
+        row_id = cur.lastrowid
+        assert row_id is not None
+        return row_id
+
+    def get_experiment(self, experiment_id: int) -> dict[str, Any] | None:
+        """Return an experiment row (variants parsed), or None if not found."""
+        row = self._conn.execute(
+            "SELECT * FROM experiments WHERE id=?", (experiment_id,)
+        ).fetchone()
+        if not row:
+            return None
+        d = dict(row)
+        for key in ("variant_a", "variant_b"):
+            try:
+                d[key] = json.loads(d[key])
+            except (json.JSONDecodeError, KeyError, TypeError):
+                pass
+        return d
+
+    def list_experiments(self, limit: int = 20) -> list[dict[str, Any]]:
+        """Return recent experiments, newest first, with battles_done count."""
+        rows = self._conn.execute(
+            """SELECT e.id, e.name, e.variant_a, e.variant_b, e.tier,
+                      e.n_battles, e.status, e.created_at, e.finished_at,
+                      COUNT(CASE WHEN b.status='completed' THEN 1 END) AS battles_done
+               FROM experiments e
+               LEFT JOIN battles b ON b.experiment_id = e.id
+               GROUP BY e.id
+               ORDER BY e.id DESC
+               LIMIT ?""",
+            (limit,),
+        ).fetchall()
+        result: list[dict[str, Any]] = []
+        for r in rows:
+            d = dict(r)
+            for key in ("variant_a", "variant_b"):
+                try:
+                    d[key] = json.loads(d[key])
+                except (json.JSONDecodeError, KeyError, TypeError):
+                    pass
+            result.append(d)
+        return result
+
+    def set_experiment_running(self, experiment_id: int) -> None:
+        self._conn.execute(
+            """UPDATE experiments SET status='running',
+               started_at=strftime('%Y-%m-%dT%H:%M:%SZ','now')
+               WHERE id=?""",
+            (experiment_id,),
+        )
+        self._conn.commit()
+
+    def finish_experiment(self, experiment_id: int, status: str = "completed") -> None:
+        self._conn.execute(
+            """UPDATE experiments SET status=?,
+               finished_at=strftime('%Y-%m-%dT%H:%M:%SZ','now')
+               WHERE id=?""",
+            (status, experiment_id),
+        )
+        self._conn.commit()
+
+    def cancel_experiment(self, experiment_id: int) -> bool:
+        """Mark a running/pending experiment cancelled. False if already terminal."""
+        row = self._conn.execute(
+            "SELECT status FROM experiments WHERE id=?", (experiment_id,)
+        ).fetchone()
+        if not row or row["status"] in ("completed", "cancelled", "failed"):
+            return False
+        self._conn.execute(
+            """UPDATE experiments SET status='cancelled',
+               finished_at=strftime('%Y-%m-%dT%H:%M:%SZ','now')
+               WHERE id=?""",
+            (experiment_id,),
+        )
+        self._conn.commit()
+        return True
+
+    def get_experiment_result(self, experiment_id: int) -> dict[str, int]:
+        """Raw decided-battle counts for an experiment from variant A's perspective.
+
+        Returns ``{a_wins, b_wins, ties}`` over completed battles. Attribution
+        uses the stored a/b model ids and each battle's side assignment, so it's
+        correct regardless of which variant played p1 in a given battle.
+        """
+        exp = self._conn.execute(
+            "SELECT a_model_id, b_model_id FROM experiments WHERE id=?",
+            (experiment_id,),
+        ).fetchone()
+        if not exp:
+            return {"a_wins": 0, "b_wins": 0, "ties": 0}
+        row = self._conn.execute(
+            """SELECT
+                 SUM(CASE WHEN (b.p1_model_id=:a AND b.winner=1)
+                            OR (b.p2_model_id=:a AND b.winner=2) THEN 1 ELSE 0 END) AS a_wins,
+                 SUM(CASE WHEN (b.p1_model_id=:b AND b.winner=1)
+                            OR (b.p2_model_id=:b AND b.winner=2) THEN 1 ELSE 0 END) AS b_wins,
+                 SUM(CASE WHEN b.winner IS NULL THEN 1 ELSE 0 END) AS ties
+               FROM battles b
+               WHERE b.experiment_id=:eid
+                 AND b.finished_at IS NOT NULL AND b.status='completed'""",
+            {"a": exp["a_model_id"], "b": exp["b_model_id"], "eid": experiment_id},
+        ).fetchone()
+        return {
+            "a_wins": int(row["a_wins"] or 0),
+            "b_wins": int(row["b_wins"] or 0),
+            "ties": int(row["ties"] or 0),
+        }
+
+    def get_experiment_battles(self, experiment_id: int) -> list[dict[str, Any]]:
+        """All battles for an experiment, scheduled order, with results."""
+        rows = self._conn.execute(
+            """SELECT b.id, b.battle_tag, b.status, b.winner, b.total_turns,
+                      b.started_at, b.finished_at,
+                      p1.provider||'/'||p1.model_name AS p1,
+                      p2.provider||'/'||p2.model_name AS p2,
+                      p1.prompt_version AS p1_prompt, p2.prompt_version AS p2_prompt
+               FROM battles b
+               JOIN models p1 ON p1.id = b.p1_model_id
+               JOIN models p2 ON p2.id = b.p2_model_id
+               WHERE b.experiment_id = ?
+               ORDER BY b.id""",
+            (experiment_id,),
         ).fetchall()
         return [dict(r) for r in rows]
 

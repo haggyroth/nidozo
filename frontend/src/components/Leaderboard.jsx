@@ -126,6 +126,9 @@ function MatchupMatrix({ lbTier }) {
 
 const PROVIDERS = ['random', 'anthropic', 'openai', 'lmstudio', 'human']
 const COACH_PROVIDERS = ['none', 'anthropic', 'openai', 'lmstudio']
+// Bake-off variants compare real LLMs — no random/human.
+const EXPERIMENT_PROVIDERS = ['anthropic', 'openai', 'lmstudio']
+const PROMPT_VERSIONS = ['v1', 'v2', 'v3', 'v4', 'v5', 'v6', 'v7', 'v8', 'v9']
 const TIERS = [
   { id: 'random',     label: 'Random Battle' },
   { id: 'ou',         label: 'OverUsed (OU)' },
@@ -987,6 +990,133 @@ function SeasonForm({ onSeasonStarted, lmModels }) {
 }
 
 // ---------------------------------------------------------------------------
+// Bake-off experiment form (#226)
+// ---------------------------------------------------------------------------
+
+function VariantFields({ label, variant, onChange, lmModels }) {
+  return (
+    <div className="tournament-player-row">
+      <div className="tournament-player-label">{label}</div>
+      <div className="tournament-player-inputs">
+        <select
+          className="form-select provider-select"
+          value={variant.provider}
+          onChange={e => onChange({ ...variant, provider: e.target.value, model: '' })}
+        >
+          {EXPERIMENT_PROVIDERS.map(pv => <option key={pv} value={pv}>{pv}</option>)}
+        </select>
+        <input
+          className="form-input model-input"
+          placeholder="model id"
+          value={variant.model}
+          onChange={e => onChange({ ...variant, model: e.target.value })}
+        />
+        <select
+          className="form-select"
+          value={variant.prompt_version}
+          onChange={e => onChange({ ...variant, prompt_version: e.target.value })}
+          title="Prompt version"
+        >
+          {PROMPT_VERSIONS.map(v => <option key={v} value={v}>{v}</option>)}
+        </select>
+      </div>
+      {variant.provider === 'lmstudio' && lmModels.length > 0 && (
+        <div className="model-presets" style={{ paddingLeft: '1.8rem' }}>
+          {lmModels.slice(0, 4).map(id => (
+            <button
+              key={id} type="button"
+              className={`preset-chip ${variant.model === id ? 'active' : ''}`}
+              onClick={() => onChange({ ...variant, model: id })}
+              title={id}
+            >
+              {id.split('/').pop()}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function ExperimentForm({ onExperimentStarted, lmModels }) {
+  const [name, setName] = useState('')
+  const [variantA, setVariantA] = useState({ provider: 'openai', model: '', prompt_version: 'v9' })
+  const [variantB, setVariantB] = useState({ provider: 'openai', model: '', prompt_version: 'v8' })
+  const [nBattles, setNBattles] = useState(20)
+  const [tier, setTier] = useState('random')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
+
+  async function handleSubmit(e) {
+    e.preventDefault()
+    if (!name.trim()) return
+    setLoading(true)
+    setError(null)
+    try {
+      const payload = {
+        name: name.trim(),
+        variant_a: { provider: variantA.provider, model: variantA.model || null, prompt_version: variantA.prompt_version },
+        variant_b: { provider: variantB.provider, model: variantB.model || null, prompt_version: variantB.prompt_version },
+        n_battles: Number(nBattles),
+        tier,
+      }
+      const res = await fetch('/api/experiments/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      const data = await res.json()
+      if (res.ok) onExperimentStarted?.(data)
+      else setError(data?.detail ?? 'Failed to start bake-off — check server logs')
+    } catch (err) {
+      setError(err.message ?? 'Network error')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <form className="start-form" onSubmit={handleSubmit}>
+      <div className="form-group">
+        <label className="form-label">Experiment name</label>
+        <input
+          className="form-input"
+          placeholder="e.g. gpt-4o: prompt v9 vs v8"
+          value={name}
+          onChange={e => setName(e.target.value)}
+          maxLength={100}
+          required
+        />
+      </div>
+
+      <label className="form-label">VARIANTS (vary provider, model, or prompt)</label>
+      <VariantFields label="A" variant={variantA} onChange={setVariantA} lmModels={lmModels} />
+      <VariantFields label="B" variant={variantB} onChange={setVariantB} lmModels={lmModels} />
+
+      <div className="form-group">
+        <label className="form-label">Tier</label>
+        <select className="form-select" value={tier} onChange={e => setTier(e.target.value)}>
+          {TIERS.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
+        </select>
+      </div>
+      <div className="form-group">
+        <label className="form-label">Number of battles</label>
+        <input
+          className="form-input" type="number" min="2" max="100"
+          value={nBattles}
+          onChange={e => setNBattles(e.target.value)}
+        />
+      </div>
+
+      {error && <p className="form-error">{error}</p>}
+      <button className="btn-start" type="submit" disabled={loading || !name.trim()}>
+        {loading ? '🧪 STARTING…' : '🧪 START BAKE-OFF'}
+      </button>
+    </form>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Main Leaderboard component
 // ---------------------------------------------------------------------------
 
@@ -1001,7 +1131,7 @@ const LB_TIERS = [
   { id: 'freeforall', label: 'FFA' },
 ]
 
-export default function Leaderboard({ onBattleStarted, onTournamentStarted, onSeasonStarted, onReplaySelected, onModelSelected, onTournamentSelected, onSeasonSelected }) {
+export default function Leaderboard({ onBattleStarted, onTournamentStarted, onSeasonStarted, onExperimentStarted, onReplaySelected, onModelSelected, onTournamentSelected, onSeasonSelected }) {
   const [rows, setRows]               = useState([])
   const [battles, setBattles]         = useState([])
   const [tournaments, setTournaments] = useState([])
@@ -1349,6 +1479,12 @@ export default function Leaderboard({ onBattleStarted, onTournamentStarted, onSe
           >
             🏆 SEASON
           </button>
+          <button
+            className={`form-tab ${formTab === 'experiment' ? 'active' : ''}`}
+            onClick={() => setFormTab('experiment')}
+          >
+            🧪 BAKE-OFF
+          </button>
         </div>
 
         {formTab === 'battle' && (
@@ -1368,6 +1504,12 @@ export default function Leaderboard({ onBattleStarted, onTournamentStarted, onSe
         {formTab === 'season' && (
           <SeasonForm
             onSeasonStarted={onSeasonStarted}
+            lmModels={lmModels}
+          />
+        )}
+        {formTab === 'experiment' && (
+          <ExperimentForm
+            onExperimentStarted={onExperimentStarted}
             lmModels={lmModels}
           />
         )}

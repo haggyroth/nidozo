@@ -20,12 +20,20 @@ from nidozo.api.models import (
     HumanActionRequest,
     StartBattleRequest,
     StartBattleResponse,
+    StartExperimentRequest,
+    StartExperimentResponse,
     StartSeasonRequest,
     StartSeasonResponse,
     StartTournamentRequest,
     StartTournamentResponse,
 )
-from nidozo.api.orchestration import run_battles, run_bracket_tournament, run_season, run_tournament
+from nidozo.api.orchestration import (
+    run_battles,
+    run_bracket_tournament,
+    run_experiment,
+    run_season,
+    run_tournament,
+)
 from nidozo.db.store import BattleStore
 
 logger = logging.getLogger(__name__)
@@ -670,5 +678,106 @@ def create_router(
             "battles_completed": None,
         })
         return {"ok": True, "season_id": season_id}
+
+    # -------------------------------------------------------------------
+    # Experiments (bake-offs, #226)
+    # -------------------------------------------------------------------
+
+    @router.post("/api/experiments/start", response_model=StartExperimentResponse)
+    async def start_experiment(
+        req: StartExperimentRequest,
+        background_tasks: BackgroundTasks,
+    ) -> StartExperimentResponse:
+        from nidozo.battle.tiers import resolve_format
+
+        va = {
+            "provider": req.variant_a.provider,
+            "model_name": _model_name(req.variant_a.provider, req.variant_a.model),
+            "prompt_version": req.variant_a.prompt_version,
+        }
+        vb = {
+            "provider": req.variant_b.provider,
+            "model_name": _model_name(req.variant_b.provider, req.variant_b.model),
+            "prompt_version": req.variant_b.prompt_version,
+        }
+        if (va["provider"], va["model_name"], va["prompt_version"]) == (
+            vb["provider"], vb["model_name"], vb["prompt_version"]
+        ):
+            raise HTTPException(
+                status_code=422,
+                detail="The two variants are identical — vary the provider, model, or prompt version.",
+            )
+
+        fmt = resolve_format(req.tier, doubles=req.doubles, team_size=req.team_size)
+        a_model_id = store.get_or_create_model(va["provider"], va["model_name"], va["prompt_version"])
+        b_model_id = store.get_or_create_model(vb["provider"], vb["model_name"], vb["prompt_version"])
+
+        experiment_id = store.create_experiment(
+            name=req.name, variant_a=va, variant_b=vb,
+            a_model_id=a_model_id, b_model_id=b_model_id,
+            tier=req.tier, fmt=fmt, n_battles=req.n_battles,
+        )
+
+        # Pre-create the battles, alternating which variant is p1 to cancel
+        # first-move advantage.
+        battle_ids: list[int] = []
+        for i in range(req.n_battles):
+            p1_id, p2_id = (a_model_id, b_model_id) if i % 2 == 0 else (b_model_id, a_model_id)
+            bid = store.create_battle(
+                f"experiment-{experiment_id}-{i}", fmt, p1_id, p2_id,
+                experiment_id=experiment_id, team_size=req.team_size,
+            )
+            battle_ids.append(bid)
+
+        background_tasks.add_task(
+            run_experiment, req, experiment_id, battle_ids, va, vb,
+            a_model_id, b_model_id, store, bus, active_tasks,
+        )
+        return StartExperimentResponse(
+            experiment_id=experiment_id,
+            battle_ids=battle_ids,
+            n_battles=req.n_battles,
+            message=(
+                f"Bake-off '{req.name}' started: {req.n_battles} battles, "
+                f"{va['model_name']}·{va['prompt_version']} vs "
+                f"{vb['model_name']}·{vb['prompt_version']}."
+            ),
+        )
+
+    @router.get("/api/experiments")
+    def list_experiments(limit: int = 20) -> list[dict[str, Any]]:
+        return store.list_experiments(limit=limit)
+
+    @router.get("/api/experiments/{experiment_id}")
+    def get_experiment(experiment_id: int) -> dict[str, Any]:
+        from nidozo.analysis.significance import bakeoff_result
+
+        exp = store.get_experiment(experiment_id)
+        if exp is None:
+            raise HTTPException(status_code=404, detail="Experiment not found")
+        exp["result"] = bakeoff_result(**store.get_experiment_result(experiment_id))
+        return exp
+
+    @router.get("/api/experiments/{experiment_id}/battles")
+    def get_experiment_battles(experiment_id: int) -> list[dict[str, Any]]:
+        if store.get_experiment(experiment_id) is None:
+            raise HTTPException(status_code=404, detail="Experiment not found")
+        return store.get_experiment_battles(experiment_id)
+
+    @router.post("/api/experiments/{experiment_id}/cancel")
+    async def cancel_experiment(experiment_id: int) -> dict[str, Any]:
+        if store.get_experiment(experiment_id) is None:
+            raise HTTPException(status_code=404, detail="Experiment not found")
+        cancelled = store.cancel_experiment(experiment_id)
+        if not cancelled:
+            raise HTTPException(
+                status_code=409, detail="Experiment is already finished or cannot be cancelled"
+            )
+        await bus.publish({
+            "type": "experiment_cancelled",
+            "experiment_id": experiment_id,
+            "battles_completed": None,
+        })
+        return {"ok": True, "experiment_id": experiment_id}
 
     return router

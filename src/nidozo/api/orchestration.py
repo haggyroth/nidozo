@@ -1342,3 +1342,138 @@ async def run_season(
         "season_name": req.name,
         "standings": final_standings,
     })
+
+
+async def run_experiment(
+    req: Any,
+    experiment_id: int,
+    battle_ids: list[int],
+    variant_a: dict[str, Any],
+    variant_b: dict[str, Any],
+    a_model_id: int,
+    b_model_id: int,
+    store: Any,
+    bus: Any,
+    active_tasks: dict[int, asyncio.Task[None]],
+) -> None:
+    """Run a bake-off: a fixed N-battle head-to-head between two variants (#226).
+
+    Sides alternate across the pre-created battles (handled at creation) to
+    cancel first-move advantage. Each player uses its *own* variant's prompt
+    version — the whole point of the comparison. Lessons and post-battle
+    generation are deliberately skipped so neither variant evolves mid-run and
+    the result reflects the prompt/model alone.
+    """
+    from nidozo.analysis.significance import bakeoff_result
+    from nidozo.battle.tiers import resolve_format
+
+    doubles: bool = getattr(req, "doubles", False)
+    team_size: int = getattr(req, "team_size", 6)
+    fmt = resolve_format(req.tier, doubles=doubles, team_size=team_size)
+    cfg = _showdown_cfg()
+    by_id = {a_model_id: variant_a, b_model_id: variant_b}
+
+    store.set_experiment_running(experiment_id)
+    await bus.publish({
+        "type": "experiment_start",
+        "experiment_id": experiment_id,
+        "name": req.name,
+        "variant_a": variant_a,
+        "variant_b": variant_b,
+        "total_battles": len(battle_ids),
+        "tier": req.tier,
+    })
+
+    def _team_for(tier: str) -> str | None:
+        # Random tier → Showdown auto-generates; non-random → a fresh random team.
+        return None if tier == "random" else _random_preset_team(tier, team_size)
+
+    for battle_num, battle_id in enumerate(battle_ids, start=1):
+        e_row = store.get_experiment(experiment_id)
+        if e_row and e_row["status"] != "running":
+            await bus.publish({
+                "type": "experiment_cancelled",
+                "experiment_id": experiment_id,
+                "battles_completed": battle_num - 1,
+            })
+            return
+
+        battle_row = store.get_battle(battle_id)
+        if not battle_row or battle_row["status"] == "cancelled":
+            continue
+
+        task = asyncio.current_task()
+        if task:
+            active_tasks[battle_id] = task
+
+        model_ids = store.get_player_model_ids(battle_id)
+        if not model_ids:
+            continue
+        p1_mid, p2_mid = model_ids
+        v1 = by_id.get(p1_mid, variant_a)
+        v2 = by_id.get(p2_mid, variant_b)
+        p1_label = f"{v1['provider']}/{v1['model_name']}·{v1['prompt_version']}"
+        p2_label = f"{v2['provider']}/{v2['model_name']}·{v2['prompt_version']}"
+
+        await bus.publish({
+            "type": "experiment_progress",
+            "experiment_id": experiment_id,
+            "battle_num": battle_num,
+            "total_battles": len(battle_ids),
+            "battle_id": battle_id,
+            "p1": p1_label,
+            "p2": p2_label,
+        })
+
+        try:
+            p1 = _build_streaming_player(
+                v1["provider"], v1["model_name"], "p1", v1["prompt_version"],
+                store, battle_id, bus, cfg, fmt, team=_team_for(req.tier),
+            )
+            p2 = _build_streaming_player(
+                v2["provider"], v2["model_name"], "p2", v2["prompt_version"],
+                store, battle_id, bus, cfg, fmt, team=_team_for(req.tier),
+            )
+
+            await _play_battle(
+                battle_id=battle_id, p1=p1, p2=p2, store=store, bus=bus,
+                p1_label=p1_label, p2_label=p2_label,
+                start_extra={"experiment_id": experiment_id, "format": fmt, "tier": req.tier},
+                end_extra={"experiment_id": experiment_id},
+            )
+
+            counts = store.get_experiment_result(experiment_id)
+            await bus.publish({
+                "type": "experiment_progress",
+                "experiment_id": experiment_id,
+                "battle_num": battle_num,
+                "total_battles": len(battle_ids),
+                "result": bakeoff_result(**counts),
+            })
+        except asyncio.CancelledError:
+            logger.info("Experiment %d cancelled at battle %d", experiment_id, battle_id)
+            store.cancel_battle(battle_id)
+            store.finish_experiment(experiment_id, status="cancelled")
+            await bus.publish({
+                "type": "experiment_cancelled",
+                "experiment_id": experiment_id,
+                "battles_completed": battle_num - 1,
+            })
+            raise
+        except Exception as exc:
+            logger.error("Experiment %d battle %d failed: %s", experiment_id, battle_id, exc)
+            store.set_battle_status(battle_id, "failed")
+            await bus.publish({"type": "error", "battle_id": battle_id, "message": str(exc)})
+        finally:
+            active_tasks.pop(battle_id, None)
+
+    final = store.get_experiment(experiment_id)
+    if final and final["status"] != "running":
+        return
+    store.finish_experiment(experiment_id, status="completed")
+    await bus.publish({
+        "type": "experiment_end",
+        "experiment_id": experiment_id,
+        "name": req.name,
+        "result": bakeoff_result(**store.get_experiment_result(experiment_id)),
+    })

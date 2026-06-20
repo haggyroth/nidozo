@@ -5,7 +5,7 @@ import sqlite3
 
 logger = logging.getLogger(__name__)
 
-SCHEMA_VERSION = 17
+SCHEMA_VERSION = 18
 
 # Table definitions only — safe to run against any DB version via IF NOT EXISTS.
 # Indexes are kept separate because they may reference columns (e.g. tournament_id)
@@ -63,6 +63,7 @@ CREATE TABLE IF NOT EXISTS battles (
     p2_team_id      INTEGER REFERENCES teams(id),         -- NULL for random battles
     tier            TEXT,                                  -- NULL for random battles
     season_id       INTEGER REFERENCES seasons(id),       -- NULL for non-season battles
+    experiment_id   INTEGER REFERENCES experiments(id),   -- NULL for non-experiment battles (#226)
     winner          INTEGER,           -- 1=p1, 2=p2, NULL=tie
     total_turns     INTEGER,
     status          TEXT    NOT NULL DEFAULT 'pending',   -- pending|running|completed|cancelled|failed
@@ -138,6 +139,25 @@ CREATE TABLE IF NOT EXISTS seasons (
     finished_at     TEXT
 );
 
+-- Bake-off experiments — a fixed N-battle head-to-head between two variants
+-- of the same base model (differing in prompt version, provider, or model) to
+-- measure which plays better, with statistical significance (#226).
+CREATE TABLE IF NOT EXISTS experiments (
+    id              INTEGER PRIMARY KEY,
+    name            TEXT    NOT NULL,
+    variant_a       TEXT    NOT NULL,   -- JSON {provider, model_name, prompt_version}
+    variant_b       TEXT    NOT NULL,   -- JSON {provider, model_name, prompt_version}
+    a_model_id      INTEGER NOT NULL REFERENCES models(id),
+    b_model_id      INTEGER NOT NULL REFERENCES models(id),
+    tier            TEXT    NOT NULL DEFAULT 'random',
+    format          TEXT    NOT NULL DEFAULT 'gen9randombattle',
+    n_battles       INTEGER NOT NULL DEFAULT 0,
+    status          TEXT    NOT NULL DEFAULT 'pending',  -- pending|running|completed|cancelled|failed
+    created_at      TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+    started_at      TEXT,
+    finished_at     TEXT
+);
+
 -- Per-model achievement badges earned after each battle
 CREATE TABLE IF NOT EXISTS badges (
     id         INTEGER PRIMARY KEY,
@@ -172,6 +192,7 @@ CREATE INDEX IF NOT EXISTS idx_battles_p2         ON battles(p2_model_id);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_elohist_battle ON elo_history(battle_id, model_id);
 CREATE INDEX IF NOT EXISTS idx_lessons_model      ON lessons(model_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_battles_season     ON battles(season_id);
+CREATE INDEX IF NOT EXISTS idx_battles_experiment ON battles(experiment_id);
 CREATE INDEX IF NOT EXISTS idx_badges_model       ON badges(model_id, earned_at);
 CREATE INDEX IF NOT EXISTS idx_teams_model        ON teams(model_id, created_at);
 -- One row per distinct model configuration. The UNIQUE index also makes
@@ -476,4 +497,33 @@ def migrate(conn: sqlite3.Connection) -> None:
             except sqlite3.OperationalError:
                 pass  # column already exists
         conn.execute("UPDATE schema_version SET version=17")
+        conn.commit()
+
+    if version < 18:
+        # #226: bake-off experiments table + battles.experiment_id link.
+        conn.executescript("""
+            CREATE TABLE IF NOT EXISTS experiments (
+                id              INTEGER PRIMARY KEY,
+                name            TEXT    NOT NULL,
+                variant_a       TEXT    NOT NULL,
+                variant_b       TEXT    NOT NULL,
+                a_model_id      INTEGER NOT NULL REFERENCES models(id),
+                b_model_id      INTEGER NOT NULL REFERENCES models(id),
+                tier            TEXT    NOT NULL DEFAULT 'random',
+                format          TEXT    NOT NULL DEFAULT 'gen9randombattle',
+                n_battles       INTEGER NOT NULL DEFAULT 0,
+                status          TEXT    NOT NULL DEFAULT 'pending',
+                created_at      TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+                started_at      TEXT,
+                finished_at     TEXT
+            );
+        """)
+        try:
+            conn.execute("ALTER TABLE battles ADD COLUMN experiment_id INTEGER REFERENCES experiments(id)")
+        except sqlite3.OperationalError:
+            pass  # column already exists
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_battles_experiment ON battles(experiment_id)"
+        )
+        conn.execute("UPDATE schema_version SET version=18")
         conn.commit()

@@ -10,6 +10,7 @@ import ModelStats from './components/ModelStats'
 import GlobalStats from './components/GlobalStats'
 import TournamentView from './components/TournamentView'
 import SeasonView from './components/SeasonView'
+import ExperimentView from './components/ExperimentView'
 import DraftPhase from './components/DraftPhase'
 import ShowdownBattleScene from './components/ShowdownBattleScene'
 import { useBattleStream } from './hooks/useBattleStream'
@@ -21,6 +22,7 @@ function App() {
   const [statsModelId, setStatsModelId]       = useState(null)
   const [tournamentId, setTournamentId]       = useState(null)
   const [seasonId, setSeasonId]               = useState(null)
+  const [experimentId, setExperimentId]       = useState(null)
   // Track where replay was launched from so Close returns there
   const [replayOrigin, setReplayOrigin]       = useState('home')
   const {
@@ -82,6 +84,22 @@ function App() {
     setView('home')
   }
 
+  function handleExperimentStarted(data) {
+    reset()
+    setDismissed(false)
+    if (data?.experiment_id) {
+      setExperimentId(data.experiment_id)
+      setView('experiment')
+    } else {
+      setView('battle')
+    }
+  }
+
+  function handleExperimentClose() {
+    setExperimentId(null)
+    setView('home')
+  }
+
   function handleWatchLive() {
     setView('battle')
   }
@@ -101,6 +119,8 @@ function App() {
       setView('tournament')
     } else if (replayOrigin === 'season' && seasonId != null) {
       setView('season')
+    } else if (replayOrigin === 'experiment' && experimentId != null) {
+      setView('experiment')
     } else {
       setView('home')
     }
@@ -149,8 +169,8 @@ function App() {
         </div>
         <nav className="app-nav">
           <button
-            className={`nav-btn ${view === 'home' || view === 'stats' || view === 'tournament' || view === 'season' ? 'active' : ''}`}
-            onClick={() => { setStatsModelId(null); setTournamentId(null); setSeasonId(null); setView('home') }}
+            className={`nav-btn ${view === 'home' || view === 'stats' || view === 'tournament' || view === 'season' || view === 'experiment' ? 'active' : ''}`}
+            onClick={() => { setStatsModelId(null); setTournamentId(null); setSeasonId(null); setExperimentId(null); setView('home') }}
           >HOME</button>
           <button
             className={`nav-btn ${view === 'globalstats' ? 'active' : ''}`}
@@ -188,6 +208,7 @@ function App() {
             onBattleStarted={handleBattleStarted}
             onTournamentStarted={handleTournamentStarted}
             onSeasonStarted={handleSeasonStarted}
+            onExperimentStarted={handleExperimentStarted}
             onReplaySelected={handleReplaySelected}
             onModelSelected={handleModelSelected}
             onTournamentSelected={handleTournamentSelected}
@@ -275,6 +296,14 @@ function App() {
             seasonId={seasonId}
             season={season?.id === seasonId ? season : null}
             onClose={handleSeasonClose}
+            onWatchLive={handleWatchLive}
+            onReplaySelected={handleReplaySelected}
+          />
+        )}
+        {view === 'experiment' && experimentId != null && (
+          <ExperimentView
+            experimentId={experimentId}
+            onClose={handleExperimentClose}
             onWatchLive={handleWatchLive}
             onReplaySelected={handleReplaySelected}
           />
