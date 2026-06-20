@@ -197,6 +197,55 @@ function TopMoves({ top_moves }) {
 }
 
 // ---------------------------------------------------------------------------
+// Token usage & estimated cost (#225)
+// ---------------------------------------------------------------------------
+
+function _fmtInt(n) {
+  return (n ?? 0).toLocaleString()
+}
+
+function _fmtUsd(n) {
+  const v = n ?? 0
+  if (v === 0) return '$0'
+  if (v < 0.01) return `$${v.toFixed(4)}`
+  return `$${v.toFixed(2)}`
+}
+
+function CostStats({ cost }) {
+  if (!cost?.by_model?.length) {
+    return <EmptyState compact icon="💸" title="No token usage yet" hint="Run cloud-model battles to track tokens and cost." />
+  }
+  return (
+    <table className="gs-cost-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+      <thead>
+        <tr style={{ textAlign: 'left', opacity: 0.7 }}>
+          <th>Model</th>
+          <th style={{ textAlign: 'right' }}>Prompt</th>
+          <th style={{ textAlign: 'right' }}>Completion</th>
+          <th style={{ textAlign: 'right' }}>Est. cost</th>
+        </tr>
+      </thead>
+      <tbody>
+        {cost.by_model.map((m, i) => (
+          <tr key={`${m.provider}/${m.model_name}-${i}`} style={{ borderTop: '1px solid var(--border, #1e3a5f)' }}>
+            <td>{m.provider}/{m.model_name}</td>
+            <td style={{ textAlign: 'right' }}>{_fmtInt(m.prompt_tokens)}</td>
+            <td style={{ textAlign: 'right' }}>{_fmtInt(m.completion_tokens)}</td>
+            <td style={{ textAlign: 'right' }}>{_fmtUsd(m.est_cost_usd)}</td>
+          </tr>
+        ))}
+        <tr style={{ borderTop: '2px solid var(--border-bright, #2a5a8f)', fontWeight: 'bold' }}>
+          <td>Total</td>
+          <td style={{ textAlign: 'right' }}>{_fmtInt(cost.total?.prompt_tokens)}</td>
+          <td style={{ textAlign: 'right' }}>{_fmtInt(cost.total?.completion_tokens)}</td>
+          <td style={{ textAlign: 'right' }}>{_fmtUsd(cost.total?.est_cost_usd)}</td>
+        </tr>
+      </tbody>
+    </table>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Personality win-rate breakdown
 // ---------------------------------------------------------------------------
 
@@ -302,6 +351,7 @@ export default function GlobalStats({ onClose, onReplaySelected }) {
     { loading: true, error: null, data: null },
   )
   const [personalityStats, setPersonalityStats] = useState(null)
+  const [costStats, setCostStats] = useState(null)
 
   useEffect(() => {
     let cancelled = false
@@ -309,11 +359,13 @@ export default function GlobalStats({ onClose, onReplaySelected }) {
     Promise.all([
       fetch('/api/stats/global').then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json() }),
       fetch('/api/stats/personalities').then(r => r.ok ? r.json() : []).catch(() => []),
+      fetch('/api/stats/cost').then(r => r.ok ? r.json() : null).catch(() => null),
     ])
-      .then(([global, personalities]) => {
+      .then(([global, personalities, cost]) => {
         if (!cancelled) {
           dispatch({ type: 'success', data: global })
           setPersonalityStats(personalities)
+          setCostStats(cost)
         }
       })
       .catch(e => { if (!cancelled) dispatch({ type: 'error', error: e.message }) })
@@ -397,6 +449,15 @@ export default function GlobalStats({ onClose, onReplaySelected }) {
           <span className="panel-subtitle">battles where that personality was active (as either player)</span>
         </div>
         <PersonalityStats personality_stats={personalityStats} />
+      </div>
+
+      {/* Token usage & estimated cost (#225) */}
+      <div className="panel stats-panel">
+        <div className="panel-title">
+          TOKEN USAGE & COST
+          <span className="panel-subtitle">estimated from data/model_prices.json · local models counted as free</span>
+        </div>
+        <CostStats cost={costStats} />
       </div>
     </div>
   )

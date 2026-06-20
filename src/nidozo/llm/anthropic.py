@@ -4,7 +4,7 @@ from typing import Any
 
 import anthropic
 
-from nidozo.llm.backend import Message
+from nidozo.llm.backend import Message, Usage
 
 
 class AnthropicBackend:
@@ -17,6 +17,8 @@ class AnthropicBackend:
         self._client = anthropic.AsyncAnthropic(api_key=api_key)
         self._model = model
         self._max_tokens = max_tokens
+        # Token usage from the most recent complete() call (#225).
+        self.last_usage: Usage | None = None
 
     async def complete(self, messages: list[Message]) -> str:
         system = next((m["content"] for m in messages if m["role"] == "system"), None)
@@ -31,6 +33,17 @@ class AnthropicBackend:
             kwargs["system"] = system
 
         response = await self._client.messages.create(**kwargs)
+
+        usage = getattr(response, "usage", None)
+        if usage:
+            # Anthropic reports input_tokens / output_tokens.
+            self.last_usage = Usage(
+                prompt_tokens=int(getattr(usage, "input_tokens", 0) or 0),
+                completion_tokens=int(getattr(usage, "output_tokens", 0) or 0),
+            )
+        else:
+            self.last_usage = None
+
         # Iterate all content blocks and join text parts.  Assuming content[0]
         # crashes on multi-block responses and thinking-model output where the
         # first block is a "thinking" block with no .text attribute.

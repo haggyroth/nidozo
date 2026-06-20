@@ -6,7 +6,7 @@ from typing import Any
 
 import openai
 
-from nidozo.llm.backend import Message
+from nidozo.llm.backend import Message, Usage
 
 logger = logging.getLogger(__name__)
 
@@ -72,6 +72,9 @@ class OpenAIBackend:
         self._model = model
         self._max_tokens = max_tokens
         self._json_mode = json_mode
+        # Token usage from the most recent complete() call (#225). None until the
+        # first call, or when the provider reports no usage (some local models).
+        self.last_usage: Usage | None = None
 
     async def complete(self, messages: list[Message]) -> str:
         kwargs: dict[str, Any] = {
@@ -111,6 +114,10 @@ class OpenAIBackend:
 
         usage = getattr(response, "usage", None)
         if usage:
+            self.last_usage = Usage(
+                prompt_tokens=int(getattr(usage, "prompt_tokens", 0) or 0),
+                completion_tokens=int(getattr(usage, "completion_tokens", 0) or 0),
+            )
             logger.info(
                 "%s — prompt=%d completion=%d tokens, %.1fs",
                 self._model,
@@ -125,6 +132,7 @@ class OpenAIBackend:
                 },
             )
         else:
+            self.last_usage = None
             logger.info("%s — %.1fs (no usage data)", self._model, elapsed)
 
         if not content:

@@ -91,6 +91,36 @@ def create_router(
         """Win/loss/tie counts per personality slug across all completed battles."""
         return store.get_personality_stats()
 
+    @router.get("/api/stats/cost")
+    def get_cost_stats() -> dict[str, Any]:
+        """Token usage + estimated USD cost per model and overall (#225).
+
+        Costs use the editable price table in ``data/model_prices.json``;
+        models not listed (local LM Studio, ``random``) are counted as free.
+        """
+        from nidozo.llm.pricing import estimate_cost
+
+        rows = store.get_token_usage_by_model()
+        by_model: list[dict[str, Any]] = []
+        total_prompt = total_completion = 0
+        total_cost = 0.0
+        for r in rows:
+            pt = int(r["prompt_tokens"])
+            ct = int(r["completion_tokens"])
+            cost = estimate_cost(r["model_name"], pt, ct)
+            total_prompt += pt
+            total_completion += ct
+            total_cost += cost
+            by_model.append({**r, "est_cost_usd": round(cost, 4)})
+        return {
+            "by_model": by_model,
+            "total": {
+                "prompt_tokens": total_prompt,
+                "completion_tokens": total_completion,
+                "est_cost_usd": round(total_cost, 4),
+            },
+        }
+
     @router.get("/api/personalities")
     def list_personalities() -> list[dict[str, Any]]:
         """Return all available play-style personas for the battle form."""

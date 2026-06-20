@@ -8,7 +8,7 @@ from typing import Any
 
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
 
-from nidozo.llm.backend import Message, ModelBackend
+from nidozo.llm.backend import Message, ModelBackend, Usage
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +40,11 @@ class CoachAgent:
             lstrip_blocks=True,
         )
         self._turn_template = self._jinja_env.get_template("turn.txt.jinja")
+
+    @property
+    def last_usage(self) -> Usage | None:
+        """Token usage from the coach backend's most recent call (#225)."""
+        return getattr(self._backend, "last_usage", None)
 
     async def analyze(self, battle_state: dict[str, Any]) -> str | None:
         """Return free-form strategic advice for the current turn.

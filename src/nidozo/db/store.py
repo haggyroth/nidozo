@@ -516,17 +516,21 @@ class BattleStore:
         state_json: str | None = None,
         coach_advice: str | None = None,
         fallback_reason: str | None = None,
+        prompt_tokens: int | None = None,
+        completion_tokens: int | None = None,
     ) -> None:
         self._conn.execute(
             """INSERT INTO turns
                (battle_id, turn_number, player_role, prompt_version,
                 action_chosen, parse_success, fallback_reason,
-                llm_response, state_json, coach_advice)
-               VALUES (?,?,?,?,?,?,?,?,?,?)""",
+                llm_response, state_json, coach_advice,
+                prompt_tokens, completion_tokens)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
             (
                 battle_id, turn_number, player_role, prompt_version,
                 action_chosen, int(parse_success), fallback_reason,
                 llm_response, state_json, coach_advice,
+                prompt_tokens, completion_tokens,
             ),
         )
         self._conn.commit()
@@ -1174,6 +1178,37 @@ class BattleStore:
             }
             for r in rows
         ]
+
+    # ------------------------------------------------------------------
+    # Token usage / cost (#225)
+    # ------------------------------------------------------------------
+
+    def get_token_usage_by_model(self) -> list[dict[str, Any]]:
+        """Sum recorded token usage per (provider, model_name) across all turns.
+
+        A turn's tokens are attributed to whichever model played that role in the
+        battle (``player_role`` p1/p2 → the battle's p1/p2 model). Turns with NULL
+        tokens (local models, or pre-#225 rows) contribute 0. Rows are grouped at
+        the same granularity as the grouped leaderboard.
+        """
+        rows = self._conn.execute(
+            """
+            SELECT m.provider, m.model_name,
+                   COALESCE(SUM(t.prompt_tokens), 0)     AS prompt_tokens,
+                   COALESCE(SUM(t.completion_tokens), 0) AS completion_tokens,
+                   COUNT(t.id)                           AS turns
+            FROM turns t
+            JOIN battles b ON b.id = t.battle_id
+            JOIN models m ON m.id = CASE
+                WHEN t.player_role = 'p1' THEN b.p1_model_id
+                ELSE b.p2_model_id END
+            WHERE t.prompt_tokens IS NOT NULL OR t.completion_tokens IS NOT NULL
+            GROUP BY m.provider, m.model_name
+            ORDER BY (COALESCE(SUM(t.prompt_tokens), 0)
+                      + COALESCE(SUM(t.completion_tokens), 0)) DESC
+            """
+        ).fetchall()
+        return [dict(r) for r in rows]
 
     # ------------------------------------------------------------------
     # Teams & Draft Sessions
