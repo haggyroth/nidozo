@@ -7,6 +7,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+- feat(experiments): bake-off harness (#226) — run a fixed N-battle head-to-head between two variants of the same base model (differing provider, model, or prompt version), with sides alternated to cancel first-move advantage. Results report win-rate **and** an exact two-sided binomial significance test so "11–9" reads as *not* significant. New `experiments` table + `battles.experiment_id` (schema v18); `run_experiment` runner reuses `_play_battle`; `POST /api/experiments/start` + list/detail/battles/cancel endpoints; a 🧪 BAKE-OFF tab and an Experiments view (win-rate bar, significance verdict, battle list). Lessons + post-battle generation are skipped during experiments so neither variant evolves mid-run
+
 ---
 
 ## [0.41.0] — 2026-06-20

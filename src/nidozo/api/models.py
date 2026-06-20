@@ -116,6 +116,35 @@ class StartSeasonResponse(BaseModel):
     message: str
 
 
+# Bake-off variants compare real LLMs — random/human have no prompt to vary.
+ExperimentProvider = Literal["anthropic", "openai", "lmstudio"]
+
+
+class ExperimentVariant(BaseModel):
+    """One side of a bake-off: a specific provider + model + prompt version."""
+    provider: ExperimentProvider
+    model: str | None = None
+    prompt_version: PromptVersion = "v9"
+
+
+class StartExperimentRequest(BaseModel):
+    """Launch a head-to-head bake-off between two variants (#226)."""
+    name: str = Field(..., min_length=1, max_length=100)
+    variant_a: ExperimentVariant
+    variant_b: ExperimentVariant
+    n_battles: int = Field(20, ge=2, le=100)
+    tier: Tier = "random"
+    doubles: bool = False
+    team_size: Literal[3, 4, 6] = 6
+
+
+class StartExperimentResponse(BaseModel):
+    experiment_id: int
+    battle_ids: list[int]
+    n_battles: int
+    message: str
+
+
 class HumanActionRequest(BaseModel):
     """Submitted by the browser when the human player chooses a move or switch."""
     player_role: Literal["p1", "p2"]
