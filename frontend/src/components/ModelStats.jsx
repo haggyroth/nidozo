@@ -551,6 +551,45 @@ function exportStatsJSON(modelName, stats) {
 }
 
 // ---------------------------------------------------------------------------
+// Lesson efficacy (#227)
+// ---------------------------------------------------------------------------
+
+function LessonEfficacy({ efficacy }) {
+  const cohorts = [
+    { key: 'with_lessons', label: 'Lessons ON' },
+    { key: 'without_lessons', label: 'Lessons OFF' },
+  ]
+  const anyGames = cohorts.some(c => (efficacy[c.key]?.games ?? 0) > 0)
+  if (!anyGames) {
+    return <p className="panel-subtitle">No completed battles yet — run battles with lessons on and off to compare.</p>
+  }
+  const fmtRate = r => (r == null ? '—' : `${(r * 100).toFixed(0)}%`)
+  return (
+    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+      <thead>
+        <tr style={{ textAlign: 'left', opacity: 0.7 }}>
+          <th>Cohort</th>
+          <th style={{ textAlign: 'right' }}>W–L–T</th>
+          <th style={{ textAlign: 'right' }}>Win rate</th>
+        </tr>
+      </thead>
+      <tbody>
+        {cohorts.map(c => {
+          const d = efficacy[c.key] ?? {}
+          return (
+            <tr key={c.key} style={{ borderTop: '1px solid var(--border, #1e3a5f)' }}>
+              <td>{c.label}</td>
+              <td style={{ textAlign: 'right' }}>{d.wins ?? 0}–{d.losses ?? 0}–{d.ties ?? 0}</td>
+              <td style={{ textAlign: 'right', fontWeight: 'bold' }}>{fmtRate(d.win_rate)}</td>
+            </tr>
+          )
+        })}
+      </tbody>
+    </table>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Main ModelStats component
 // ---------------------------------------------------------------------------
 
@@ -600,7 +639,7 @@ export default function ModelStats({ modelId, onClose, onReplaySelected }) {
     )
   }
 
-  const { model, elo_history, battle_history, turn_stats, lessons, usage } = stats
+  const { model, elo_history, battle_history, turn_stats, lessons, usage, lesson_efficacy } = stats
   const winRate = model.games > 0
     ? ((model.wins / model.games) * 100).toFixed(1)
     : null
@@ -679,6 +718,17 @@ export default function ModelStats({ modelId, onClose, onReplaySelected }) {
           />
         </div>
       </div>
+
+      {/* Lesson efficacy — lessons-on vs lessons-off win rate (#227) */}
+      {lesson_efficacy && (
+        <div className="panel stats-panel">
+          <div className="panel-title">
+            LESSON EFFICACY
+            <span className="panel-subtitle">win rate with cross-battle lessons on vs off</span>
+          </div>
+          <LessonEfficacy efficacy={lesson_efficacy} />
+        </div>
+      )}
 
       {/* Usage stats — only shown when there's turn data */}
       {usage && (usage.top_pokemon?.length > 0 || usage.top_moves?.length > 0) && (

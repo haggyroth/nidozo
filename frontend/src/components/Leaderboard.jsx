@@ -390,6 +390,7 @@ function BattleForm({ onBattleStarted, lmModels, lmLoading }) {
     draft: false,
     doubles: false,
     team_size: 6,
+    lessons_enabled: true,
   })
 
   useEffect(() => {
@@ -522,6 +523,15 @@ function BattleForm({ onBattleStarted, lmModels, lmLoading }) {
           />
         </div>
       )}
+      <div className="form-group form-group--inline">
+        <label className="form-label">Use cross-battle lessons</label>
+        <input
+          type="checkbox"
+          className="form-checkbox"
+          checked={form.lessons_enabled}
+          onChange={e => setForm(f => ({ ...f, lessons_enabled: e.target.checked }))}
+        />
+      </div>
       <div className="form-group form-group--inline">
         <label className="form-label">Doubles (2v2 per turn)</label>
         <input

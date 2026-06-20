@@ -330,15 +330,16 @@ class BattleStore:
         p2_personality: str | None = None,
         team_size: int = 6,
         experiment_id: int | None = None,
+        lessons_enabled: bool = True,
     ) -> int:
         """Insert a battle row and return its id."""
         cur = self._conn.execute(
             """INSERT INTO battles
                (battle_tag, format, p1_model_id, p2_model_id, tournament_id, season_id,
-                experiment_id, p1_personality, p2_personality, team_size, status)
-               VALUES (?,?,?,?,?,?,?,?,?,?,'pending')""",
+                experiment_id, p1_personality, p2_personality, team_size, lessons_enabled, status)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,'pending')""",
             (battle_tag, format, p1_model_id, p2_model_id, tournament_id, season_id,
-             experiment_id, p1_personality, p2_personality, team_size),
+             experiment_id, p1_personality, p2_personality, team_size, int(lessons_enabled)),
         )
         self._conn.commit()
         row_id = cur.lastrowid
@@ -976,7 +977,46 @@ class BattleStore:
             },
             "lessons": [dict(r) for r in lesson_rows],
             "usage": usage,
+            "lesson_efficacy": self.get_lesson_efficacy(model_id),
         }
+
+    def get_lesson_efficacy(self, model_id: int) -> dict[str, dict[str, Any]]:
+        """Compare this model's record with cross-battle lessons on vs off (#227).
+
+        Splits completed battles by the ``lessons_enabled`` flag and returns
+        win/loss/tie/games + win-rate for each cohort. Answers whether lessons
+        measurably help — a controlled comparison when both cohorts have games.
+        """
+        rows = self._conn.execute(
+            """SELECT b.lessons_enabled AS on_flag,
+                   SUM(CASE WHEN (b.p1_model_id=:mid AND b.winner=1)
+                              OR (b.p2_model_id=:mid AND b.winner=2) THEN 1 ELSE 0 END) AS wins,
+                   SUM(CASE WHEN (b.p1_model_id=:mid AND b.winner=2)
+                              OR (b.p2_model_id=:mid AND b.winner=1) THEN 1 ELSE 0 END) AS losses,
+                   SUM(CASE WHEN b.winner IS NULL THEN 1 ELSE 0 END) AS ties,
+                   COUNT(*) AS games
+               FROM battles b
+               WHERE (b.p1_model_id=:mid OR b.p2_model_id=:mid)
+                 AND b.finished_at IS NOT NULL AND b.status='completed'
+               GROUP BY b.lessons_enabled""",
+            {"mid": model_id},
+        ).fetchall()
+
+        def _blank() -> dict[str, Any]:
+            return {"wins": 0, "losses": 0, "ties": 0, "games": 0, "win_rate": None}
+
+        cohorts = {"with_lessons": _blank(), "without_lessons": _blank()}
+        for r in rows:
+            key = "with_lessons" if r["on_flag"] else "without_lessons"
+            decided = int(r["wins"]) + int(r["losses"])
+            cohorts[key] = {
+                "wins": int(r["wins"]),
+                "losses": int(r["losses"]),
+                "ties": int(r["ties"]),
+                "games": int(r["games"]),
+                "win_rate": round(int(r["wins"]) / decided, 4) if decided else None,
+            }
+        return cohorts
 
     def get_model_usage_stats(self, model_id: int) -> dict[str, Any]:
         """Mine turns.state_json and turns.llm_response for per-model usage stats.

@@ -22,7 +22,7 @@ Sibling project to [Nimzo](https://github.com/haggyroth/nimzo) (the LLM chess ar
 - **JSON structured outputs** — models respond with `{"reasoning":"…","action_type":"move","identifier":"thunderbolt"}`; grammar-sampled on OpenAI/LM Studio backends for near-certain parse reliability. The default prompt is **v9** (see [Prompt versions](#prompt-versions))
 - **Heuristic advisory** — type effectiveness, estimated damage (accuracy-adjusted), speed-tier awareness, entry-hazard chip costs, weather modifiers, switch quality scoring, low-PP warnings, battle-context block — all surfaced as advisory context (non-binding)
 - **Hidden-information enforcement** — each model sees only what a human player would legitimately know
-- **Cross-battle memory** — after each battle the LLM generates a short lesson; lessons are stored per model and injected into future system prompts so models adapt strategy over time
+- **Cross-battle memory** — after each battle the LLM generates a short lesson; lessons are stored per model and injected into future system prompts so models adapt strategy over time. A per-battle toggle plus a per-model **Lesson Efficacy** panel (win rate with lessons on vs off) let you actually measure whether the learning loop helps
 - **Personality profiles** — per-model play-style profiling derived from decision history
 - **ELO rankings** — updated after every battle, persisted in SQLite; leaderboard with tier filter tabs
 - **Token & cost analytics** — per-turn token usage (player + coach) is recorded; the Global Stats page shows per-model and total tokens with estimated USD cost from an editable price table (`data/model_prices.json`); local models count as free

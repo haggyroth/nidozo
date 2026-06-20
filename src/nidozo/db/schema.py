@@ -5,7 +5,7 @@ import sqlite3
 
 logger = logging.getLogger(__name__)
 
-SCHEMA_VERSION = 18
+SCHEMA_VERSION = 19
 
 # Table definitions only — safe to run against any DB version via IF NOT EXISTS.
 # Indexes are kept separate because they may reference columns (e.g. tournament_id)
@@ -72,7 +72,8 @@ CREATE TABLE IF NOT EXISTS battles (
     narrative       TEXT,   -- LLM-generated post-battle story (NULL until generated)
     p1_personality  TEXT,   -- play-style persona slug for p1 (NULL = no persona)
     p2_personality  TEXT,   -- play-style persona slug for p2 (NULL = no persona)
-    team_size       INTEGER NOT NULL DEFAULT 6   -- 3, 4, or 6
+    team_size       INTEGER NOT NULL DEFAULT 6,  -- 3, 4, or 6
+    lessons_enabled INTEGER NOT NULL DEFAULT 1   -- 0 = cross-battle lessons suppressed (control cohort, #227)
 );
 
 -- ELO delta per model per battle (for history / audit)
@@ -526,4 +527,16 @@ def migrate(conn: sqlite3.Connection) -> None:
             "CREATE INDEX IF NOT EXISTS idx_battles_experiment ON battles(experiment_id)"
         )
         conn.execute("UPDATE schema_version SET version=18")
+        conn.commit()
+
+    if version < 19:
+        # #227: per-battle lessons toggle so lessons-on vs lessons-off cohorts
+        # can be compared. Defaults to 1 (lessons on, the historical behaviour).
+        try:
+            conn.execute(
+                "ALTER TABLE battles ADD COLUMN lessons_enabled INTEGER NOT NULL DEFAULT 1"
+            )
+        except sqlite3.OperationalError:
+            pass  # column already exists
+        conn.execute("UPDATE schema_version SET version=19")
         conn.commit()

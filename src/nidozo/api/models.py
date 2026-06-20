@@ -35,6 +35,9 @@ class StartBattleRequest(BaseModel):
     n_battles: int = Field(1, ge=1, le=50)
     tier: Tier = "random"
     draft: bool = False    # If True and tier != "random", run LLM draft phase first
+    # Inject cross-battle lessons into the system prompt. Set False for a
+    # control cohort to measure whether lessons actually help (#227).
+    lessons_enabled: bool = True
     # Doubles (2v2 per turn): when True, uses a Showdown doubles format.
     # Random tier → gen9randomdoublesbattle; non-random → NatDex Doubles.
     # Draft and preset teams are format-agnostic and work with doubles.
@@ -89,6 +92,7 @@ class StartTournamentRequest(BaseModel):
     tournament_format: TournamentFormat = "round_robin"
     doubles: bool = False
     team_size: Literal[3, 4, 6] = 6
+    lessons_enabled: bool = True
 
 
 class StartTournamentResponse(BaseModel):
@@ -107,6 +111,7 @@ class StartSeasonRequest(BaseModel):
     draft: bool = False
     doubles: bool = False
     team_size: Literal[3, 4, 6] = 6
+    lessons_enabled: bool = True
 
 
 class StartSeasonResponse(BaseModel):
