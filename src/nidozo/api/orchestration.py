@@ -237,13 +237,14 @@ async def run_battles(
 
             model_ids = store.get_player_model_ids(battle_id)
             p1_id, p2_id = model_ids if model_ids else (None, None)
+            _lessons_on = getattr(req, "lessons_enabled", True)
             p1_lessons = (
                 [r["content"] for r in store.get_lessons(p1_id)]
-                if p1_id and req.p1_provider not in ("random", "human") else None
+                if _lessons_on and p1_id and req.p1_provider not in ("random", "human") else None
             )
             p2_lessons = (
                 [r["content"] for r in store.get_lessons(p2_id)]
-                if p2_id and req.p2_provider not in ("random", "human") else None
+                if _lessons_on and p2_id and req.p2_provider not in ("random", "human") else None
             )
 
             p1_team: str | None = None
@@ -462,13 +463,14 @@ async def run_tournament(
             model_ids = store.get_player_model_ids(battle_id)
             t_p1_id, t_p2_id = model_ids if model_ids else (None, None)
             t_p1_prov, t_p2_prov = battle_info["p1_provider"], battle_info["p2_provider"]
+            _lessons_on = getattr(req, "lessons_enabled", True)
             t_p1_lessons = (
                 [r["content"] for r in store.get_lessons(t_p1_id)]
-                if t_p1_id and t_p1_prov != "random" else None
+                if _lessons_on and t_p1_id and t_p1_prov != "random" else None
             )
             t_p2_lessons = (
                 [r["content"] for r in store.get_lessons(t_p2_id)]
-                if t_p2_id and t_p2_prov != "random" else None
+                if _lessons_on and t_p2_id and t_p2_prov != "random" else None
             )
 
             t_p1_team: str | None = None
@@ -935,13 +937,14 @@ async def run_bracket_tournament(
                 try:
                     t_p1_id = p1_db_id
                     t_p2_id = p2_db_id
+                    _lessons_on = getattr(req, "lessons_enabled", True)
                     t_p1_lessons = (
                         [r["content"] for r in store.get_lessons(t_p1_id)]
-                        if p1_prov != "random" else None
+                        if _lessons_on and p1_prov != "random" else None
                     )
                     t_p2_lessons = (
                         [r["content"] for r in store.get_lessons(t_p2_id)]
-                        if p2_prov != "random" else None
+                        if _lessons_on and p2_prov != "random" else None
                     )
 
                     b_p1_preset = preset_lookup.get((p1_prov, p1_model))
@@ -1186,13 +1189,14 @@ async def run_season(
             model_ids = store.get_player_model_ids(battle_id)
             s_p1_id, s_p2_id = model_ids if model_ids else (None, None)
             s_p1_prov, s_p2_prov = battle_info["p1_provider"], battle_info["p2_provider"]
+            _lessons_on = getattr(req, "lessons_enabled", True)
             s_p1_lessons = (
                 [r["content"] for r in store.get_lessons(s_p1_id)]
-                if s_p1_id and s_p1_prov != "random" else None
+                if _lessons_on and s_p1_id and s_p1_prov != "random" else None
             )
             s_p2_lessons = (
                 [r["content"] for r in store.get_lessons(s_p2_id)]
-                if s_p2_id and s_p2_prov != "random" else None
+                if _lessons_on and s_p2_id and s_p2_prov != "random" else None
             )
 
             s_p1_team: str | None = None

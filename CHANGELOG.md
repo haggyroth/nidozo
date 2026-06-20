@@ -7,6 +7,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+- feat(lessons): cross-battle lesson efficacy measurement (#227) — a `lessons_enabled` toggle on battle/tournament/season requests (and the battle form) suppresses lesson injection for a control cohort; persisted per battle (`battles.lessons_enabled`, schema v19). A new per-model **Lesson Efficacy** panel compares win-rate with lessons on vs off (`store.get_lesson_efficacy`), so the "models that learn" claim is finally measurable. Experiments are recorded as lessons-off
+
 ---
 
 ## [0.42.0] — 2026-06-20

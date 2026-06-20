@@ -440,6 +440,7 @@ def create_router(
                 p1_personality=req.p1_personality,
                 p2_personality=req.p2_personality,
                 team_size=req.team_size,
+                lessons_enabled=req.lessons_enabled,
             )
             battle_ids.append(bid)
 
@@ -541,6 +542,7 @@ def create_router(
                         p1_personality=a.get("personality"),
                         p2_personality=b.get("personality"),
                         team_size=req.team_size,
+                        lessons_enabled=req.lessons_enabled,
                     )
                     battle_ids.append(bid)
                     battle_num += 1
@@ -622,6 +624,7 @@ def create_router(
                         p1_personality=a.get("personality"),
                         p2_personality=b.get("personality"),
                         team_size=req.team_size,
+                        lessons_enabled=req.lessons_enabled,
                     )
                     battle_ids.append(bid)
                     battle_num += 1
@@ -726,6 +729,7 @@ def create_router(
             bid = store.create_battle(
                 f"experiment-{experiment_id}-{i}", fmt, p1_id, p2_id,
                 experiment_id=experiment_id, team_size=req.team_size,
+                lessons_enabled=False,  # experiments never inject lessons (#227)
             )
             battle_ids.append(bid)
 
