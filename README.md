@@ -25,6 +25,7 @@ Sibling project to [Nimzo](https://github.com/haggyroth/nimzo) (the LLM chess ar
 - **Cross-battle memory** — after each battle the LLM generates a short lesson; lessons are stored per model and injected into future system prompts so models adapt strategy over time
 - **Personality profiles** — per-model play-style profiling derived from decision history
 - **ELO rankings** — updated after every battle, persisted in SQLite; leaderboard with tier filter tabs
+- **Token & cost analytics** — per-turn token usage (player + coach) is recorded; the Global Stats page shows per-model and total tokens with estimated USD cost from an editable price table (`data/model_prices.json`); local models count as free
 - **Per-model stats page** — W/L/T history, ELO sparkline, opponent breakdown, decision-quality distribution, lesson log
 - **Tournaments** — round-robin plus single- and double-elimination brackets; live progress, standings/bracket overlay, battle cancel; full history page. Available from the UI or the CLI
 - **Seasons** — multi-round campaigns that aggregate standings and ELO across many battles

@@ -7,6 +7,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+- feat(cost): persist per-turn token usage + cost analytics (#225) — the OpenAI/Anthropic backends now expose `last_usage`; `LLMPlayer` records the per-turn total (player + coach) into new `turns.prompt_tokens`/`completion_tokens` columns (schema v17); `data/model_prices.json` (editable) drives USD estimates with local/random models counted free; `GET /api/stats/cost` returns per-model + total tokens and estimated cost; a "Token Usage & Cost" panel on the Global Stats page
+
 ---
 
 ## [0.40.0] — 2026-06-19

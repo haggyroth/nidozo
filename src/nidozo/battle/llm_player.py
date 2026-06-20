@@ -226,8 +226,10 @@ class LLMPlayer(Player):
                 self._player_role, battle.turn,
                 extra=_extra,
             )
+            _pt, _ct = self._gather_usage()
             self._log_turn(battle.turn, None, False, "", state_json, coach_advice,
-                           fallback_reason="empty_response")
+                           fallback_reason="empty_response",
+                           prompt_tokens=_pt, completion_tokens=_ct)
             return self.choose_random_move(battle)
 
         if logger.isEnabledFor(logging.DEBUG):
@@ -244,8 +246,10 @@ class LLMPlayer(Player):
                 self._player_role, battle.turn, response[:200],
                 extra=_extra,
             )
+            _pt, _ct = self._gather_usage()
             self._log_turn(battle.turn, None, False, response, state_json, coach_advice,
-                           fallback_reason="parse_failure")
+                           fallback_reason="parse_failure",
+                           prompt_tokens=_pt, completion_tokens=_ct)
             return self.choose_random_move(battle)
 
         action_label = getattr(order, "message", str(order))
@@ -254,7 +258,9 @@ class LLMPlayer(Player):
             self._player_role, battle.turn, action_label, _elapsed,
             extra={**_extra, "action": action_label, "elapsed_s": round(_elapsed, 2)},
         )
-        self._log_turn(battle.turn, action_label, True, response, state_json, coach_advice)
+        _pt, _ct = self._gather_usage()
+        self._log_turn(battle.turn, action_label, True, response, state_json, coach_advice,
+                       prompt_tokens=_pt, completion_tokens=_ct)
         # Store for next turn's battle history summary
         self._last_action_display = self._action_display(response)
         return order
@@ -472,6 +478,28 @@ class LLMPlayer(Player):
         except Exception:
             pass
 
+    def _gather_usage(self) -> tuple[int | None, int | None]:
+        """Sum token usage of this turn's player + coach calls (#225).
+
+        Reads ``last_usage`` from the player backend and the coach (if any).
+        Returns (None, None) when neither reports usage (e.g. local models), so
+        the turn's token columns stay NULL rather than a misleading 0.
+        Only call this right after a completion actually returned this turn —
+        on a timeout/error the backend's ``last_usage`` is stale.
+        """
+        prompt = 0
+        completion = 0
+        seen = False
+        for src in (self._backend, self._coach):
+            usage = getattr(src, "last_usage", None)
+            # isinstance guard: a real backend exposes a Usage dict; test doubles
+            # (MagicMock) auto-create truthy attributes that aren't mappings.
+            if isinstance(usage, dict):
+                prompt += int(usage.get("prompt_tokens", 0) or 0)
+                completion += int(usage.get("completion_tokens", 0) or 0)
+                seen = True
+        return (prompt, completion) if seen else (None, None)
+
     def _log_turn(
         self,
         turn_number: int,
@@ -481,6 +509,8 @@ class LLMPlayer(Player):
         state_json: str | None = None,
         coach_advice: str | None = None,
         fallback_reason: str | None = None,
+        prompt_tokens: int | None = None,
+        completion_tokens: int | None = None,
     ) -> None:
         if self._store is None or self._battle_id is None:
             return
@@ -496,6 +526,8 @@ class LLMPlayer(Player):
                 state_json=state_json,
                 coach_advice=coach_advice,
                 fallback_reason=fallback_reason,
+                prompt_tokens=prompt_tokens,
+                completion_tokens=completion_tokens,
             )
         except Exception as exc:
             logger.warning("Failed to log turn: %s", exc)

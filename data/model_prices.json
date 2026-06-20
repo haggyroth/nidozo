@@ -1,0 +1,9 @@
+{
+  "__comment": "USD per 1,000,000 tokens. Approximate published list prices — edit to match your account/contract. Models not listed (local LM Studio models, 'random') are treated as free. Keys are the model_name as stored in the models table.",
+  "gpt-4o": { "input": 2.5, "output": 10.0 },
+  "gpt-4o-mini": { "input": 0.15, "output": 0.6 },
+  "o4-mini": { "input": 1.1, "output": 4.4 },
+  "claude-opus-4-8": { "input": 15.0, "output": 75.0 },
+  "claude-sonnet-4-6": { "input": 3.0, "output": 15.0 },
+  "claude-haiku-4-5-20251001": { "input": 0.8, "output": 4.0 }
+}

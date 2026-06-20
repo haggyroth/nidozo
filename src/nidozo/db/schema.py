@@ -5,7 +5,7 @@ import sqlite3
 
 logger = logging.getLogger(__name__)
 
-SCHEMA_VERSION = 16
+SCHEMA_VERSION = 17
 
 # Table definitions only — safe to run against any DB version via IF NOT EXISTS.
 # Indexes are kept separate because they may reference columns (e.g. tournament_id)
@@ -97,7 +97,9 @@ CREATE TABLE IF NOT EXISTS turns (
     fallback_reason TEXT,                      -- why the turn fell back: 'backend_timeout' | 'backend_error' | 'empty_response' | 'parse_failure' | 'no_legal_move' | NULL
     llm_response  TEXT,                        -- full raw response (may be large)
     state_json    TEXT,                        -- serialized battle state at decision time (v2+)
-    coach_advice  TEXT                         -- free-form advice from the coach model (NULL if no coach)
+    coach_advice  TEXT,                        -- free-form advice from the coach model (NULL if no coach)
+    prompt_tokens     INTEGER,                 -- tokens spent producing this turn (player + coach); NULL = unknown/local (#225)
+    completion_tokens INTEGER                  -- completion tokens for this turn (player + coach); NULL = unknown/local (#225)
 );
 
 -- Post-battle lessons: one row per model per battle (LLM-generated reflection)
@@ -463,4 +465,15 @@ def migrate(conn: sqlite3.Connection) -> None:
                 "prompt_version): duplicate rows exist. Dedupe manually to enforce it."
             )
         conn.execute("UPDATE schema_version SET version=16")
+        conn.commit()
+
+    if version < 17:
+        # #225: per-turn token usage for cost analytics. Nullable — NULL means
+        # the turn predates this column or the provider reported no usage (local).
+        for col in ("prompt_tokens INTEGER", "completion_tokens INTEGER"):
+            try:
+                conn.execute(f"ALTER TABLE turns ADD COLUMN {col}")
+            except sqlite3.OperationalError:
+                pass  # column already exists
+        conn.execute("UPDATE schema_version SET version=17")
         conn.commit()
