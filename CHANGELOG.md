@@ -7,6 +7,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+- fix(scripts): make the `run_battle.py` and `tournament.py` CLI runners env-aware — they now honor `NIDOZO_SHOWDOWN_HOST`/`NIDOZO_SHOWDOWN_PORT` (mirroring the API) instead of hardcoding `LocalhostServerConfiguration`, so they can drive battles against a containerised or remote Showdown. Defaults to localhost:8000
+- docs: add `docs/DEPLOYMENT.md` — a multi-machine deploy checklist + smoke test (server / LM-Studio-host / client), covering the LM Studio `0.0.0.0` bind, `.env` (token + `LM_STUDIO_BASE_URL`), ports/firewall, healthz, token entry, and troubleshooting
+
 ---
 
 ## [0.45.0] — 2026-06-21

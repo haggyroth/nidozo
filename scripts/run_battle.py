@@ -28,7 +28,6 @@ import logging
 import os
 from pathlib import Path
 
-from poke_env import LocalhostServerConfiguration
 from poke_env.player import Player
 
 from nidozo.api.helpers import _JSON_OUTPUT_PROMPT_VERSIONS as _JSON_VERSIONS
@@ -42,6 +41,23 @@ logging.basicConfig(level=logging.WARNING)
 _FORMAT = "gen9randombattle"
 
 
+def _showdown_cfg() -> object:
+    """Env-driven Showdown server config (NIDOZO_SHOWDOWN_HOST / NIDOZO_SHOWDOWN_PORT).
+
+    Mirrors the API's ``nidozo.api.orchestration._showdown_cfg`` so the CLI can
+    run against a containerised or remote Showdown, not just localhost. Defaults
+    to ``localhost:8000`` (bare-metal dev), matching the old LocalhostServerConfiguration.
+    """
+    from poke_env.ps_client.server_configuration import ServerConfiguration
+
+    host = os.environ.get("NIDOZO_SHOWDOWN_HOST", "localhost")
+    port = os.environ.get("NIDOZO_SHOWDOWN_PORT", "8000")
+    return ServerConfiguration(
+        websocket_url=f"ws://{host}:{port}/showdown/websocket",
+        authentication_url="https://play.pokemonshowdown.com/action.php?",
+    )
+
+
 def _build_player(
     provider: str,
     model: str | None,
@@ -50,7 +66,7 @@ def _build_player(
     battle_id: int,
     prompt_version: str = "v9",
 ) -> Player:
-    cfg = LocalhostServerConfiguration
+    cfg = _showdown_cfg()
 
     if provider == "random":
         return RandomBot(battle_format=_FORMAT, server_configuration=cfg)

@@ -101,6 +101,8 @@ A split setup — Nidozo on a server, LLMs on a workstation, viewed from a lapto
 - **Workstation** — run LM Studio with its server enabled and **listening on the network** (not just `127.0.0.1`) so the container can reach it.
 - **Laptop** — open `http://<server-host>:5001`, click **🔑**, and paste the same token.
 
+See **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)** for the full pre-flight checklist, smoke test, and troubleshooting.
+
 ---
 
 ## Prerequisites (local / dev setup)

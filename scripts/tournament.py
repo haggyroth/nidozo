@@ -42,6 +42,22 @@ from nidozo.db.store import BattleStore
 # Helpers
 # ---------------------------------------------------------------------------
 
+def _showdown_cfg() -> object:
+    """Env-driven Showdown server config (NIDOZO_SHOWDOWN_HOST / NIDOZO_SHOWDOWN_PORT).
+
+    Mirrors the API so the tournament CLI can target a containerised or remote
+    Showdown; defaults to localhost:8000 (matching the old LocalhostServerConfiguration).
+    """
+    from poke_env.ps_client.server_configuration import ServerConfiguration
+
+    host = os.environ.get("NIDOZO_SHOWDOWN_HOST", "localhost")
+    port = os.environ.get("NIDOZO_SHOWDOWN_PORT", "8000")
+    return ServerConfiguration(
+        websocket_url=f"ws://{host}:{port}/showdown/websocket",
+        authentication_url="https://play.pokemonshowdown.com/action.php?",
+    )
+
+
 def _parse_player(spec: str) -> tuple[str, str]:
     """Parse 'provider:model_name' → (provider, model_name)."""
     if ":" not in spec:
@@ -103,11 +119,9 @@ async def run_one_battle(
     fmt: str = "gen9randombattle",
 ) -> dict:
     """Run one battle, persist results, return summary dict."""
-    from poke_env import LocalhostServerConfiguration
-
     from nidozo.api.events import EventBus
 
-    cfg = LocalhostServerConfiguration
+    cfg = _showdown_cfg()
     bus = EventBus()
 
     p1_id = store.get_or_create_model(p1_provider, p1_model, prompt_version)
