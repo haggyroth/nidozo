@@ -208,6 +208,7 @@ async def run_battles(
     from nidozo.battle.tiers import resolve_format
 
     use_preset = bool(req.p1_preset or req.p2_preset)
+    use_import = bool(getattr(req, "p1_team", None) or getattr(req, "p2_team", None))
     doubles = bool(getattr(req, "doubles", False))
     team_size: int = getattr(req, "team_size", 6)
     has_human = req.p1_provider == "human" or req.p2_provider == "human"
@@ -216,9 +217,11 @@ async def run_battles(
         and req.tier != "random"
         and req.draft
         and not use_preset
+        and not use_import
     )
+    # Presets and pasted teams both force AG so any well-formed team is accepted.
     showdown_format = (
-        PRESET_FORMAT if use_preset
+        PRESET_FORMAT if (use_preset or use_import)
         else resolve_format(req.tier, doubles=doubles, team_size=team_size)
     )
     # Doubles requires the v7 prompt (it carries the 2v2 turn template); draft
@@ -252,11 +255,16 @@ async def run_battles(
             p1_team_id: int | None = None
             p2_team_id: int | None = None
 
-            # Preset teams take priority over draft and random fallback.
+            # Pasted teams and presets take priority over draft and random
+            # fallback (a player can't have both — validated at the API).
             if req.p1_preset:
                 p1_team = build_preset_team_string(req.p1_preset)
+            elif getattr(req, "p1_team", None):
+                p1_team = req.p1_team
             if req.p2_preset:
                 p2_team = build_preset_team_string(req.p2_preset)
+            elif getattr(req, "p2_team", None):
+                p2_team = req.p2_team
 
             if do_draft and p1_id is not None and req.p1_provider != "random":
                 await bus.publish({
@@ -284,9 +292,9 @@ async def run_battles(
 
             if do_draft:
                 store.set_battle_teams(battle_id, p1_team_id, p2_team_id, req.tier)
-            elif req.tier != "random" and not use_preset:
+            elif req.tier != "random" and not use_preset and not use_import:
                 # Non-random format requires a real team even when draft was
-                # skipped and no preset was given.
+                # skipped and no preset/import was given.
                 p1_team = p1_team or _random_preset_team(req.tier, team_size)
                 p2_team = p2_team or _random_preset_team(req.tier, team_size)
 
@@ -322,6 +330,8 @@ async def run_battles(
                     "p2_personality": req.p2_personality,
                     "p1_preset": req.p1_preset,
                     "p2_preset": req.p2_preset,
+                    "p1_imported": bool(getattr(req, "p1_team", None)),
+                    "p2_imported": bool(getattr(req, "p2_team", None)),
                 },
             )
 

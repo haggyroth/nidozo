@@ -314,6 +314,29 @@ function CoachSelector({ label, provider, model, onProviderChange, onModelChange
 // Personality selector (compact — shown below each player)
 // ---------------------------------------------------------------------------
 
+function TeamImport({ label, value, onChange }) {
+  const monCount = value.trim()
+    ? value.split(/\n\s*\n/).filter(b => b.trim()).length
+    : 0
+  return (
+    <details className="preset-selector">
+      <summary className="preset-selector-label" style={{ cursor: 'pointer' }}>
+        📋 {label} PASTE TEAM {monCount > 0 ? `(${monCount} mon${monCount !== 1 ? 's' : ''})` : ''}
+      </summary>
+      <textarea
+        className="form-input"
+        style={{ width: '100%', minHeight: '7rem', fontFamily: 'monospace', boxSizing: 'border-box', marginTop: '0.4rem' }}
+        placeholder={'Paste a Showdown export, e.g.\n\nGarchomp @ Choice Scarf\nAbility: Rough Skin\n- Earthquake\n...'}
+        value={value}
+        onChange={e => onChange(e.target.value)}
+      />
+      <div className="preset-selector-label" style={{ opacity: 0.6, marginTop: '0.2rem' }}>
+        Overrides draft; runs in Anything Goes so any legal team is accepted.
+      </div>
+    </details>
+  )
+}
+
 function PresetSelector({ label, value, onChange, presets }) {
   return (
     <div className="preset-selector">
@@ -385,6 +408,7 @@ function BattleForm({ onBattleStarted, lmModels, lmLoading }) {
     p2_coach_provider: 'none', p2_coach_model: '',
     p1_personality: null, p2_personality: null,
     p1_preset: null, p2_preset: null,
+    p1_team: '', p2_team: '',
     n_battles: 1,
     tier: 'random',
     draft: false,
@@ -432,6 +456,10 @@ function BattleForm({ onBattleStarted, lmModels, lmLoading }) {
       if (!body.p1_preset) delete body.p1_preset
       if (!body.p2_preset) delete body.p2_preset
       if (body.p1_preset || body.p2_preset) { body.draft = false; body.team_size = 6 }
+      // Pasted team — omit if blank; imports override draft
+      if (!body.p1_team?.trim()) delete body.p1_team
+      if (!body.p2_team?.trim()) delete body.p2_team
+      if (body.p1_team || body.p2_team) body.draft = false
       body.team_size = Number(body.team_size)
       const res = await fetch('/api/battles/start', {
         method: 'POST',
@@ -477,6 +505,11 @@ function BattleForm({ onBattleStarted, lmModels, lmLoading }) {
         onChange={v => setForm(f => ({ ...f, p1_preset: v }))}
         presets={presets}
       />
+      <TeamImport
+        label="P1"
+        value={form.p1_team}
+        onChange={v => setForm(f => ({ ...f, p1_team: v }))}
+      />
       <ModelSelector
         label="PLAYER 2"
         provider={form.p2_provider} model={form.p2_model}
@@ -501,6 +534,11 @@ function BattleForm({ onBattleStarted, lmModels, lmLoading }) {
         value={form.p2_preset}
         onChange={v => setForm(f => ({ ...f, p2_preset: v }))}
         presets={presets}
+      />
+      <TeamImport
+        label="P2"
+        value={form.p2_team}
+        onChange={v => setForm(f => ({ ...f, p2_team: v }))}
       />
       <div className="form-group">
         <label className="form-label">Tier</label>
