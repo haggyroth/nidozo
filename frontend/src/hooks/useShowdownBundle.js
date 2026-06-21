@@ -1,17 +1,23 @@
 /**
- * useShowdownBundle — dynamically loads the Pokémon Showdown battle renderer
- * from the PS CDN on first use and reports readiness.
+ * useShowdownBundle — loads the Pokémon Showdown battle renderer on first use
+ * and reports readiness.
  *
- * OP-02 (#84) — Stage 2
+ * OP-02 (#84) — Stage 2; vendored in #232.
  *
- * Why CDN, not vendored files
- * ---------------------------
- * The smogon/pokemon-showdown-client repo (MIT) ships TypeScript source only;
- * compiled JS is never committed. The CDN at play.pokemonshowdown.com serves the
- * build output and is the canonical source for sprites, audio, and FX assets too.
- * Vendoring the large (~4 MB) compiled bundle into this repo would add significant
- * noise without benefit — the CDN is always available in the environments where
- * battles are watched. This can be revisited for offline use.
+ * Vendored, not CDN
+ * -----------------
+ * The renderer's JS + CSS are vendored into `frontend/public/showdown/` (mirrors
+ * the CDN's `js/`, `data/`, `style/` layout) and served from our own origin.
+ * Previously these 14 scripts + stylesheet were fetched at runtime from
+ * play.pokemonshowdown.com, making that third party a single point of failure for
+ * the *only* battle view — if the CDN was down or changed a path, the live scene
+ * broke. Vendoring removes that dependency so the scene renders fully offline.
+ * See `frontend/public/showdown/NOTICE.md` for the source commit + licensing.
+ *
+ * Sprites / FX still load from the CDN (cosmetic): `Config.routes.client` points
+ * there for Pokémon sprites and icons, and the vendored `battle.css` keeps its
+ * background-image `url()`s absolute to the CDN. If the CDN is unavailable the
+ * scene still renders (HP bars, layout, log) — only sprites/backgrounds degrade.
  *
  * Load order
  * ----------
@@ -22,26 +28,27 @@
 
 import { useEffect, useState, useRef } from 'react'
 
-const CDN = 'https://play.pokemonshowdown.com'
+// Local origin path where the vendored bundle is served (Vite copies
+// `frontend/public/*` to the SPA root, and the Docker image ships it too).
+const LOCAL = '/showdown'
+// CDN host kept only for cosmetic sprite/icon assets (see Config stub below).
+const CDN_HOST = 'play.pokemonshowdown.com'
 
-// Showdown's own battle stylesheet. The renderer builds DOM (`.statbar`,
-// `.hpbar`, sprite/scene divs) that is positioned and styled entirely by this
-// file — without it HP bars vanish and the scene collapses into document flow
-// (the original "no healthbars / mashed in" jank). It is 16.8 KB, has zero
-// global/reset selectors, and every rule is scoped to PS-specific class names,
-// so it cannot conflict with the app's own styles. Loaded via <link> so the
-// `url(../fx/…)` background refs resolve against the CDN automatically.
+// Showdown's own battle stylesheet (vendored). The renderer builds DOM
+// (`.statbar`, `.hpbar`, sprite/scene divs) positioned and styled entirely by
+// this file — without it HP bars vanish and the scene collapses into document
+// flow. It is scoped to PS-specific class names, so it can't conflict with the
+// app's own styles. `@import`s the vendored battle-log.css; its background
+// `url()`s were rewritten to absolute CDN URLs (cosmetic, graceful if offline).
 const STYLES = [
-  `${CDN}/style/battle.css`,
+  `${LOCAL}/style/battle.css`,
 ]
 
 // Showdown's battledata.js sets Dex.resourcePrefix = '//' + Config.routes.client,
-// so routes.client must be the bare host (no protocol prefix) — e.g.
-// 'play.pokemonshowdown.com/' not 'https://play.pokemonshowdown.com/'.
-// Supplying the full https:// URL causes the double-prefix bug:
-//   '//' + 'https://play.pokemonshowdown.com/' → '//https://play.pokemonshowdown.com/'
-// which resolves to the broken URL http://https//play.pokemonshowdown.com/…
-const CDN_HOST = CDN.replace(/^https?:\/\//, '')  // 'play.pokemonshowdown.com'
+// so routes.client must be the bare host (no protocol prefix). We keep it
+// pointing at the CDN so Pokémon sprites/icons load from there (vendoring the
+// full sprite set would add tens of MB). The vendored JS/CSS make the scene
+// itself CDN-independent; only these cosmetic assets still need the network.
 const CONFIG_STUB = `
 window.Config = window.Config || {};
 window.Config.routes = window.Config.routes || {};
@@ -50,26 +57,26 @@ window.Config.routes.client2 = '${CDN_HOST}/';
 window.Config.routes.dex = 'www.smogon.com/dex/';
 `
 
-// Script URLs in strict dependency order.
+// Vendored script paths in strict dependency order.
 const SCRIPTS = [
-  `${CDN}/js/lib/ps-polyfill.js`,
-  `${CDN}/js/lib/jquery-1.11.0.min.js`,
-  `${CDN}/js/lib/html-sanitizer-minified.js`,
-  `${CDN}/js/battle-sound.js`,
-  `${CDN}/js/battledata.js`,
-  `${CDN}/data/pokedex-mini.js`,
-  `${CDN}/data/pokedex-mini-bw.js`,
-  `${CDN}/data/graphics.js`,
+  `${LOCAL}/js/lib/ps-polyfill.js`,
+  `${LOCAL}/js/lib/jquery-1.11.0.min.js`,
+  `${LOCAL}/js/lib/html-sanitizer-minified.js`,
+  `${LOCAL}/js/battle-sound.js`,
+  `${LOCAL}/js/battledata.js`,
+  `${LOCAL}/data/pokedex-mini.js`,
+  `${LOCAL}/data/pokedex-mini-bw.js`,
+  `${LOCAL}/data/graphics.js`,
   // Full dex data (lazy — Dex falls back gracefully without them, but moves /
   // abilities / items won't have display names in the battle log).
-  `${CDN}/data/pokedex.js`,
-  `${CDN}/data/moves.js`,
-  `${CDN}/data/abilities.js`,
-  `${CDN}/data/items.js`,
+  `${LOCAL}/data/pokedex.js`,
+  `${LOCAL}/data/moves.js`,
+  `${LOCAL}/data/abilities.js`,
+  `${LOCAL}/data/items.js`,
   // Tooltips before Battle class (Battle references BattleTooltips).
-  `${CDN}/js/battle-tooltips.js`,
+  `${LOCAL}/js/battle-tooltips.js`,
   // Battle class must be last — depends on all of the above.
-  `${CDN}/js/battle.js`,
+  `${LOCAL}/js/battle.js`,
 ]
 
 /** Inject a single <script src> and resolve when loaded, skip if already present. */
@@ -129,7 +136,7 @@ function loadBundle() {
     }
     await stylesReady
     if (typeof window.Battle !== 'function') {
-      throw new Error('window.Battle not defined after bundle load — check CDN availability')
+      throw new Error('window.Battle not defined after bundle load — vendored bundle may be incomplete')
     }
   })()
   return _loadPromise

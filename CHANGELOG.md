@@ -7,6 +7,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+- fix(frontend): vendor the Pokémon Showdown client bundle (#232) — the live battle view's 14 renderer scripts + `battle.css` are now served from `frontend/public/showdown/` instead of fetched at runtime from `play.pokemonshowdown.com`, removing a third-party single-point-of-failure for the only battle view. The scene now renders fully offline (HP bars, layout, log); only Pokémon sprites/backgrounds still load from the CDN (cosmetic, graceful when unavailable). Licensing recorded in `public/showdown/NOTICE.md`
+
 ---
 
 ## [0.44.0] — 2026-06-21
