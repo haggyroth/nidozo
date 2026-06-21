@@ -43,6 +43,9 @@ services:
       # and WebSocket. Leave unset ONLY when the host is not reachable beyond
       # localhost — the API spends real LLM credits.
       NIDOZO_API_TOKEN: ${NIDOZO_API_TOKEN:-}
+      # Optional rate limit (requests/min per IP) on the battle-start endpoints.
+      # 0 / unset disables it. Pairs with NIDOZO_API_TOKEN for exposed instances.
+      NIDOZO_RATE_LIMIT_PER_MIN: ${NIDOZO_RATE_LIMIT_PER_MIN:-0}
       # LLM backends. Point LM_STUDIO_BASE_URL at the machine running LM Studio
       # (e.g. http://enterprise-e:1234/v1). Cloud keys are passed through from
       # the host env when present.

@@ -7,6 +7,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+- feat(api): optional rate limiting on the battle/tournament/season/experiment **start** endpoints (#233) — set `NIDOZO_RATE_LIMIT_PER_MIN` to cap requests per minute per client IP (fixed-window, in-process; returns `429` + `Retry-After`). `0`/unset disables it, so local dev is unchanged. Complements the shared-secret auth (#212) for exposed instances; `docker-compose` passes the var through
 - test(orchestration): cover the draft, cancellation, and failure branches of the battle runners (#236) — `run_battles` draft/cancel/fail, tournament & season cancel-checks, bracket match-failure, and experiment fail/cancel paths, all with fake players (no Showdown). orchestration.py coverage 78% → 84%
 
 ---

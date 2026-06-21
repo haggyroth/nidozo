@@ -15,6 +15,7 @@ from nidozo.api.events import EventBus
 from nidozo.api.lifespan import create_lifespan
 from nidozo.api.logging_config import configure_logging
 from nidozo.api.middleware import add_cors
+from nidozo.api.ratelimit import add_rate_limit, get_rate_limit
 from nidozo.api.routes import create_router
 from nidozo.api.ws import create_ws_router
 from nidozo.api.ws_showdown import create_showdown_ws_router
@@ -47,6 +48,7 @@ def create_app(db_path: Path = _DB_PATH) -> FastAPI:
 
     add_cors(app)
     add_auth(app, api_token)
+    add_rate_limit(app, get_rate_limit())
     app.include_router(create_router(store, bus, active_tasks))
     app.include_router(create_ws_router(bus, auth_token=api_token))
     # OP-02 (#84): spectator-stream proxy for the Showdown battle-scene renderer.

@@ -77,6 +77,7 @@ The `api` service reads these environment variables (pass them in the host shell
 | Variable | Purpose | Default |
 |---|---|---|
 | `NIDOZO_API_TOKEN` | Shared-secret token. When set, **every `/api/*` request and WebSocket requires it**. When unset, auth is disabled and a warning is logged at startup. | _(unset → auth off)_ |
+| `NIDOZO_RATE_LIMIT_PER_MIN` | Max battle/tournament/season/experiment **start** requests per minute per client IP (returns `429` over the limit). `0` disables it. | `0` |
 | `LM_STUDIO_BASE_URL` | OpenAI-compatible URL of your LM Studio server. | `http://localhost:1234/v1` |
 | `LM_STUDIO_MODEL` | Default LM Studio model id. | `local-model` |
 | `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` | Cloud LLM keys, used only for those providers. | _(unset)_ |
