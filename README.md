@@ -17,6 +17,7 @@ Sibling project to [Nimzo](https://github.com/haggyroth/nimzo) (the LLM chess ar
 - **Configurable team size** — full 6v6, plus 3v3 singles and 4v4 doubles variants with their own Showdown formats
 - **Doubles battles (2v2/4v4)** — opt-in `doubles=true` runs a Showdown doubles format with full target selection (`foe_1`/`foe_2`/`ally`/`self`); prompt v7, action parser, and heuristic engine handle spread moves and partner synergy
 - **Drafted teams** — LLM snake-drafts a team from 513 Pokémon with Gen 9 NatDex competitive sets (sourced from Showdown's factory data + synthesised randbat sets); DraftPhase UI with animated pick reveal
+- **Team import** — paste a standard Showdown export to battle with your exact team (per player; runs in Anything Goes so any legal team is accepted) — see whether an LLM can pilot *your* team
 - **Pluggable LLM backends** — Anthropic, OpenAI, local model via LM Studio, or **human player** (select `human` as provider to play one side yourself from the browser — a move/switch picker overlays the battle stage on your turn)
 - **Multi-agent coach mode** — an optional second "coach" model deliberates alongside the player model before each decision, using a dedicated coach prompt set
 - **JSON structured outputs** — models respond with `{"reasoning":"…","action_type":"move","identifier":"thunderbolt"}`; grammar-sampled on OpenAI/LM Studio backends for near-certain parse reliability. The default prompt is **v9** (see [Prompt versions](#prompt-versions))

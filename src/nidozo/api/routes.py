@@ -412,8 +412,9 @@ def create_router(
         # tier / prompt_version / providers are validated by the Pydantic model
         # (Literal types → 422 on bad input), so no manual checks are needed here.
         use_preset = bool(req.p1_preset or req.p2_preset)
+        use_import = bool(req.p1_team or req.p2_team)
         showdown_format = (
-            "gen9nationaldexag" if use_preset
+            "gen9nationaldexag" if (use_preset or use_import)
             else resolve_format(req.tier, doubles=req.doubles, team_size=req.team_size)
         )
         effective_prompt = "v3" if (req.tier != "random" and req.draft) else req.prompt_version

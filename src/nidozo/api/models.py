@@ -58,11 +58,18 @@ class StartBattleRequest(BaseModel):
     # Optional trainer-archetype preset team (overrides draft; forces AG format)
     p1_preset: PresetSlug | None = None
     p2_preset: PresetSlug | None = None
+    # Optional pasted Showdown team export (#228). When set, that player battles
+    # with this exact team — overrides draft and forces AG format so any
+    # well-formed team is accepted. Mutually exclusive with a preset.
+    p1_team: str | None = Field(None, max_length=20000)
+    p2_team: str | None = Field(None, max_length=20000)
 
     @model_validator(mode="after")
     def validate_team_size_constraints(self) -> StartBattleRequest:
         if (self.p1_preset or self.p2_preset) and self.team_size != 6:
             raise ValueError("Preset teams are fixed 6-mon rosters — team_size must be 6 when using presets")
+        if (self.p1_preset and self.p1_team) or (self.p2_preset and self.p2_team):
+            raise ValueError("A player can use either a preset or a pasted team, not both")
         return self
 
 
