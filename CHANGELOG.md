@@ -7,6 +7,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+---
+
+## [0.45.0] — 2026-06-21
+
 - feat(battle): import a pasted Showdown team (#228) — new `p1_team`/`p2_team` on the battle request let a player battle with an exact pasted team (overrides draft, runs in Anything Goes so any well-formed team is accepted; mutually exclusive with a preset). The battle form gains a collapsible "📋 Paste team" textarea per player. Imported teams suit LLM/human players ("can a model pilot *my* team?")
 
 ---
