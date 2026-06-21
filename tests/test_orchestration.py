@@ -125,6 +125,8 @@ async def test_play_battle_records_tie(tmp_path) -> None:
 import asyncio  # noqa: E402
 from unittest.mock import MagicMock  # noqa: E402
 
+import pytest  # noqa: E402
+
 from nidozo.api import orchestration  # noqa: E402
 from nidozo.api.orchestration import (  # noqa: E402
     _bracket_advance_slot,
@@ -353,5 +355,256 @@ async def test_run_bracket_single_elim_completes(tmp_path, monkeypatch) -> None:
         end = next(e for e in bus.events if e["type"] == "tournament_end")
         assert end["champion"] is not None
         assert any(e["type"] == "bracket_update" for e in bus.events)
+    finally:
+        store.close()
+
+
+# ---------------------------------------------------------------------------
+# Draft / cancellation / failure branches (#236)
+# ---------------------------------------------------------------------------
+
+class _RaisingPlayer:
+    """Fake player whose battle_against raises a chosen exception."""
+
+    def __init__(self, exc: BaseException) -> None:
+        self._exc = exc
+        self.n_won_battles = 0
+        self.battles: dict[str, Any] = {}
+
+    async def battle_against(self, other: Any, n_battles: int = 1) -> None:
+        raise self._exc
+
+    async def terminate(self) -> None:
+        pass
+
+
+async def _noop(*args: Any, **kwargs: Any) -> None:
+    return None
+
+
+async def test_run_battles_draft_branch(tmp_path, monkeypatch) -> None:
+    from nidozo.api.models import StartBattleRequest
+
+    store = BattleStore(tmp_path / "draft.db")
+    try:
+        p1 = store.get_or_create_model("anthropic", "claude-x", "v3")
+        p2 = store.get_or_create_model("anthropic", "claude-y", "v3")
+        bid = store.create_battle("d", "gen9nationaldex", p1, p2)
+
+        async def fake_draft(backend, model_id, tier, store_, bus_, role, team_size=6, doubles=False):
+            team_id = store_.save_team(model_id, tier, "gen9nationaldex", ["pikachu"], "Pikachu")
+            return {"team_string": "Pikachu", "team_id": team_id}
+
+        monkeypatch.setattr(orchestration, "run_draft_phase", fake_draft)
+        monkeypatch.setattr(orchestration, "_build_backend", lambda *a, **k: object())
+        monkeypatch.setattr(orchestration, "_build_streaming_player",
+                            lambda *a, **k: _FakePlayer(won=True, tag=f"b-{uuid.uuid4().hex[:8]}", turns=3))
+        monkeypatch.setattr(orchestration, "generate_and_store_lessons", _noop)
+        monkeypatch.setattr(orchestration, "generate_and_store_narrative", _noop)
+
+        req = StartBattleRequest(
+            p1_provider="anthropic", p1_model="claude-x",
+            p2_provider="anthropic", p2_model="claude-y",
+            tier="ou", draft=True, n_battles=1,
+        )
+        bus = _FakeBus()
+        await orchestration.run_battles(req, [bid], store, bus, {})
+
+        roles = {e.get("player_role") for e in bus.events if e["type"] == "draft_start"}
+        assert roles == {"p1", "p2"}
+        assert store.get_battle(bid)["tier"] == "ou"  # set_battle_teams ran
+    finally:
+        store.close()
+
+
+async def test_run_battles_cancellation_strands_queued(tmp_path, monkeypatch) -> None:
+    from nidozo.api.models import StartBattleRequest
+
+    store = BattleStore(tmp_path / "cancel.db")
+    try:
+        p1 = store.get_or_create_model("random", "random", "v9")
+        p2 = store.get_or_create_model("random", "random2", "v9")
+        b1 = store.create_battle("c1", "gen9randombattle", p1, p2)
+        b2 = store.create_battle("c2", "gen9randombattle", p1, p2)
+
+        monkeypatch.setattr(orchestration, "_build_streaming_player",
+                            lambda *a, **k: _RaisingPlayer(asyncio.CancelledError()))
+
+        req = StartBattleRequest(p1_provider="random", p2_provider="random", tier="random", n_battles=2)
+        bus = _FakeBus()
+        import pytest
+        with pytest.raises(asyncio.CancelledError):
+            await orchestration.run_battles(req, [b1, b2], store, bus, {})
+
+        assert store.get_battle(b1)["status"] == "cancelled"
+        assert store.get_battle(b2)["status"] == "cancelled"  # stranded → cancelled
+        assert any(e["type"] == "battle_cancelled" and e["battle_id"] == b2 for e in bus.events)
+    finally:
+        store.close()
+
+
+async def test_run_battles_failure_marks_failed(tmp_path, monkeypatch) -> None:
+    from nidozo.api.models import StartBattleRequest
+
+    store = BattleStore(tmp_path / "fail.db")
+    try:
+        p1 = store.get_or_create_model("random", "random", "v9")
+        p2 = store.get_or_create_model("random", "random2", "v9")
+        bid = store.create_battle("f", "gen9randombattle", p1, p2)
+
+        monkeypatch.setattr(orchestration, "_build_streaming_player",
+                            lambda *a, **k: _RaisingPlayer(ValueError("boom")))
+
+        req = StartBattleRequest(p1_provider="random", p2_provider="random", tier="random", n_battles=1)
+        bus = _FakeBus()
+        await orchestration.run_battles(req, [bid], store, bus, {})  # no raise
+
+        assert store.get_battle(bid)["status"] == "failed"
+        assert any(e["type"] == "error" and e["battle_id"] == bid for e in bus.events)
+    finally:
+        store.close()
+
+
+async def test_run_tournament_stops_when_cancelled(tmp_path, monkeypatch) -> None:
+    from nidozo.api.models import PlayerSpec, StartTournamentRequest
+
+    store = BattleStore(tmp_path / "tcancel.db")
+    try:
+        specs = _random_specs()
+        tid = store.create_tournament(
+            players=specs, rounds=1, prompt_version="v9", total_battles=2,
+            tier="random", tournament_format="round_robin",
+        )
+        a = store.get_or_create_model("random", "random", "v9")
+        b = store.get_or_create_model("random", "random2", "v9")
+        bids = [store.create_battle(f"tc-{i}", "gen9randombattle", a, b, tournament_id=tid) for i in range(2)]
+        store.cancel_tournament(tid)  # flip status before the runner starts
+
+        req = StartTournamentRequest(
+            players=[PlayerSpec(provider="random"), PlayerSpec(provider="random", model="random2")],
+            rounds=1, tier="random",
+        )
+        bus = _FakeBus()
+        await orchestration.run_tournament(req, tid, bids, specs, store, bus, {})
+        assert any(e["type"] == "tournament_cancelled" for e in bus.events)
+        # The runner stops before playing anything — no battle was completed.
+        assert not any(e["type"] == "battle_end" for e in bus.events)
+        assert store.get_battle(bids[0])["status"] == "pending"
+    finally:
+        store.close()
+
+
+async def test_run_bracket_marks_failed_on_match_error(tmp_path, monkeypatch) -> None:
+    from nidozo.api.models import PlayerSpec, StartTournamentRequest
+
+    store = BattleStore(tmp_path / "bfail.db")
+    try:
+        specs = _random_specs()
+        tid = store.create_tournament(
+            players=specs, rounds=1, prompt_version="v9", total_battles=1,
+            tier="random", tournament_format="single_elim",
+        )
+        monkeypatch.setattr(orchestration, "_build_streaming_player",
+                            lambda *a, **k: _RaisingPlayer(ValueError("boom")))
+
+        req = StartTournamentRequest(
+            players=[PlayerSpec(provider="random"), PlayerSpec(provider="random", model="random2")],
+            rounds=1, tier="random", tournament_format="single_elim",
+        )
+        bus = _FakeBus()
+        await orchestration.run_bracket_tournament(req, tid, specs, store, bus, {})
+        assert store.get_tournament(tid)["status"] == "failed"
+        assert any(e["type"] == "tournament_failed" for e in bus.events)
+    finally:
+        store.close()
+
+
+async def test_run_season_stops_when_cancelled(tmp_path, monkeypatch) -> None:
+    from nidozo.api.models import PlayerSpec, StartSeasonRequest
+
+    store = BattleStore(tmp_path / "scancel.db")
+    try:
+        specs = _random_specs()
+        sid = store.create_season(
+            name="S", tier="random", fmt="gen9randombattle",
+            participants=specs, rounds=1, prompt_version="v9", total_battles=2,
+        )
+        a = store.get_or_create_model("random", "random", "v9")
+        b = store.get_or_create_model("random", "random2", "v9")
+        bids = [store.create_battle(f"sc-{i}", "gen9randombattle", a, b, season_id=sid) for i in range(2)]
+        store.cancel_season(sid)  # status -> cancelled
+
+        # run_season normally flips status back to 'running' first; stub that out
+        # so the loop's cancel check fires. Also guard against ever building a
+        # real player (which would hang trying to reach Showdown).
+        monkeypatch.setattr(store, "set_season_running", lambda _sid: None)
+        monkeypatch.setattr(orchestration, "_build_streaming_player",
+                            lambda *a, **k: _FakePlayer(won=True, tag="x", turns=1))
+
+        req = StartSeasonRequest(
+            name="S",
+            players=[PlayerSpec(provider="random"), PlayerSpec(provider="random", model="random2")],
+            rounds=1, tier="random",
+        )
+        bus = _FakeBus()
+        await orchestration.run_season(req, sid, bids, specs, store, bus, {})
+        assert any(e["type"] == "season_cancelled" for e in bus.events)
+        assert not any(e["type"] == "battle_end" for e in bus.events)
+    finally:
+        store.close()
+
+
+def _experiment_setup(store):
+    va = {"provider": "openai", "model_name": "gpt-4o", "prompt_version": "v9"}
+    vb = {"provider": "openai", "model_name": "gpt-4o", "prompt_version": "v8"}
+    a = store.get_or_create_model(va["provider"], va["model_name"], va["prompt_version"])
+    b = store.get_or_create_model(vb["provider"], vb["model_name"], vb["prompt_version"])
+    eid = store.create_experiment(
+        name="x", variant_a=va, variant_b=vb, a_model_id=a, b_model_id=b,
+        tier="random", fmt="gen9randombattle", n_battles=2,
+    )
+    bids = []
+    for i in range(2):
+        p1, p2 = (a, b) if i % 2 == 0 else (b, a)
+        bids.append(store.create_battle(f"x-{eid}-{i}", "gen9randombattle", p1, p2, experiment_id=eid))
+    return va, vb, a, b, eid, bids
+
+
+def _experiment_req():
+    from nidozo.api.models import ExperimentVariant, StartExperimentRequest
+    return StartExperimentRequest(
+        name="x",
+        variant_a=ExperimentVariant(provider="openai", model="gpt-4o", prompt_version="v9"),
+        variant_b=ExperimentVariant(provider="openai", model="gpt-4o", prompt_version="v8"),
+        n_battles=2, tier="random",
+    )
+
+
+async def test_run_experiment_marks_failed_battle(tmp_path, monkeypatch) -> None:
+    store = BattleStore(tmp_path / "xfail.db")
+    try:
+        va, vb, a, b, eid, bids = _experiment_setup(store)
+        monkeypatch.setattr(orchestration, "_build_streaming_player",
+                            lambda *args, **kw: _RaisingPlayer(ValueError("boom")))
+        bus = _FakeBus()
+        await orchestration.run_experiment(_experiment_req(), eid, bids, va, vb, a, b, store, bus, {})
+        assert any(e["type"] == "error" for e in bus.events)
+        assert store.get_battle(bids[0])["status"] == "failed"
+        assert store.get_experiment(eid)["status"] == "completed"
+    finally:
+        store.close()
+
+
+async def test_run_experiment_cancelled_during_battle(tmp_path, monkeypatch) -> None:
+    store = BattleStore(tmp_path / "xcancel.db")
+    try:
+        va, vb, a, b, eid, bids = _experiment_setup(store)
+        monkeypatch.setattr(orchestration, "_build_streaming_player",
+                            lambda *args, **kw: _RaisingPlayer(asyncio.CancelledError()))
+        bus = _FakeBus()
+        with pytest.raises(asyncio.CancelledError):
+            await orchestration.run_experiment(_experiment_req(), eid, bids, va, vb, a, b, store, bus, {})
+        assert store.get_experiment(eid)["status"] == "cancelled"
+        assert any(e["type"] == "experiment_cancelled" for e in bus.events)
     finally:
         store.close()
