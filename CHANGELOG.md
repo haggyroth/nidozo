@@ -7,6 +7,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+- test(orchestration): cover the draft, cancellation, and failure branches of the battle runners (#236) — `run_battles` draft/cancel/fail, tournament & season cancel-checks, bracket match-failure, and experiment fail/cancel paths, all with fake players (no Showdown). orchestration.py coverage 78% → 84%
+
 ---
 
 ## [0.43.0] — 2026-06-20
