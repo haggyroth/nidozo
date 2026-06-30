@@ -8,7 +8,7 @@ A pre-flight checklist + smoke test for running Nidozo across three machines:
 | **enterprise-e** | LLM host | LM Studio, serving models over the network |
 | **voyager** | client | a browser pointed at the server; local dev |
 
-The stack is two containers (`showdown` on `:8000`, `api`+SPA on `:5001`). The
+The stack is two containers (`showdown` on host port `:8001` → container `:8000`, `api`+SPA on `:5001`). The
 `api` container reaches LM Studio on enterprise-e for moves and is viewed from
 voyager's browser, gated by a shared-secret token.
 
@@ -35,6 +35,13 @@ voyager's browser, gated by a shared-secret token.
 
 ## 2. utopiaplanitia — configure and bring up the stack
 
+0. **On a shared/prod host, check for port collisions first:**
+   ```bash
+   docker ps --format '{{.Names}}\t{{.Ports}}' | grep -E ':5001|:8001'
+   ```
+   If something else already publishes `5001` or `8001`, change the host-side
+   port in `docker-compose.yml` (`"<new-port>:5001"` or `"<new-port>:8000"`)
+   before starting — don't stop an unrelated container to free the port.
 1. Clone (or pull) the repo and create a `.env` **next to `docker-compose.yml`**
    (Compose loads it automatically):
    ```bash
@@ -66,8 +73,8 @@ voyager's browser, gated by a shared-secret token.
 
 ### Ports & firewall
 - `5001` (api+UI) must be reachable **from voyager** → allow inbound TCP 5001 on utopiaplanitia.
-- `8000` (Showdown) only needs to be reachable from voyager if you want the raw
-  cockpit spectator stream; the SPA proxies what it needs through `:5001`.
+- `8001` (Showdown, host-side) only needs to be reachable from voyager if you want
+  the raw cockpit spectator stream; the SPA proxies what it needs through `:5001`.
 - `1234` on enterprise-e must be reachable **from utopiaplanitia**.
 
 ---
@@ -98,7 +105,7 @@ can drive battles/tournaments against the containerised Showdown — e.g. from
 utopiaplanitia or any host that can reach it:
 
 ```bash
-NIDOZO_SHOWDOWN_HOST=<server> NIDOZO_SHOWDOWN_PORT=8000 \
+NIDOZO_SHOWDOWN_HOST=<server> NIDOZO_SHOWDOWN_PORT=8001 \
   uv run python scripts/run_battle.py --p1 random --p2 random --battles 1
 ```
 
@@ -111,6 +118,8 @@ through the authenticated API.)
 
 | Symptom | Likely cause |
 |---|---|
+| `Bind for 0.0.0.0:8000 failed: port is already allocated` | Another container/process on the host already owns that port (`docker ps` to find it). Remap the host side in `docker-compose.yml` — don't stop someone else's service. Don't need to touch internal `NIDOZO_SHOWDOWN_PORT=8000`, only the published host port |
+| `docker compose up` fails after a previous failed attempt | Leftover containers stuck in `Created` state from the failed run — `docker compose down` (or `docker rm <name>`) before retrying |
 | `/healthz` is `degraded` | Showdown container not up yet, or crashed — `docker compose logs showdown` |
 | Browser data panels all 401 | Token not entered (click 🔑) or wrong token |
 | LLM battle stuck "thinking" | `LM_STUDIO_BASE_URL` unreachable from the container (bind/firewall) |
