@@ -7,6 +7,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+---
+
+## [0.45.2] — 2026-06-30
+
 - fix(deploy): remap Showdown's published host port from `8000` to `8001` in `docker-compose.yml` — `8000` is a common default for other self-hosted services and collided with an existing container on a shared host. The internal container port (and `NIDOZO_SHOWDOWN_PORT=8000` used between the `api` and `showdown` containers) is unchanged; only the host-published port moved
 - docs: deploy guide now tells you to check for port collisions on shared hosts before bringing the stack up, and documents the leftover-`Created`-container case after a failed `docker compose up`
 
