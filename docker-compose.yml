@@ -14,9 +14,12 @@ services:
       context: showdown
       dockerfile: Dockerfile
     restart: unless-stopped
-    # Port exposed for direct Showdown access (debugging / cockpit view)
+    # Port exposed for direct Showdown access (debugging / cockpit view).
+    # Host side is 8001 (not 8000) to avoid colliding with other services on
+    # shared hosts — the api container talks to Showdown over the internal
+    # Docker network (NIDOZO_SHOWDOWN_HOST=showdown), not this published port.
     ports:
-      - "8000:8000"
+      - "8001:8000"
     healthcheck:
       test: ["CMD", "nc", "-z", "localhost", "8000"]
       interval: 5s

@@ -51,7 +51,7 @@ docker compose up -d
 
 Open `http://<host>:5001` — the React SPA is served directly by FastAPI.
 
-- **Showdown** runs on port `8000` (exposed for the cockpit view and debugging).
+- **Showdown** runs on host port `8001` (exposed for the cockpit view and debugging; internally it's `8000`, mapped to `8001` to avoid colliding with other services on shared hosts).
 - **API + frontend** runs on port `5001`.
 - **SQLite** data persists on a named Docker volume (`nidozo-data`) and survives container restarts.
 
