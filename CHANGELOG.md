@@ -7,6 +7,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+- refactor(heuristics): split the 1205-line `battle/heuristics.py` into a `battle/heuristics/` package (#235) — one module per concern (`damage`, `type_chart`, `status`, `hazards`, `context`, `moves`, `switching`, `singles`, `doubles`) with downward-only dependencies; largest module is now 233 lines. Pure refactor: every block extracted verbatim, `__init__.py` re-exports the full former surface, so no caller or test changed and all 1124 tests pass unmodified
+
 ---
 
 ## [0.45.2] — 2026-06-30
