@@ -26,8 +26,18 @@ jobs:
         with:
           enable-cache: false
 
+      # The ruff version lives in exactly one place: the pin in pyproject.toml.
+      # Reading it here keeps CI and local dev on the same linter, so a dependabot
+      # bump to the pin can't silently leave CI behind.
       - name: Run ruff via uvx (no venv needed)
-        run: uvx ruff@0.11.13 check src/ tests/
+        run: |
+          RUFF_VERSION=$(grep -oE 'ruff==[0-9]+\.[0-9]+\.[0-9]+' pyproject.toml | head -1 | cut -d= -f3)
+          if [ -z "$RUFF_VERSION" ]; then
+            echo "::error::Could not read the ruff pin from pyproject.toml (expected a 'ruff==X.Y.Z' entry)"
+            exit 1
+          fi
+          echo "Using ruff $RUFF_VERSION (pinned in pyproject.toml)"
+          uvx ruff@"$RUFF_VERSION" check src/ tests/
 
   typecheck:
     name: Type check (mypy)
