@@ -7,6 +7,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+- chore(ci): the lint job now reads the ruff version from the `pyproject.toml` pin instead of hardcoding its own (#263) — CI had been linting with `ruff 0.11.13` while pyproject pinned `0.16.3` under a comment claiming they matched, so a green lint check was testing a linter nobody develops against. Guarded so an unreadable pin fails the job rather than silently linting with nothing
+- chore(deps): reconcile the two dev dependency lists (#264) — `[dependency-groups] dev` now aliases the `[project.optional-dependencies] dev` extra instead of duplicating it. The lists had drifted (pytest/ruff in one, httpx2 in the other), and since `uv run` activates the group by default, tools missing from it were uninstalled out from under `uv run` — `uv run mypy` worked while `uv run ruff`/`uv run pytest` failed
+- fix(deps): declare `httpx` as a runtime dependency (#264) — `api/routes.py` imports it at module scope but it was listed dev-only, resolving in production only because `anthropic`/`openai` pull it in transitively
 - refactor(heuristics): split the 1205-line `battle/heuristics.py` into a `battle/heuristics/` package (#235) — one module per concern (`damage`, `type_chart`, `status`, `hazards`, `context`, `moves`, `switching`, `singles`, `doubles`) with downward-only dependencies; largest module is now 233 lines. Pure refactor: every block extracted verbatim, `__init__.py` re-exports the full former surface, so no caller or test changed and all 1124 tests pass unmodified
 
 ---
