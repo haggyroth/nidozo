@@ -7,6 +7,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+---
+
+## [0.46.0] — 2026-08-19
+
 - feat(ratings): replace plain Elo with **Glicko-2** (#231) — every model now carries a rating deviation (RD) and volatility alongside its rating, so the leaderboard can distinguish a settled contender from a 3-0 newcomer. Ratings show their 95% confidence band and are tagged *provisional* until enough games narrow them; season standings replay with Glicko-2 too. Schema v20 adds `elo_ratings.rd`/`.volatility` and `elo_history.rd_before`/`.rd_after`; existing ratings carry over unchanged with RD backfilled to the unplayed-model prior. Validated against the worked example in Glickman's Glicko-2 paper
 - fix(scripts): `scripts/leaderboard.py` crashed with `KeyError: 'prompt_version'` — it read a grouped leaderboard (which exposes `versions`) while printing a per-version column. Now requests the per-version rows it actually prints, and shows the confidence band
 - chore(ci): the lint job now reads the ruff version from the `pyproject.toml` pin instead of hardcoding its own (#263) — CI had been linting with `ruff 0.11.13` while pyproject pinned `0.16.3` under a comment claiming they matched, so a green lint check was testing a linter nobody develops against. Guarded so an unreadable pin fails the job rather than silently linting with nothing
