@@ -888,3 +888,100 @@ def test_migration_v15_to_v16_adds_indexes(tmp_path) -> None:
     assert "idx_teams_model" in names
     assert "idx_models_identity" in names
     conn.close()
+
+
+# ---------------------------------------------------------------------------
+# v20 — Glicko-2 (#231)
+# ---------------------------------------------------------------------------
+
+def _pre_glicko_conn() -> sqlite3.Connection:
+    """A v19 database: the elo tables as they stood before Glicko-2."""
+    conn = _fresh_conn()
+    conn.executescript("""
+        CREATE TABLE schema_version (version INTEGER NOT NULL);
+        INSERT INTO schema_version VALUES (19);
+        CREATE TABLE models (
+            id INTEGER PRIMARY KEY,
+            provider TEXT NOT NULL,
+            model_name TEXT NOT NULL,
+            prompt_version TEXT NOT NULL DEFAULT 'v1'
+        );
+        CREATE TABLE elo_ratings (
+            model_id   INTEGER PRIMARY KEY REFERENCES models(id),
+            rating     REAL    NOT NULL DEFAULT 1000.0,
+            games      INTEGER NOT NULL DEFAULT 0,
+            updated_at TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+        );
+        CREATE TABLE elo_history (
+            id            INTEGER PRIMARY KEY,
+            battle_id     INTEGER NOT NULL,
+            model_id      INTEGER NOT NULL,
+            rating_before REAL    NOT NULL,
+            rating_after  REAL    NOT NULL,
+            delta         REAL    NOT NULL,
+            UNIQUE(battle_id, model_id)
+        );
+        INSERT INTO models (id, provider, model_name) VALUES (1, 'anthropic', 'veteran');
+        INSERT INTO elo_ratings (model_id, rating, games) VALUES (1, 1337.5, 42);
+        INSERT INTO elo_history (battle_id, model_id, rating_before, rating_after, delta)
+            VALUES (7, 1, 1300.0, 1337.5, 37.5);
+    """)
+    return conn
+
+
+def test_migrate_v19_adds_glicko_columns() -> None:
+    conn = _pre_glicko_conn()
+    migrate(conn)
+
+    rating_cols = {r["name"] for r in conn.execute("PRAGMA table_info(elo_ratings)")}
+    assert {"rd", "volatility"} <= rating_cols
+
+    history_cols = {r["name"] for r in conn.execute("PRAGMA table_info(elo_history)")}
+    assert {"rd_before", "rd_after"} <= history_cols
+
+    assert _version(conn) == SCHEMA_VERSION
+
+
+def test_migrate_v19_backfills_rd_to_the_unplayed_prior() -> None:
+    """Existing ratings survive; their uncertainty backfills to the wide prior.
+
+    A rating carried over from plain Elo has no measured uncertainty, so the
+    honest backfill is the unplayed-model RD — the model re-converges as it plays.
+    """
+    conn = _pre_glicko_conn()
+    migrate(conn)
+
+    row = conn.execute("SELECT rating, rd, volatility, games FROM elo_ratings WHERE model_id=1").fetchone()
+    assert row["rating"] == 1337.5   # preserved exactly
+    assert row["games"] == 42        # preserved exactly
+    assert row["rd"] == 350.0
+    assert row["volatility"] == 0.06
+
+
+def test_migrate_v19_leaves_pre_glicko_history_rd_null() -> None:
+    """Old history rows get NULL RD rather than a fabricated number."""
+    conn = _pre_glicko_conn()
+    migrate(conn)
+
+    row = conn.execute("SELECT rating_before, rd_before, rd_after FROM elo_history WHERE battle_id=7").fetchone()
+    assert row["rating_before"] == 1300.0
+    assert row["rd_before"] is None
+    assert row["rd_after"] is None
+
+
+def test_migrate_v19_glicko_columns_already_exist_no_error() -> None:
+    """Re-running the v20 block over an already-migrated DB is a no-op."""
+    conn = _pre_glicko_conn()
+    migrate(conn)
+    conn.execute("UPDATE schema_version SET version=19")  # force the block to re-run
+    migrate(conn)
+
+    assert _version(conn) == SCHEMA_VERSION
+
+
+def test_fresh_install_has_glicko_columns() -> None:
+    conn = _fresh_conn()
+    migrate(conn)
+
+    rating_cols = {r["name"] for r in conn.execute("PRAGMA table_info(elo_ratings)")}
+    assert {"rating", "rd", "volatility", "games"} <= rating_cols

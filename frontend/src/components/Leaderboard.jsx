@@ -1250,7 +1250,7 @@ export default function Leaderboard({ onBattleStarted, onTournamentStarted, onSe
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
         <div className="panel">
           <div className="panel-title-row">
-            <div className="panel-title">ELO LEADERBOARD</div>
+            <div className="panel-title">RATING LEADERBOARD</div>
             <div className="lb-tier-tabs">
               {LB_TIERS.map(t => (
                 <button
@@ -1298,7 +1298,7 @@ export default function Leaderboard({ onBattleStarted, onTournamentStarted, onSe
               <table className="leaderboard-table">
                 <thead>
                   <tr>
-                    <th>#</th><th>MODEL</th><th>ELO</th><th>GAMES</th><th>W / L / T</th><th>STREAK</th><th></th>
+                    <th>#</th><th>MODEL</th><th>RATING</th><th>GAMES</th><th>W / L / T</th><th>STREAK</th><th></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1327,7 +1327,25 @@ export default function Leaderboard({ onBattleStarted, onTournamentStarted, onSe
                           )}
                         </div>
                       </td>
-                      <td><span className="elo-value">{r.rating.toFixed(1)}</span></td>
+                      <td>
+                        <span className="elo-value">{r.rating.toFixed(1)}</span>
+                        {r.rd != null && (
+                          <span
+                            className="elo-rd"
+                            title={`95% confidence: ${r.rating_low?.toFixed(0)} – ${r.rating_high?.toFixed(0)} (RD ${r.rd.toFixed(0)})`}
+                          >
+                            ±{(2 * r.rd).toFixed(0)}
+                          </span>
+                        )}
+                        {r.provisional && (
+                          <span
+                            className="provisional-tag"
+                            title="Too few games to be confident in this rating yet — it will settle as the model plays."
+                          >
+                            provisional
+                          </span>
+                        )}
+                      </td>
                       <td>{r.games}</td>
                       <td className="wlt">
                         <span className="w">{r.wins}W</span>

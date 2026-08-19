@@ -32,7 +32,7 @@ function StandingsTable({ standings }) {
         <tr>
           <th>#</th>
           <th>MODEL</th>
-          <th>SEASON ELO</th>
+          <th>SEASON RATING</th>
           <th>GAMES</th>
           <th>W / L / T</th>
         </tr>
@@ -45,7 +45,19 @@ function StandingsTable({ standings }) {
               <div className="model-name">{s.model_name}</div>
               <div className="provider-tag">{s.provider}</div>
             </td>
-            <td><span className="elo-value">{s.elo.toFixed(1)}</span></td>
+            <td>
+              <span className="elo-value">{s.elo.toFixed(1)}</span>
+              {s.rd != null && (
+                <span className="elo-rd" title={`Rating deviation ${s.rd.toFixed(0)}`}>
+                  ±{(2 * s.rd).toFixed(0)}
+                </span>
+              )}
+              {s.provisional && (
+                <span className="provisional-tag" title="Too few games this season to be confident in this rating yet.">
+                  provisional
+                </span>
+              )}
+            </td>
             <td>{s.games}</td>
             <td className="wlt">
               <span className="w">{s.wins}W</span>
@@ -258,7 +270,9 @@ export default function SeasonView({
       <div className="panel">
         <div className="panel-title">SEASON STANDINGS</div>
         <div className="season-elo-note">
-          ELO starts at 1000 for all participants and is computed only from battles within this season.
+          Ratings start at 1000 for all participants and are computed with Glicko-2 from
+          battles within this season only. ± shows the 95% confidence interval; a rating
+          stays <em>provisional</em> until enough games narrow it.
         </div>
         <StandingsTable standings={liveStandings} />
       </div>
