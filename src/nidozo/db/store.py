@@ -9,10 +9,35 @@ from pathlib import Path
 from typing import Any
 
 from nidozo.battle.achievements import BADGES, evaluate_badges
-from nidozo.db.elo import DEFAULT_RATING, updated_ratings
+from nidozo.db.elo import (
+    DEFAULT_RATING,
+    DEFAULT_RD,
+    DEFAULT_VOLATILITY,
+    PROVISIONAL_RD,
+    Rating,
+    updated_glicko,
+)
 from nidozo.db.schema import migrate
 
 _DEFAULT_DB = Path(__file__).parent.parent.parent.parent / "nidozo.db"
+
+
+def _with_uncertainty(row: dict[str, Any]) -> dict[str, Any]:
+    """Annotate a leaderboard row with its Glicko-2 confidence interval.
+
+    Rows from a database migrated from plain Elo can carry NULL rd/volatility;
+    those fall back to the unplayed-model priors so the row still renders.
+    """
+    rd = row.get("rd")
+    rd = DEFAULT_RD if rd is None else float(rd)
+    row["rd"] = round(rd, 1)
+    if row.get("volatility") is None:
+        row["volatility"] = DEFAULT_VOLATILITY
+    rating = float(row.get("rating") or DEFAULT_RATING)
+    row["rating_low"] = round(rating - 2.0 * rd, 1)
+    row["rating_high"] = round(rating + 2.0 * rd, 1)
+    row["provisional"] = rd >= PROVISIONAL_RD
+    return row
 
 
 class BattleStore:
@@ -99,8 +124,9 @@ class BattleStore:
             model_id = cur.lastrowid
             assert model_id is not None
             self._conn.execute(
-                "INSERT INTO elo_ratings (model_id, rating, games) VALUES (?,?,0)",
-                (model_id, DEFAULT_RATING),
+                "INSERT INTO elo_ratings (model_id, rating, rd, volatility, games)"
+                " VALUES (?,?,?,?,0)",
+                (model_id, DEFAULT_RATING, DEFAULT_RD, DEFAULT_VOLATILITY),
             )
             self._conn.commit()
             return model_id
@@ -417,36 +443,52 @@ class BattleStore:
             self._update_elo(battle_id, winner)
             return self._award_badges(battle_id, winner)
 
+    def _read_rating(self, model_id: int) -> Rating:
+        """Load one model's Glicko-2 state, tolerating pre-migration NULLs."""
+        row = self._conn.execute(
+            "SELECT rating, rd, volatility FROM elo_ratings WHERE model_id=?",
+            (model_id,),
+        ).fetchone()
+        if row is None:
+            return Rating()
+        return Rating(
+            rating=row["rating"],
+            rd=row["rd"] if row["rd"] is not None else DEFAULT_RD,
+            volatility=(
+                row["volatility"] if row["volatility"] is not None else DEFAULT_VOLATILITY
+            ),
+        )
+
     def _update_elo(self, battle_id: int, winner: int | None) -> None:
-        """Compute and persist ELO deltas. Must be called inside a transaction."""
+        """Compute and persist Glicko-2 updates. Must be called inside a transaction."""
         row = self._conn.execute(
             "SELECT p1_model_id, p2_model_id FROM battles WHERE id=?",
             (battle_id,),
         ).fetchone()
         p1_id, p2_id = row["p1_model_id"], row["p2_model_id"]
 
-        r1 = self._conn.execute(
-            "SELECT rating FROM elo_ratings WHERE model_id=?", (p1_id,)
-        ).fetchone()["rating"]
-        r2 = self._conn.execute(
-            "SELECT rating FROM elo_ratings WHERE model_id=?", (p2_id,)
-        ).fetchone()["rating"]
+        r1 = self._read_rating(p1_id)
+        r2 = self._read_rating(p2_id)
 
-        new_r1, new_r2 = updated_ratings(r1, r2, winner)
+        new_r1, new_r2 = updated_glicko(r1, r2, winner)
 
         for model_id, before, after in ((p1_id, r1, new_r1), (p2_id, r2, new_r2)):
             self._conn.execute(
                 """UPDATE elo_ratings
-                   SET rating=?, games=games+1,
+                   SET rating=?, rd=?, volatility=?, games=games+1,
                        updated_at=strftime('%Y-%m-%dT%H:%M:%SZ','now')
                    WHERE model_id=?""",
-                (after, model_id),
+                (after.rating, after.rd, after.volatility, model_id),
             )
             self._conn.execute(
                 """INSERT OR IGNORE INTO elo_history
-                   (battle_id, model_id, rating_before, rating_after, delta)
-                   VALUES (?,?,?,?,?)""",
-                (battle_id, model_id, before, after, after - before),
+                   (battle_id, model_id, rating_before, rating_after, delta,
+                    rd_before, rd_after)
+                   VALUES (?,?,?,?,?,?,?)""",
+                (
+                    battle_id, model_id, before.rating, after.rating,
+                    after.rating - before.rating, before.rd, after.rd,
+                ),
             )
         # No commit here — the `with self._conn:` block in finish_battle handles it.
 
@@ -611,6 +653,14 @@ class BattleStore:
         cur = self._conn.execute(
             f"""SELECT m.provider, m.model_name,
                       MAX(e.rating) AS rating,
+                      (SELECT e2.rd FROM models m2
+                         JOIN elo_ratings e2 ON e2.model_id = m2.id
+                        WHERE m2.provider = m.provider AND m2.model_name = m.model_name
+                        ORDER BY e2.rating DESC LIMIT 1) AS rd,
+                      (SELECT e2.volatility FROM models m2
+                         JOIN elo_ratings e2 ON e2.model_id = m2.id
+                        WHERE m2.provider = m.provider AND m2.model_name = m.model_name
+                        ORDER BY e2.rating DESC LIMIT 1) AS volatility,
                       COALESCE(SUM(wld.wins),   0)
                         + COALESCE(SUM(wld.losses), 0)
                         + COALESCE(SUM(wld.ties),   0) AS games,
@@ -647,7 +697,7 @@ class BattleStore:
                ORDER BY MAX(e.rating) DESC""",
             {"tier": tier},
         )
-        rows = [dict(r) for r in cur.fetchall()]
+        rows = [_with_uncertainty(dict(r)) for r in cur.fetchall()]
         streaks = self._win_streaks()
         for row in rows:
             row["streak"] = streaks.get(row["model_id"], 0)
@@ -699,7 +749,7 @@ class BattleStore:
         """One row per (provider, model_name, prompt_version) — original behaviour."""
         cur = self._conn.execute(
             """SELECT m.provider, m.model_name, m.prompt_version,
-                      e.rating, e.games,
+                      e.rating, e.rd, e.volatility, e.games,
                       COALESCE(wld.wins,   0) AS wins,
                       COALESCE(wld.losses, 0) AS losses,
                       COALESCE(wld.ties,   0) AS ties
@@ -726,7 +776,7 @@ class BattleStore:
                ) wld ON wld.model_id = m.id
                ORDER BY e.rating DESC""",
         )
-        return [dict(r) for r in cur.fetchall()]
+        return [_with_uncertainty(dict(r)) for r in cur.fetchall()]
 
     def matchup_matrix(self, tier: str | None = None) -> list[dict[str, Any]]:
         """Return per-pair win/loss/tie counts for the head-to-head matchup matrix.
@@ -872,7 +922,7 @@ class BattleStore:
         # Identity + current ELO + W/L/T
         info_row = self._conn.execute(
             """SELECT m.id, m.provider, m.model_name, m.prompt_version,
-                      e.rating, e.games,
+                      e.rating, e.rd, e.volatility, e.games,
                       COALESCE(wld.wins,   0) AS wins,
                       COALESCE(wld.losses, 0) AS losses,
                       COALESCE(wld.ties,   0) AS ties
@@ -898,6 +948,7 @@ class BattleStore:
         ).fetchone()
         if not info_row:
             return None
+        info = _with_uncertainty(dict(info_row))
 
         # ELO history (chronological, capped to the *most recent* 30 battles).
         # Take the latest 30 by finished_at DESC, then re-sort ASC so the chart
@@ -966,7 +1017,7 @@ class BattleStore:
         usage = self.get_model_usage_stats(model_id)
 
         return {
-            "model": dict(info_row),
+            "model": info,
             "elo_history": [dict(r) for r in elo_rows],
             "battle_history": [dict(r) for r in battle_rows],
             "turn_stats": {
@@ -1453,12 +1504,13 @@ class BattleStore:
         return True
 
     def get_season_standings(self, season_id: int) -> list[dict[str, Any]]:
-        """Return per-season standings with W/L/T and ELO replayed from 1000.
+        """Return per-season standings with W/L/T and ratings replayed from scratch.
 
-        ELO is computed fresh from DEFAULT_RATING for each participant using
-        only battles that belong to this season, in chronological order.
+        Ratings are computed fresh with Glicko-2 for each participant using only
+        battles that belong to this season, in chronological order — so a season
+        rating reflects that season alone, independent of global rating.
         """
-        from nidozo.db.elo import DEFAULT_RATING, updated_ratings
+        from nidozo.db.elo import Rating, updated_glicko
 
         season = self.get_season(season_id)
         if season is None:
@@ -1468,14 +1520,14 @@ class BattleStore:
             season["participants"] if isinstance(season["participants"], list) else []
         )
 
-        ratings: dict[str, float] = {}
+        ratings: dict[str, Rating] = {}
         wins: dict[str, int] = {}
         losses: dict[str, int] = {}
         ties: dict[str, int] = {}
 
         for p in participants:
             key = f"{p['provider']}/{p['model_name']}"
-            ratings[key] = DEFAULT_RATING
+            ratings[key] = Rating()
             wins[key] = 0
             losses[key] = 0
             ties[key] = 0
@@ -1497,9 +1549,9 @@ class BattleStore:
             p2_key: str = row["p2_key"]
             winner: int | None = row["winner"]
 
-            r1 = ratings.get(p1_key, DEFAULT_RATING)
-            r2 = ratings.get(p2_key, DEFAULT_RATING)
-            r1_new, r2_new = updated_ratings(r1, r2, winner)
+            r1 = ratings.get(p1_key, Rating())
+            r2 = ratings.get(p2_key, Rating())
+            r1_new, r2_new = updated_glicko(r1, r2, winner)
             ratings[p1_key] = r1_new
             ratings[p2_key] = r2_new
 
@@ -1522,7 +1574,9 @@ class BattleStore:
             standings.append({
                 "provider":   p["provider"],
                 "model_name": p["model_name"],
-                "elo":        round(ratings.get(key, DEFAULT_RATING), 1),
+                "elo":        round(ratings.get(key, Rating()).rating, 1),
+                "rd":         round(ratings.get(key, Rating()).rd, 1),
+                "provisional": ratings.get(key, Rating()).provisional,
                 "wins":       w,
                 "losses":     lo,
                 "ties":       t,

@@ -2,13 +2,13 @@ import { useState, useReducer, useEffect, useCallback } from 'react'
 import EmptyState from './EmptyState'
 
 // ---------------------------------------------------------------------------
-// ELO Sparkline — pure SVG, no external deps
+// Rating sparkline — pure SVG, no external deps
 // ---------------------------------------------------------------------------
 
 function EloSparkline({ history }) {
   if (!history || history.length < 2) {
     return (
-      <div className="sparkline-empty">Not enough data for ELO chart</div>
+      <div className="sparkline-empty">Not enough data for rating chart</div>
     )
   }
 
@@ -45,7 +45,7 @@ function EloSparkline({ history }) {
   return (
     <div className="sparkline-wrap">
       <div className="sparkline-header">
-        <span className="sparkline-label">ELO PROGRESSION</span>
+        <span className="sparkline-label">RATING PROGRESSION</span>
         <span className={`sparkline-delta ${deltaClass}`}>
           {deltaSign}{delta.toFixed(1)} over {history.length} battles
         </span>
@@ -670,8 +670,18 @@ export default function ModelStats({ modelId, onClose, onReplaySelected }) {
         </div>
         <div className="stats-kpis">
           <div className="kpi-block">
-            <div className="kpi-value elo-value">{model.rating.toFixed(1)}</div>
-            <div className="kpi-label">ELO</div>
+            <div className="kpi-value elo-value">
+              {model.rating.toFixed(1)}
+              {model.rd != null && (
+                <span className="elo-rd" title={`Rating deviation ${model.rd.toFixed(0)}`}>
+                  ±{(2 * model.rd).toFixed(0)}
+                </span>
+              )}
+            </div>
+            <div className="kpi-label">
+              RATING
+              {model.provisional && <span className="provisional-tag">provisional</span>}
+            </div>
           </div>
           <div className="kpi-block">
             <div className="kpi-value">
@@ -698,7 +708,7 @@ export default function ModelStats({ modelId, onClose, onReplaySelected }) {
         </div>
       </div>
 
-      {/* ELO chart */}
+      {/* Rating chart */}
       <div className="panel stats-panel">
         <EloSparkline history={elo_history} />
       </div>

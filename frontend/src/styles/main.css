@@ -435,6 +435,34 @@ body::after {
   color: var(--accent-amber);
 }
 
+/* Glicko-2 uncertainty: the confidence band and the provisional marker.
+   Deliberately quieter than the rating itself — it qualifies the number
+   without competing with it for attention. */
+.elo-rd {
+  margin-left: 0.35em;
+  /* --fs-3xs is reserved for the pixel font, which stays legible that small;
+     this is body type, so it needs the next steps up to be readable. */
+  font-size: var(--fs-sm);
+  font-weight: 400;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.provisional-tag {
+  margin-left: 0.4em;
+  padding: 0.05em 0.4em;
+  border: 1px solid var(--text-muted);
+  border-radius: 3px;
+  font-family: var(--font-pixel);
+  font-size: var(--fs-3xs);
+  font-weight: 400;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
 .rank-badge {
   font-family: var(--font-pixel);
   font-size: var(--fs-3xs);

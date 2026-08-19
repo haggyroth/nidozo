@@ -5,7 +5,7 @@ import sqlite3
 
 logger = logging.getLogger(__name__)
 
-SCHEMA_VERSION = 19
+SCHEMA_VERSION = 20
 
 # Table definitions only — safe to run against any DB version via IF NOT EXISTS.
 # Indexes are kept separate because they may reference columns (e.g. tournament_id)
@@ -32,6 +32,10 @@ CREATE TABLE IF NOT EXISTS models (
 CREATE TABLE IF NOT EXISTS elo_ratings (
     model_id   INTEGER PRIMARY KEY REFERENCES models(id),
     rating     REAL    NOT NULL DEFAULT 1000.0,
+    -- Glicko-2 uncertainty (#231): rd is the rating deviation, volatility is
+    -- how erratic results have been. Defaults are the unplayed-model priors.
+    rd         REAL    NOT NULL DEFAULT 350.0,
+    volatility REAL    NOT NULL DEFAULT 0.06,
     games      INTEGER NOT NULL DEFAULT 0,
     updated_at TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
 );
@@ -84,6 +88,9 @@ CREATE TABLE IF NOT EXISTS elo_history (
     rating_before REAL    NOT NULL,
     rating_after  REAL    NOT NULL,
     delta         REAL    NOT NULL,
+    -- Nullable: rows written before the Glicko-2 migration have no RD to record.
+    rd_before     REAL,
+    rd_after      REAL,
     UNIQUE(battle_id, model_id)  -- prevents double ELO application on retry
 );
 
@@ -539,4 +546,21 @@ def migrate(conn: sqlite3.Connection) -> None:
         except sqlite3.OperationalError:
             pass  # column already exists
         conn.execute("UPDATE schema_version SET version=19")
+        conn.commit()
+
+    if version < 20:
+        # #231: Glicko-2. Existing rows backfill to the unplayed-model priors —
+        # a wide RD is the honest description of a rating whose uncertainty was
+        # never tracked, and it lets those models re-converge as they play.
+        for table, col in (
+            ("elo_ratings", "rd REAL NOT NULL DEFAULT 350.0"),
+            ("elo_ratings", "volatility REAL NOT NULL DEFAULT 0.06"),
+            ("elo_history", "rd_before REAL"),
+            ("elo_history", "rd_after REAL"),
+        ):
+            try:
+                conn.execute(f"ALTER TABLE {table} ADD COLUMN {col}")
+            except sqlite3.OperationalError:
+                pass  # column already exists
+        conn.execute("UPDATE schema_version SET version=20")
         conn.commit()

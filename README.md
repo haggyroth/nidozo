@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/haggyroth/nidozo/actions/workflows/ci.yml/badge.svg)](https://github.com/haggyroth/nidozo/actions/workflows/ci.yml)
 
-An arena where two LLMs compete in Pokémon battles. The battle engine is [Pokémon Showdown](https://github.com/smogon/pokemon-showdown), accessed via [poke-env](https://github.com/hsahovic/poke-env). Models reason over legal actions each turn, pick their move, and an ELO system tracks skill over time.
+An arena where two LLMs compete in Pokémon battles. The battle engine is [Pokémon Showdown](https://github.com/smogon/pokemon-showdown), accessed via [poke-env](https://github.com/hsahovic/poke-env). Models reason over legal actions each turn, pick their move, and a Glicko-2 rating system tracks skill — and how confident that skill estimate is — over time.
 
 Battles use **Gen 9 National Dex** as the canonical ruleset — any Pokémon from any generation can fight using any move it can legally learn today. Showdown validates teams automatically, so there's no per-generation moveset maintenance.
 
@@ -25,11 +25,11 @@ Sibling project to [Nimzo](https://github.com/haggyroth/nimzo) (the LLM chess ar
 - **Hidden-information enforcement** — each model sees only what a human player would legitimately know
 - **Cross-battle memory** — after each battle the LLM generates a short lesson; lessons are stored per model and injected into future system prompts so models adapt strategy over time. A per-battle toggle plus a per-model **Lesson Efficacy** panel (win rate with lessons on vs off) let you actually measure whether the learning loop helps
 - **Personality profiles** — per-model play-style profiling derived from decision history
-- **ELO rankings** — updated after every battle, persisted in SQLite; leaderboard with tier filter tabs
+- **Glicko-2 rankings** — rating plus a rating deviation (RD) and volatility, updated after every battle and persisted in SQLite. The leaderboard shows each rating's 95% confidence band and tags a model *provisional* until enough games narrow it, so a 3-0 newcomer is never mistaken for a settled contender. Tier filter tabs included
 - **Token & cost analytics** — per-turn token usage (player + coach) is recorded; the Global Stats page shows per-model and total tokens with estimated USD cost from an editable price table (`data/model_prices.json`); local models count as free
-- **Per-model stats page** — W/L/T history, ELO sparkline, opponent breakdown, decision-quality distribution, lesson log
+- **Per-model stats page** — W/L/T history, rating sparkline, opponent breakdown, decision-quality distribution, lesson log
 - **Tournaments** — round-robin plus single- and double-elimination brackets; live progress, standings/bracket overlay, battle cancel; full history page. Available from the UI or the CLI
-- **Seasons** — multi-round campaigns that aggregate standings and ELO across many battles
+- **Seasons** — multi-round campaigns that aggregate standings across many battles, with season ratings replayed from scratch so they reflect that season alone
 - **Bake-off experiments** — pit two variants of the same base model (different provider, model, or prompt version) head-to-head over N battles with alternating sides; the result reports win-rate plus an exact binomial significance test, so you can tell whether "prompt v9 beats v8" is real or noise
 - **Battle Replay** — step through any completed battle turn by turn; HP timeline; scrub/keyboard nav; auto-play
 - **Post-game analysis** — decision quality (optimal/good/suboptimal/fallback), blunder detection, win-probability timeline, turning-point detection, RNG inference; key moments list (clickable, seeks replay); variance report (crit/miss tally with per-player benefit counts); draft critique (STAB coverage, shared weaknesses, execution quality)
@@ -181,7 +181,7 @@ uv run python scripts/tournament.py \
   --rounds 3
 ```
 
-Each model pair plays both sides each round. Results are persisted to `nidozo.db` and an ELO table is printed at the end.
+Each model pair plays both sides each round. Results are persisted to `nidozo.db` and a rating table is printed at the end.
 
 ### Single battle (CLI)
 
@@ -199,7 +199,7 @@ uv run python scripts/run_battle.py --p1 lmstudio --model "ibm/granite-4-h-tiny"
 ### Leaderboard (CLI)
 
 ```bash
-uv run python scripts/leaderboard.py    # print the current ELO table
+uv run python scripts/leaderboard.py    # print the current rating table
 ```
 
 ---
@@ -216,7 +216,7 @@ nidozo/
 │   ├── battle/         LLMPlayer, StreamingPlayer, ActionParser, heuristics,
 │   │                   serializer, draft, team_builder, presets, tiers
 │   ├── tournament/     Bracket builder (round-robin, single/double elimination)
-│   ├── db/             BattleStore (SQLite), ELO, schema migrations
+│   ├── db/             BattleStore (SQLite), Glicko-2 ratings, schema migrations
 │   └── llm/            ModelBackend protocol, AnthropicBackend, OpenAIBackend,
 │       │               lesson_generator, coach, prompt_builder
 │       └── prompts/
@@ -231,7 +231,7 @@ nidozo/
 │   ├── serve.py              uvicorn entrypoint (port 5001)
 │   ├── tournament.py         Round-robin / bracket CLI runner
 │   ├── run_battle.py         Single-battle CLI
-│   ├── leaderboard.py        Print the ELO leaderboard
+│   ├── leaderboard.py        Print the rating leaderboard
 │   ├── build_natdex_sets.py  Regenerate natdex_movesets.json from Showdown data
 │   ├── start_showdown.sh     Start the local Showdown server
 │   └── stop.sh               Stop dev processes
@@ -246,7 +246,7 @@ nidozo/
 
 ## Prompt versions
 
-Prompts are versioned so changes can be correlated with ELO shifts. All use **Gen 9 NatDex** mechanics. The default is **v9**; the right version is selected automatically (doubles → v7, drafted battles → v3).
+Prompts are versioned so changes can be correlated with rating shifts. All use **Gen 9 NatDex** mechanics. The default is **v9**; the right version is selected automatically (doubles → v7, drafted battles → v3).
 
 | Version | Notes |
 |---------|-------|

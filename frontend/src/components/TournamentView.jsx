@@ -64,7 +64,7 @@ function StandingsTable({ standings }) {
           <th>T</th>
           <th>PTS</th>
           <th>PLAYED</th>
-          <th>ELO Δ</th>
+          <th>RATING Δ</th>
           <th>FORM</th>
         </tr>
       </thead>

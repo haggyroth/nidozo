@@ -2,7 +2,7 @@
 
 import pytest
 
-from nidozo.db.elo import DEFAULT_RATING
+from nidozo.db.elo import DEFAULT_RATING, DEFAULT_RD, PROVISIONAL_RD
 from nidozo.db.store import BattleStore
 
 
@@ -977,8 +977,8 @@ def test_get_season_standings_returns_empty_for_missing_season(store) -> None:
 
 
 def test_get_season_standings_multi_battle_elo_progression(store) -> None:
-    """ELO moves correctly across multiple sequential battles."""
-    from nidozo.db.elo import K_FACTOR, expected_score
+    """Season ratings move correctly across multiple sequential battles."""
+    from nidozo.db.elo import Rating, updated_glicko
 
     sid = _make_season(store, participants=[
         {"provider": "random", "model_name": "aa"},
@@ -991,17 +991,19 @@ def test_get_season_standings_multi_battle_elo_progression(store) -> None:
     standings = store.get_season_standings(sid)
     by_name = {s["model_name"]: s for s in standings}
 
-    # Manually replay to verify
-    r_aa, r_bb = DEFAULT_RATING, DEFAULT_RATING
+    # Manually replay the same Glicko-2 sequence to verify
+    r_aa, r_bb = Rating(), Rating()
     for _ in range(2):
-        e = expected_score(r_aa, r_bb)
-        r_aa = r_aa + K_FACTOR * (1.0 - e)
-        r_bb = r_bb + K_FACTOR * (0.0 - (1.0 - e))
+        r_aa, r_bb = updated_glicko(r_aa, r_bb, winner=1)
 
-    assert by_name["aa"]["elo"] == pytest.approx(r_aa, abs=0.1)
-    assert by_name["bb"]["elo"] == pytest.approx(r_bb, abs=0.1)
+    assert by_name["aa"]["elo"] == pytest.approx(r_aa.rating, abs=0.1)
+    assert by_name["bb"]["elo"] == pytest.approx(r_bb.rating, abs=0.1)
     assert by_name["aa"]["wins"] == 2
     assert by_name["bb"]["losses"] == 2
+    # Two games is not enough to settle a rating — both stay provisional, and
+    # the winner's RD has narrowed from the unplayed prior.
+    assert by_name["aa"]["provisional"] is True
+    assert by_name["aa"]["rd"] < DEFAULT_RD
 
 
 # ------------------------------------------------------------------
@@ -1404,3 +1406,112 @@ def test_cancelled_battle_excluded_from_global_stats_summary(store) -> None:
     gs = store.get_global_stats()
     # Only the 1 completed battle counts
     assert gs["summary"]["total_battles"] == 1
+
+
+# ------------------------------------------------------------------
+# Glicko-2 persistence (#231)
+# ------------------------------------------------------------------
+
+def test_new_model_seeded_with_glicko_priors(store) -> None:
+    """A model that has never played carries the wide unplayed prior."""
+    mid = store.get_or_create_model("random", "glicko-newcomer")
+    row = store._conn.execute(
+        "SELECT rating, rd, volatility FROM elo_ratings WHERE model_id=?", (mid,)
+    ).fetchone()
+
+    assert row["rating"] == DEFAULT_RATING
+    assert row["rd"] == DEFAULT_RD
+    assert row["volatility"] == pytest.approx(0.06)
+
+
+def test_finish_battle_persists_rd_and_volatility(store) -> None:
+    """Playing a battle narrows RD for both players and records volatility."""
+    p1 = store.get_or_create_model("random", "g2a")
+    p2 = store.get_or_create_model("random", "g2b")
+    bid = store.create_battle("glicko-1", "gen9randombattle", p1, p2)
+    store.finish_battle(bid, winner=1, total_turns=10)
+
+    for mid in (p1, p2):
+        row = store._conn.execute(
+            "SELECT rd, volatility, games FROM elo_ratings WHERE model_id=?", (mid,)
+        ).fetchone()
+        assert row["rd"] < DEFAULT_RD, "playing should reduce uncertainty"
+        assert row["rd"] > 0
+        assert row["volatility"] > 0
+        assert row["games"] == 1
+
+
+def test_elo_history_records_rd_transition(store) -> None:
+    p1 = store.get_or_create_model("random", "g2c")
+    p2 = store.get_or_create_model("random", "g2d")
+    bid = store.create_battle("glicko-2", "gen9randombattle", p1, p2)
+    store.finish_battle(bid, winner=1, total_turns=10)
+
+    row = store._conn.execute(
+        "SELECT rd_before, rd_after FROM elo_history WHERE battle_id=? AND model_id=?",
+        (bid, p1),
+    ).fetchone()
+
+    assert row["rd_before"] == DEFAULT_RD
+    assert row["rd_after"] < row["rd_before"]
+
+
+def test_rd_keeps_narrowing_across_many_battles(store) -> None:
+    """A model with a real track record leaves provisional status behind."""
+    p1 = store.get_or_create_model("random", "g2veteran")
+    p2 = store.get_or_create_model("random", "g2sparring")
+    for i in range(25):
+        bid = store.create_battle(f"glicko-series-{i}", "gen9randombattle", p1, p2)
+        store.finish_battle(bid, winner=1 if i % 2 == 0 else 2, total_turns=10)
+
+    rd = store._conn.execute(
+        "SELECT rd FROM elo_ratings WHERE model_id=?", (p1,)
+    ).fetchone()["rd"]
+    assert rd < PROVISIONAL_RD
+
+
+def test_leaderboard_exposes_uncertainty_fields(store) -> None:
+    p1 = store.get_or_create_model("random", "g2lb1")
+    p2 = store.get_or_create_model("random", "g2lb2")
+    bid = store.create_battle("glicko-lb", "gen9randombattle", p1, p2)
+    store.finish_battle(bid, winner=1, total_turns=10)
+
+    for grouped in (True, False):
+        rows = store.leaderboard(grouped=grouped)
+        assert rows, f"expected leaderboard rows (grouped={grouped})"
+        for row in rows:
+            assert "rd" in row
+            assert "provisional" in row
+            assert row["rating_low"] == pytest.approx(row["rating"] - 2 * row["rd"], abs=0.2)
+            assert row["rating_high"] == pytest.approx(row["rating"] + 2 * row["rd"], abs=0.2)
+            assert row["provisional"] is (row["rd"] >= PROVISIONAL_RD)
+
+
+def test_model_stats_exposes_uncertainty(store) -> None:
+    p1 = store.get_or_create_model("random", "g2stats1")
+    p2 = store.get_or_create_model("random", "g2stats2")
+    bid = store.create_battle("glicko-stats", "gen9randombattle", p1, p2)
+    store.finish_battle(bid, winner=1, total_turns=10)
+
+    stats = store.get_model_stats(p1)
+    assert stats is not None
+    assert stats["model"]["rd"] < DEFAULT_RD
+    assert stats["model"]["provisional"] is True
+
+
+def test_glicko_update_is_idempotent_on_replayed_finish(store) -> None:
+    """A second finish_battle must not re-apply the rating change."""
+    p1 = store.get_or_create_model("random", "g2idem1")
+    p2 = store.get_or_create_model("random", "g2idem2")
+    bid = store.create_battle("glicko-idem", "gen9randombattle", p1, p2)
+    store.finish_battle(bid, winner=1, total_turns=10)
+
+    after_first = store._conn.execute(
+        "SELECT rating, rd, volatility, games FROM elo_ratings WHERE model_id=?", (p1,)
+    ).fetchone()
+    store.finish_battle(bid, winner=1, total_turns=10)
+    after_second = store._conn.execute(
+        "SELECT rating, rd, volatility, games FROM elo_ratings WHERE model_id=?", (p1,)
+    ).fetchone()
+
+    assert dict(after_first) == dict(after_second)

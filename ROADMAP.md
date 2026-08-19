@@ -289,6 +289,8 @@
 ## Upcoming
 
 _No major tracked initiatives open. Smaller follow-ups live as GitHub issues._
+_Glicko-2 uncertainty-aware ratings (#231) shipped — ratings now carry an RD and_
+_volatility, and the leaderboard distinguishes provisional from settled._
 _The v0.39 code-review audit is fully cleared: the wave-1 fixes (perf, schema_
 _integrity, draft guard) shipped in v0.39.6, followed by the orchestration-runner_
 _refactor (#208), the test-coverage backfill (#213–#218, project ~93%), and_
