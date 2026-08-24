@@ -19,7 +19,7 @@ dev = [
     "pytest-asyncio>=0.24",
     "pytest-cov>=7.1",
     "httpx2>=2.5.0",        # silences the starlette TestClient deprecation warning
-    "ruff==0.16.3",        # linting — CI installs and runs this exact version
+    "ruff==0.16.4",        # linting — CI installs and runs this exact version
     "mypy>=2.1.0",
 ]
 
