@@ -8,7 +8,7 @@ from typing import Any
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
-from nidozo.api.auth import ws_authorized
+from nidozo.api.auth import ws_auth_subprotocol, ws_authorized
 
 # WebSocket close code for an unauthorized connection (1008 = policy violation).
 _CLOSE_POLICY_VIOLATION = 1008
@@ -17,8 +17,9 @@ _CLOSE_POLICY_VIOLATION = 1008
 def create_ws_router(bus: Any, auth_token: str | None = None) -> APIRouter:
     """Return a router containing the /ws/battles WebSocket endpoint.
 
-    When *auth_token* is set, the client must supply a matching ``?token=``
-    query parameter (browsers can't set headers on a WS handshake).
+    When *auth_token* is set, the client must supply it via the
+    ``Sec-WebSocket-Protocol`` handshake header (``nidozo-auth.<base64url>``,
+    which browsers can set) or the legacy ``?token=`` query parameter.
     """
     router = APIRouter()
 
@@ -27,7 +28,9 @@ def create_ws_router(bus: Any, auth_token: str | None = None) -> APIRouter:
         if not ws_authorized(ws, auth_token):
             await ws.close(code=_CLOSE_POLICY_VIOLATION, reason="unauthorized")
             return
-        await ws.accept()
+        # Echo the credential subprotocol — a browser aborts the handshake if the
+        # server accepts without selecting one of the protocols it offered.
+        await ws.accept(subprotocol=ws_auth_subprotocol(ws))
         q = bus.subscribe()
         try:
             while True:
