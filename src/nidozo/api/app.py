@@ -10,7 +10,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from nidozo import __version__
-from nidozo.api.auth import add_auth, get_api_token
+from nidozo.api.auth import add_auth, enforce_auth_policy, get_api_token
 from nidozo.api.events import EventBus
 from nidozo.api.lifespan import create_lifespan
 from nidozo.api.logging_config import configure_logging
@@ -29,6 +29,13 @@ _SHOWDOWN_PORT = int(os.environ.get("NIDOZO_SHOWDOWN_PORT", "8000"))
 
 def create_app(db_path: Path = _DB_PATH) -> FastAPI:
     configure_logging()
+    # Optional shared-secret auth (#212), now fail-closed: when NIDOZO_API_TOKEN
+    # is unset the app refuses to start unless NIDOZO_ALLOW_INSECURE=1. Read here
+    # (not at import) so tests and deployments can set the env before create_app
+    # runs, and enforce before any resource is opened.
+    api_token = get_api_token()
+    enforce_auth_policy(api_token)
+
     bus = EventBus()
     store = BattleStore(db_path)
     active_tasks: dict[int, asyncio.Task[None]] = {}
@@ -40,11 +47,6 @@ def create_app(db_path: Path = _DB_PATH) -> FastAPI:
     )
     app.state.store = store
     app.state.active_tasks = active_tasks
-
-    # Optional shared-secret auth (#212). Enabled only when NIDOZO_API_TOKEN is
-    # set; otherwise a no-op with a startup warning. Read here (not at import)
-    # so tests and deployments can set the env before create_app runs.
-    api_token = get_api_token()
 
     add_cors(app)
     add_auth(app, api_token)

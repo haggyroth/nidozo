@@ -141,6 +141,10 @@ jobs:
       # validates startup ordering. If a container crashes the step fails, but
       # the always() log-dump step below still captures why.
       - name: Start the stack
+        env:
+          # localhost-only smoke test — no token needed; opts out of the
+          # fail-closed auth guard for the duration of the run.
+          NIDOZO_ALLOW_INSECURE: "1"
         run: docker compose up -d
 
       - name: Wait for the stack to become healthy

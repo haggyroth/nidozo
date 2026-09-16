@@ -109,3 +109,21 @@ def test_token_matches_is_constant_time_safe() -> None:
     assert token_matches("abc", "abd") is False
     assert token_matches(None, "abc") is False
     assert token_matches("", "abc") is False
+
+
+# ---------------------------------------------------------------------------
+# Fail-closed startup (#273)
+# ---------------------------------------------------------------------------
+
+def test_create_app_fails_closed_when_no_token(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.delenv("NIDOZO_API_TOKEN", raising=False)
+    monkeypatch.delenv("NIDOZO_ALLOW_INSECURE", raising=False)
+    with pytest.raises(RuntimeError, match="NIDOZO_API_TOKEN"):
+        create_app(db_path=tmp_path / "failclosed.db")
+
+
+def test_create_app_allows_insecure_opt_in(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.delenv("NIDOZO_API_TOKEN", raising=False)
+    monkeypatch.setenv("NIDOZO_ALLOW_INSECURE", "1")
+    app = create_app(db_path=tmp_path / "insecure.db")
+    assert app is not None

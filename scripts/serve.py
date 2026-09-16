@@ -43,6 +43,15 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
+    # Loopback-only bind is the documented safe case: keep local dev frictionless
+    # by opting out of the fail-closed guard automatically. A non-loopback host
+    # (e.g. `--host 0.0.0.0`) still requires NIDOZO_API_TOKEN.
+    if (
+        not os.environ.get("NIDOZO_API_TOKEN")
+        and args.host in ("127.0.0.1", "localhost", "::1")
+    ):
+        os.environ.setdefault("NIDOZO_ALLOW_INSECURE", "1")
+
     # Configure structured JSON logging before anything else starts.
     from nidozo.api.logging_config import configure_logging
     configure_logging(level=args.log_level)

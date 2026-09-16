@@ -77,7 +77,8 @@ The `api` service reads these environment variables (pass them in the host shell
 
 | Variable | Purpose | Default |
 |---|---|---|
-| `NIDOZO_API_TOKEN` | Shared-secret token. When set, **every `/api/*` request and WebSocket requires it**. When unset, auth is disabled and a warning is logged at startup. | _(unset → auth off)_ |
+| `NIDOZO_API_TOKEN` | Shared-secret token. When set, **every `/api/*` request and WebSocket requires it**. When unset, the API **refuses to start** (fail-closed) unless `NIDOZO_ALLOW_INSECURE=1`. | _(unset → startup error)_ |
+| `NIDOZO_ALLOW_INSECURE` | Explicit opt-out of the fail-closed guard when the token is unset. Set to `1` only for a loopback-only / air-gapped instance. | `0` |
 | `NIDOZO_RATE_LIMIT_PER_MIN` | Max battle/tournament/season/experiment **start** requests per minute per client IP (returns `429` over the limit). `0` disables it. | `0` |
 | `LM_STUDIO_BASE_URL` | OpenAI-compatible URL of your LM Studio server. | `http://localhost:1234/v1` |
 | `LM_STUDIO_MODEL` | Default LM Studio model id. | `local-model` |
@@ -85,7 +86,7 @@ The `api` service reads these environment variables (pass them in the host shell
 
 **Authentication (#212).** `/healthz` and the static web app always stay open (so health checks work and the page can load); everything else is gated when `NIDOZO_API_TOKEN` is set. In the browser, click the **🔑** button in the header and paste the token — it's stored in `localStorage` and attached to every request automatically (you'll also be prompted automatically on the first `401`). Programmatic clients send `Authorization: Bearer <token>` (WebSockets use a `?token=<token>` query parameter, since browsers can't set headers on a WS handshake).
 
-> ⚠️ **If you expose port `5001` beyond localhost, set `NIDOZO_API_TOKEN`.** The battle-start endpoints spend real LLM API credits, so an open, internet-reachable instance is a money-drain risk.
+> ⚠️ **If you expose port `5001` beyond localhost, set `NIDOZO_API_TOKEN`.** The battle-start endpoints spend real LLM API credits. The API fails closed: with no token it refuses to start unless you explicitly set `NIDOZO_ALLOW_INSECURE=1` (loopback-only).
 
 ### Example: multi-machine deployment
 
@@ -161,6 +162,8 @@ cd frontend && npm run dev
 ```
 
 Open `http://localhost:5173`, select models, and click **▶ START BATTLE** to watch turn by turn. Use **⚔ TOURNAMENT** to run a round-robin or elimination bracket across multiple models. Completed battles show **▶ REPLAY** and **▼ ANALYZE** buttons in the Recent Battles panel.
+
+`scripts/serve.py` binds `127.0.0.1` by default and opts out of the auth guard automatically; to bind a non-loopback host, set `NIDOZO_API_TOKEN` (or `NIDOZO_ALLOW_INSECURE=1`).
 
 ### The battle view — Showdown cockpit
 

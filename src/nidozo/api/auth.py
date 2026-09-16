@@ -1,9 +1,9 @@
 """Optional shared-secret authentication for the Nidozo API.
 
 When ``NIDOZO_API_TOKEN`` is set, every ``/api/*`` HTTP route and both
-WebSocket endpoints require the token. When it is unset, authentication is
-disabled (the historical local-dev behaviour) and a loud warning is logged at
-startup.
+WebSocket endpoints require the token. When it is unset, the app refuses to
+start (fail-closed) unless ``NIDOZO_ALLOW_INSECURE=1`` explicitly opts into an
+open, loopback-only instance.
 
 Always left open, regardless of the token:
   * ``/healthz`` — so container/load-balancer health checks keep working.
@@ -56,14 +56,48 @@ def token_matches(provided: str | None, expected: str) -> bool:
     return secrets.compare_digest(provided, expected)
 
 
-def add_auth(app: FastAPI, token: str | None) -> None:
-    """Install the token-gate middleware on *app* (no-op when *token* is None)."""
-    if not token:
+def allow_insecure() -> bool:
+    """Return True when the operator has explicitly opted out of the token gate.
+
+    Only consulted when ``NIDOZO_API_TOKEN`` is unset. Accepts common truthy
+    spellings so a blank or typo'd value can never silently disable the
+    fail-closed guard.
+    """
+    return os.environ.get("NIDOZO_ALLOW_INSECURE", "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+
+
+def enforce_auth_policy(token: str | None) -> None:
+    """Fail closed when no token is configured, unless explicitly opted out.
+
+    Raises ``RuntimeError`` when authentication would be disabled without an
+    explicit ``NIDOZO_ALLOW_INSECURE=1`` opt-in, so an exposed instance can
+    never silently start open. Called before any resources are opened.
+    """
+    if token is not None:
+        return
+    if allow_insecure():
         logger.warning(
-            "API authentication is DISABLED (NIDOZO_API_TOKEN not set). "
+            "API authentication is DISABLED (NIDOZO_ALLOW_INSECURE=1). "
             "Do NOT expose this server beyond localhost: the battle-start "
             "endpoints spend real LLM API credits, and all data is readable."
         )
+        return
+    raise RuntimeError(
+        "NIDOZO_API_TOKEN is not set — refusing to start with authentication "
+        "disabled. Set NIDOZO_API_TOKEN, or set NIDOZO_ALLOW_INSECURE=1 to "
+        "explicitly opt into an open (loopback-only) instance."
+    )
+
+
+def add_auth(app: FastAPI, token: str | None) -> None:
+    """Install the token-gate middleware on *app* (no-op when *token* is None)."""
+    if not token:
+        # enforce_auth_policy() has already validated this path (opt-in).
         return
 
     logger.info("API authentication ENABLED — token required on /api/* and WebSockets.")
