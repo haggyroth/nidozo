@@ -12,9 +12,10 @@ import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from poke_env.battle import DoubleBattle
+from poke_env.battle import DoubleBattle, Pokemon
 
 from nidozo.battle.llm_player import LLMPlayer, _status_label, _status_verb
+from nidozo.battle.serializer import _serialize_own_pokemon
 
 # ---------------------------------------------------------------------------
 # Shared fixtures
@@ -1389,3 +1390,81 @@ def test_update_hp_snapshot_swallows_exception(mock_backend) -> None:
 
     # Should not raise.
     player._update_hp_snapshot(battle)
+
+
+# ---------------------------------------------------------------------------
+# Snapshot / serialized-state species-key agreement (#275)
+#
+# _build_recent_events diffs the HP snapshot against the serialized state, so
+# both must key a Pokémon by the same string. They were keyed by different ones
+# (raw poke-env id `"rotomwash"` vs Pokédex display name `"Rotom-Wash"`), so
+# every lookup missed and the battle-history feature silently emitted nothing
+# but "Your action" / "Opponent used" lines.
+#
+# These tests use **real `Pokemon` objects** on purpose: `species_name()` falls
+# back to the raw id whenever the Pokédex lookup fails, and a `MagicMock` has no
+# usable `gen`, so mock-based tests see both sides agree no matter what. Only a
+# real Pokémon exercises the lookup that caused the mismatch.
+# ---------------------------------------------------------------------------
+
+def _real_mon(species: str, hp: str) -> Pokemon:
+    """A real Pokemon with Showdown-format HP, e.g. '100/100' or '40/100 brn'."""
+    mon = Pokemon(gen=9, species=species)
+    mon.set_hp(hp)
+    return mon
+
+
+def test_snapshot_keys_real_pokemon_by_the_serialized_name(mock_backend) -> None:
+    own = _real_mon("rotomwash", "100/100")
+    opp = _real_mon("garchomp", "80/100")
+    battle = _make_singles_battle(turn=3)
+    battle.team = {"a": own}
+    battle.opponent_team = {"x": opp}
+
+    player = _make_player(mock_backend)
+    player._update_hp_snapshot(battle)
+
+    # The serializer's key for the same mon — what _build_recent_events looks up.
+    own_key = _serialize_own_pokemon(own)["species"]
+    assert own_key == "Rotom-Wash"          # display name, not "rotomwash"
+
+    assert own_key in player._prev_hp
+    assert own_key in player._prev_snapshot
+    assert player._prev_hp[own_key] == pytest.approx(1.0)
+    assert f"opp_{_serialize_own_pokemon(opp)['species']}" in player._prev_hp
+    assert player._prev_hp["opp_Garchomp"] == pytest.approx(0.8)
+
+
+def test_recent_events_reports_hp_loss_for_a_real_pokemon(mock_backend) -> None:
+    mon = _real_mon("rotomwash", "100/100")
+    battle = _make_singles_battle(turn=4)
+    battle.team = {"a": mon}
+    battle.opponent_team = {}
+
+    player = _make_player(mock_backend)
+    player._update_hp_snapshot(battle)
+
+    mon.set_hp("40/100")                    # took 60% this turn
+    state = {"my_active": _serialize_own_pokemon(mon), "opponent_active": None}
+    result = player._build_recent_events(battle, state)
+
+    lines = [line for entry in result for line in entry["lines"]]
+    assert any("took ~60% damage" in line for line in lines), lines
+
+
+def test_recent_events_reports_hp_loss_for_a_real_pokemon_in_doubles(mock_backend) -> None:
+    mon = _real_mon("rotomwash", "100/100")
+    battle = _make_doubles_battle(turn=4)
+    battle.team = {"a": mon}
+    battle.opponent_team = {}
+
+    player = _make_player(mock_backend)
+    player._recent_events = []
+    player._update_hp_snapshot(battle)
+
+    mon.set_hp("40/100")
+    state = {"my_active": [_serialize_own_pokemon(mon)], "opponent_active": []}
+    result = player._build_recent_events(battle, state)
+
+    lines = [line for entry in result for line in entry["lines"]]
+    assert any("took ~60% damage" in line for line in lines), lines

@@ -22,8 +22,13 @@ from poke_env.data.gen_data import GenData
 from nidozo.battle.heuristics import score_actions, score_doubles_actions
 
 
-def _species_name(mon: Pokemon) -> str:
+def species_name(mon: Pokemon) -> str:
     """Return a display-friendly species name suitable for sprites and prompts.
+
+    Public because it is the single source of truth for how a Pokémon is *named*
+    anywhere a name is used as a lookup key or rendered — the serialized state and
+    LLMPlayer's HP snapshots must agree, or diffing between them silently finds
+    nothing (#275).
 
     poke-env normalises species IDs via ``to_id_str()`` — stripping all
     special characters including hyphens — so form Pokémon come out as e.g.
@@ -116,7 +121,7 @@ def _serialize_singles_battle(battle: AbstractBattle, *, light: bool = False) ->
         return state
 
     state["available_moves"] = [_serialize_move(m) for m in battle.available_moves]
-    state["available_switches"] = [_species_name(p) for p in battle.available_switches]
+    state["available_switches"] = [species_name(p) for p in battle.available_switches]
     state["heuristics"] = score_actions(battle)
     state["opponent_threat_map"] = _compute_threat_map(battle)
     return state
@@ -198,7 +203,7 @@ def _serialize_doubles_battle(battle: DoubleBattle, *, light: bool = False) -> d
         for slot_moves in raw_moves
     ]
     state["available_switches"] = [
-        [_species_name(p) for p in slot_switches]
+        [species_name(p) for p in slot_switches]
         for slot_switches in raw_switches
     ]
     state["heuristics"] = score_doubles_actions(battle)
@@ -222,7 +227,7 @@ def _serialize_own_pokemon(mon: Pokemon | None) -> dict[str, Any] | None:
     last_move = mon.last_move
     tera = getattr(mon, "tera_type", None)
     return {
-        "species": _species_name(mon),
+        "species": species_name(mon),
         "level": mon.level,
         # types already reflects Tera type when Terastallized (poke-env handles this).
         "types": [t.name for t in mon.types],
@@ -261,7 +266,7 @@ def _serialize_opponent_pokemon(mon: Pokemon | None) -> dict[str, Any] | None:
     # that point the animation reveals it publicly, so it's safe to surface.
     tera = getattr(mon, "tera_type", None) if is_tera else None
     return {
-        "species": _species_name(mon),
+        "species": species_name(mon),
         "level": mon.level,
         # types already reflects Tera type when Terastallized (poke-env handles this).
         "types": [t.name for t in mon.types],
@@ -384,14 +389,14 @@ def _compute_threat_map(battle: AbstractBattle) -> list[dict[str, Any]]:
                     default=1.0,
                 )
                 if max_mult >= 2.0:
-                    threatens.append(_species_name(own))
+                    threatens.append(species_name(own))
                 elif max_mult <= 0.5:
-                    resists.append(_species_name(own))
+                    resists.append(species_name(own))
             except Exception:  # noqa: BLE001
                 pass
 
         result.append({
-            "species": _species_name(opp),
+            "species": species_name(opp),
             "threatens": threatens,
             "resists": resists,
         })
