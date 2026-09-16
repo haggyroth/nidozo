@@ -98,13 +98,17 @@ def _perfect_game(conn: sqlite3.Connection, battle_id: int, winner_role: str) ->
         state = json.loads(row["state_json"])
     except (ValueError, TypeError):
         return False
-    active_hp = (state.get("my_active") or {}).get("hp_fraction", 0)
-    if active_hp <= 0:
-        return False
-    for bench in state.get("my_bench") or []:
-        if bench.get("hp_fraction", 0) <= 0:
-            return False
-    return True
+    # Singles: "my_active" is one dict; doubles: a list of up to two dicts.
+    # Bench mons live under "my_team" (the serializer never emits "my_bench").
+    active = state.get("my_active")
+    if isinstance(active, list):
+        mons = [m for m in active if m]
+    elif active:
+        mons = [active]
+    else:
+        mons = []
+    mons += [m for m in (state.get("my_team") or []) if m]
+    return all(m.get("hp_fraction", 0) > 0 for m in mons)
 
 
 def evaluate_badges(

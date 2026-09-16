@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import sqlite3
 import threading
 from pathlib import Path
@@ -18,6 +19,8 @@ from nidozo.db.elo import (
     updated_glicko,
 )
 from nidozo.db.schema import migrate
+
+logger = logging.getLogger(__name__)
 
 _DEFAULT_DB = Path(__file__).parent.parent.parent.parent / "nidozo.db"
 
@@ -506,7 +509,14 @@ class BattleStore:
 
         new_badges: list[dict[str, Any]] = []
         for model_id, opp_id in ((p1_id, p2_id), (p2_id, p1_id)):
-            for slug in evaluate_badges(self._conn, battle_id, model_id, winner_mid, opp_id):
+            try:
+                slugs = evaluate_badges(self._conn, battle_id, model_id, winner_mid, opp_id)
+            except Exception:  # noqa: BLE001 — a badge bug must never abort finalization
+                logger.exception(
+                    "Badge evaluation failed for model %d in battle %d", model_id, battle_id
+                )
+                continue
+            for slug in slugs:
                 cur = self._conn.execute(
                     "INSERT OR IGNORE INTO badges (model_id, battle_id, slug) VALUES (?,?,?)",
                     (model_id, battle_id, slug),
