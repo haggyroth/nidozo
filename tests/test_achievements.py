@@ -100,7 +100,7 @@ def test_perfect_game_when_no_mon_fainted(tmp_path) -> None:
         bid = _completed_battle(conn, p1, p2, 1, "pg", _ts(1))
         _seed_last_state(conn, bid, "p1", {
             "my_active": {"hp_fraction": 1.0},
-            "my_bench": [{"hp_fraction": 0.5}, {"hp_fraction": 1.0}],
+            "my_team": [{"hp_fraction": 0.5}, {"hp_fraction": 1.0}],
         })
         earned = evaluate_badges(conn, bid, p1, winner_model_id=p1, opponent_model_id=p2)
         assert "perfect_game" in earned
@@ -117,7 +117,43 @@ def test_no_perfect_game_when_a_bench_mon_fainted(tmp_path) -> None:
         bid = _completed_battle(conn, p1, p2, 1, "npg", _ts(1))
         _seed_last_state(conn, bid, "p1", {
             "my_active": {"hp_fraction": 1.0},
-            "my_bench": [{"hp_fraction": 0.0}],  # one fainted
+            "my_team": [{"hp_fraction": 0.0}],  # one fainted
+        })
+        earned = evaluate_badges(conn, bid, p1, winner_model_id=p1, opponent_model_id=p2)
+        assert "perfect_game" not in earned
+    finally:
+        store.close()
+
+
+def test_perfect_game_doubles_list_active(tmp_path) -> None:
+    store = BattleStore(tmp_path / "h.db")
+    try:
+        conn = store._conn
+        p1 = store.get_or_create_model("anthropic", "x", "v9")
+        p2 = store.get_or_create_model("openai", "y", "v9")
+        bid = _completed_battle(conn, p1, p2, 1, "pg-doubles", _ts(1))
+        # Doubles: my_active is a list of dicts; no bench mons left.
+        _seed_last_state(conn, bid, "p1", {
+            "my_active": [{"hp_fraction": 1.0}, {"hp_fraction": 0.75}],
+            "my_team": [],
+        })
+        earned = evaluate_badges(conn, bid, p1, winner_model_id=p1, opponent_model_id=p2)
+        assert "perfect_game" in earned
+    finally:
+        store.close()
+
+
+def test_no_perfect_game_doubles_when_active_fainted(tmp_path) -> None:
+    store = BattleStore(tmp_path / "i.db")
+    try:
+        conn = store._conn
+        p1 = store.get_or_create_model("anthropic", "x", "v9")
+        p2 = store.get_or_create_model("openai", "y", "v9")
+        bid = _completed_battle(conn, p1, p2, 1, "npg-doubles", _ts(1))
+        # One active slot fainted -> not a perfect game (and no crash on the list shape).
+        _seed_last_state(conn, bid, "p1", {
+            "my_active": [{"hp_fraction": 0.0}, {"hp_fraction": 1.0}],
+            "my_team": [],
         })
         earned = evaluate_badges(conn, bid, p1, winner_model_id=p1, opponent_model_id=p2)
         assert "perfect_game" not in earned
