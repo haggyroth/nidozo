@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 from pathlib import Path
 
 import pytest
@@ -9,6 +10,7 @@ from fastapi.testclient import TestClient
 from starlette.websockets import WebSocketDisconnect
 
 from nidozo.api.app import create_app
+from nidozo.api.auth import WS_SUBPROTOCOL_PREFIX, _decode_subprotocol_token, ws_auth_subprotocol
 
 _TOKEN = "s3cret-token"
 
@@ -87,6 +89,83 @@ def test_ws_showdown_rejected_without_token(auth_client) -> None:
     with pytest.raises(WebSocketDisconnect):
         with auth_client.websocket_connect("/ws/showdown/battle-gen9ou-1") as ws:
             ws.receive_text()
+
+
+# ---------------------------------------------------------------------------
+# WebSocket gate — credential in Sec-WebSocket-Protocol (#276)
+#
+# The query parameter lands in uvicorn's access log, so browsers send the token
+# as `nidozo-auth.<base64url(token)>` instead. Both must keep working.
+# ---------------------------------------------------------------------------
+
+def _subprotocol(token: str) -> str:
+    encoded = base64.urlsafe_b64encode(token.encode()).decode().rstrip("=")
+    return f"{WS_SUBPROTOCOL_PREFIX}{encoded}"
+
+
+def test_ws_battles_allowed_with_subprotocol_token(auth_client) -> None:
+    entry = _subprotocol(_TOKEN)
+    with auth_client.websocket_connect("/ws/battles", subprotocols=[entry]) as ws:
+        # The server must *select* the offered protocol: a browser aborts the
+        # handshake if it accepts without echoing one back.
+        assert ws.accepted_subprotocol == entry
+
+
+def test_ws_showdown_allowed_with_subprotocol_token(auth_client) -> None:
+    entry = _subprotocol(_TOKEN)
+    with auth_client.websocket_connect(
+        "/ws/showdown/battle-gen9ou-1", subprotocols=[entry]
+    ) as ws:
+        assert ws.accepted_subprotocol == entry
+
+
+def test_ws_battles_rejected_with_wrong_subprotocol_token(auth_client) -> None:
+    with pytest.raises(WebSocketDisconnect):
+        with auth_client.websocket_connect(
+            "/ws/battles", subprotocols=[_subprotocol("not-the-token")]
+        ) as ws:
+            ws.receive_text()
+
+
+def test_unrelated_subprotocol_still_falls_back_to_the_query_token(auth_client) -> None:
+    """A legacy/non-browser client offering some other protocol is not locked out."""
+    with auth_client.websocket_connect(
+        f"/ws/battles?token={_TOKEN}", subprotocols=["graphql-ws"]
+    ) as ws:
+        assert ws.accepted_subprotocol is None
+
+
+def test_subprotocol_token_survives_an_unsigned_or_base64_variant_token() -> None:
+    """The encoding has to round-trip characters that break RFC 6455's grammar."""
+    token = "a+b/c=d?e&f"  # base64 + / = and query separators, all in one
+    encoded = base64.urlsafe_b64encode(token.encode()).decode().rstrip("=")
+    assert "+" not in encoded and "/" not in encoded and "=" not in encoded
+    assert _decode_subprotocol_token(f"{WS_SUBPROTOCOL_PREFIX}{encoded}") == token
+
+
+@pytest.mark.parametrize(
+    "entry",
+    [
+        f"{WS_SUBPROTOCOL_PREFIX}",           # prefix with nothing after it
+        f"{WS_SUBPROTOCOL_PREFIX}!!!not-base64",
+        f"{WS_SUBPROTOCOL_PREFIX}////",       # decodes to bytes that aren't UTF-8
+    ],
+)
+def test_undecodable_subprotocol_yields_no_token(entry: str) -> None:
+    """A hand-crafted entry must not crash the handshake or sneak a match through."""
+    assert _decode_subprotocol_token(entry) is None
+
+
+def test_a_subprotocol_that_is_not_ours_is_ignored() -> None:
+    assert ws_auth_subprotocol(_FakeWS("chat, superchat")) is None
+    assert ws_auth_subprotocol(_FakeWS("chat, nidozo-auth.abc, superchat")) == "nidozo-auth.abc"
+
+
+class _FakeWS:
+    """Just enough of a WebSocket for the header-reading helpers."""
+
+    def __init__(self, offered: str) -> None:
+        self.headers = {"sec-websocket-protocol": offered}
 
 
 # ---------------------------------------------------------------------------

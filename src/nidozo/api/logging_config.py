@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 import sys
 from datetime import UTC, datetime
 from typing import Any
@@ -51,6 +52,39 @@ _STANDARD_ATTRS: frozenset[str] = frozenset({
     "stack_info", "thread", "threadName", "exc_info", "exc_text",
     "taskName",
 })
+
+
+class _RedactTokenFilter(logging.Filter):
+    """Strip ``?token=`` values out of anything on its way to a log sink (#276).
+
+    Browsers now carry the WebSocket credential in ``Sec-WebSocket-Protocol``, but
+    non-browser clients still use the query parameter — and uvicorn's access log
+    records the full request line, query string included. Writing the shared
+    secret to stdout or ``LOG_FILE`` hands it to anyone who can read the logs.
+    """
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        if isinstance(record.msg, str):
+            record.msg = _redact_token_query(record.msg)
+        if isinstance(record.args, dict):
+            record.args = {k: _redact_arg(v) for k, v in record.args.items()}
+        elif record.args:
+            record.args = tuple(_redact_arg(a) for a in record.args)
+        return True
+
+
+def _redact_arg(value: Any) -> Any:
+    return _redact_token_query(value) if isinstance(value, str) else value
+
+
+def _redact_token_query(text: str) -> str:
+    return _TOKEN_QUERY_RE.sub("token=REDACTED", text)
+
+
+# The value of a `token=` parameter, wherever it appears — in a query string
+# (`?token=…`, `&token=…`) or formatted into a message. Runs to the next
+# separator so the rest of the request line survives for debugging.
+_TOKEN_QUERY_RE = re.compile(r"token=[^&\s\"',]*", re.IGNORECASE)
 
 
 class _JsonFormatter(logging.Formatter):
@@ -104,6 +138,9 @@ def configure_logging(level: str | None = None) -> None:
 
     handler: logging.Handler = logging.StreamHandler(sys.stdout)
     handler.setFormatter(_JsonFormatter())
+    # Redact on the handler too: handler filters see records from *every* logger
+    # that reaches this sink, including third-party ones (#276).
+    handler.addFilter(_RedactTokenFilter())
 
     root = logging.getLogger()
     root.setLevel(numeric)
@@ -115,6 +152,7 @@ def configure_logging(level: str | None = None) -> None:
     if log_file:
         fh = logging.FileHandler(log_file, encoding="utf-8")
         fh.setFormatter(_JsonFormatter())
+        fh.addFilter(_RedactTokenFilter())
         root.addHandler(fh)
 
     # Uvicorn splits output across three loggers; align them to root.
@@ -122,6 +160,12 @@ def configure_logging(level: str | None = None) -> None:
         uv = logging.getLogger(name)
         uv.handlers.clear()
         uv.propagate = True
+
+    # Also redact at the originating loggers, so records logged here stay clean
+    # for handlers attached later (pytest's caplog, a log shipper) rather than
+    # only for the sinks configured above (#276).
+    for name in ("uvicorn.access", "nidozo.api"):
+        logging.getLogger(name).addFilter(_RedactTokenFilter())
 
     # httpx / httpcore: expose raw LM Studio HTTP traffic at DEBUG.
     # At INFO+ these are silenced so they don't flood production logs.

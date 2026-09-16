@@ -144,10 +144,11 @@ def create_showdown_ws_router(
         showdown_port: Port of the local Showdown server.
         connect_upstream: Optional upstream-connection factory (injected in
             tests).  Defaults to a real ``websockets`` connection.
-        auth_token: When set, the client must supply a matching ``?token=``
-            query parameter.
+        auth_token: When set, the client must supply it via the
+            ``Sec-WebSocket-Protocol`` handshake header (``nidozo-auth.<base64url>``)
+            or the legacy ``?token=`` query parameter.
     """
-    from nidozo.api.auth import ws_authorized
+    from nidozo.api.auth import ws_auth_subprotocol, ws_authorized
 
     router = APIRouter()
     connect = connect_upstream or _default_connect
@@ -164,7 +165,9 @@ def create_showdown_ws_router(
             await ws.close(code=_CLOSE_POLICY_VIOLATION, reason="unauthorized")
             return
 
-        await ws.accept()
+        # Echo the credential subprotocol — a browser aborts the handshake if the
+        # server accepts without selecting one of the protocols it offered.
+        await ws.accept(subprotocol=ws_auth_subprotocol(ws))
 
         upstream: UpstreamWS | None = None
         try:
