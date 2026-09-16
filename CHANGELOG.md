@@ -7,6 +7,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+---
+
+## [0.46.1] — 2026-09-16
+
 - fix(battle): the **battle-history section** of the turn prompt (HP deltas, status applied/cured, items consumed, abilities revealed) was **dead code** — every lookup missed (#275). `_update_hp_snapshot` keyed each Pokémon by the raw poke-env species id (`"rotomwash"`), while `_build_recent_events` looked up the serialized `"species"` field, which is the Pokédex display name (`"Rotom-Wash"`). `prev_hp.get(key)` therefore returned `None` for every mon, and only the unconditional "Your action" / "Opponent used" lines ever reached the model — a silent loss of decision context in *every* battle, in both the singles and doubles builders. The snapshot now keys by the same name the serializer emits. `_species_name` is promoted to the public `species_name()` to mark it as the single source of truth for how a Pokémon is named anywhere a name is used as a lookup key. New tests drive the **real round trip with real `Pokemon` objects**, which is the only way to catch this: `species_name()` falls back to the raw id when the Pokédex lookup fails, and a `MagicMock` mon has no usable `gen`, so the existing mock-based tests saw both sides agree no matter what — the same faked-interface blind spot that hid the poke-env 0.16 breaks
 
 ---
