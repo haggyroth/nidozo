@@ -43,9 +43,14 @@ services:
       NIDOZO_DB: /data/nidozo.db
       # Shared-secret auth (#212). Set NIDOZO_API_TOKEN in the host env (or a
       # .env file next to this compose file) to require it on every /api/* call
-      # and WebSocket. Leave unset ONLY when the host is not reachable beyond
-      # localhost — the API spends real LLM credits.
+      # and WebSocket. The API now FAILS CLOSED: if the token is unset it
+      # refuses to start unless NIDOZO_ALLOW_INSECURE=1 is set (see below).
+      # Leave it open ONLY when the host is not reachable beyond localhost —
+      # the API spends real LLM credits.
       NIDOZO_API_TOKEN: ${NIDOZO_API_TOKEN:-}
+      # Explicit opt-out of the fail-closed auth guard. Set to 1 only for a
+      # loopback-only / air-gapped instance; otherwise always set the token above.
+      NIDOZO_ALLOW_INSECURE: ${NIDOZO_ALLOW_INSECURE:-0}
       # Optional rate limit (requests/min per IP) on the battle-start endpoints.
       # 0 / unset disables it. Pairs with NIDOZO_API_TOKEN for exposed instances.
       NIDOZO_RATE_LIMIT_PER_MIN: ${NIDOZO_RATE_LIMIT_PER_MIN:-0}
