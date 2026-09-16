@@ -245,7 +245,18 @@ def _resolve_move_doubles(
     if acting_mon is not None:
         try:
             valid_targets = battle.get_possible_showdown_targets(chosen, acting_mon)
-        except Exception:  # noqa: BLE001
+        except Exception as exc:  # noqa: BLE001
+            # Keep the battle alive, but don't swallow this silently: an empty
+            # list makes a foe-targeting move fall back to target 0, so a change
+            # in poke-env's target resolution would otherwise degrade targeting
+            # with no signal anywhere. poke-env 0.16 added an
+            # `assert move.target is not None` inside this call.
+            logger.warning(
+                "Doubles: could not resolve targets for %r — defaulting to 0 (%s: %s)",
+                getattr(chosen, "id", chosen),
+                type(exc).__name__,
+                exc,
+            )
             valid_targets = []
 
     resolved_target = 0  # EMPTY_TARGET_POSITION default

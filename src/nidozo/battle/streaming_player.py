@@ -27,7 +27,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from collections.abc import Callable
 from time import perf_counter
 from typing import TYPE_CHECKING, Any
 
@@ -134,7 +133,8 @@ class _StreamingMixin:
     _format: str
     _battle_semaphore: asyncio.Semaphore
     _battle_count_queue: asyncio.Queue[Any]
-    get_next_team: Callable[[], str | None]
+    # poke-env 0.16 replaced Player.get_next_team() with this property.
+    next_team: str | None
 
     def _init_streaming(self, event_bus: EventBus, player_role: str) -> None:
         self._bus = event_bus
@@ -199,7 +199,7 @@ class _StreamingMixin:
         start_time = perf_counter()
 
         for _ in range(n_challenges):
-            await self.ps_client.challenge(opponent, self._format, self.get_next_team())
+            await self.ps_client.challenge(opponent, self._format, self.next_team)
             try:
                 await asyncio.wait_for(
                     self._battle_semaphore.acquire(),

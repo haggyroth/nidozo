@@ -72,20 +72,23 @@ def _move_target_hint(move: Move, has_ally: bool) -> dict[str, Any]:
         ``"auto"``
       - ``target_note``: human-readable advisory string
     """
-    try:
-        deduced = move.deduced_target
-    except Exception:  # noqa: BLE001
-        deduced = None
+    # poke-env 0.16 folded the old `Move.deduced_target` into `Move.target`
+    # (and dropped its SPECIAL_MOVES short-circuit). Read it directly: the
+    # previous bare `except Exception` turned that rename into a silent
+    # AttributeError, and every move below fell through to "auto".
+    # `target` is `Target | None`; None falls through to the "auto" return
+    # at the end of this function, which is the correct answer for those moves.
+    target = move.target
 
     # Hits both foes simultaneously (spread) — no explicit target needed
-    if deduced in _SPREAD_FOE_TARGETS:
+    if target in _SPREAD_FOE_TARGETS:
         return {
             "targeting": "spread_foes",
             "target_note": "Hits all opponents automatically — no target needed",
         }
 
     # Hits all adjacent INCLUDING ally — warn
-    if deduced in _HIT_ALLY_TARGETS:
+    if target in _HIT_ALLY_TARGETS:
         ally_note = " (⚠ ALSO HITS ALLY)" if has_ally else ""
         return {
             "targeting": "hits_ally_too",
@@ -93,16 +96,16 @@ def _move_target_hint(move: Move, has_ally: bool) -> dict[str, Any]:
         }
 
     # Choose one foe, or optionally the ally
-    if deduced == Target.ANY:
+    if target == Target.ANY:
         return {
             "targeting": "choose_foe_or_ally",
             "target_note": 'Choose target: "foe_1", "foe_2", or "ally"',
         }
 
     # Ally-targeting only (e.g. Helping Hand, Heal Pulse)
-    if deduced in {Target.ADJACENT_ALLY, Target.ADJACENT_ALLY_OR_SELF}:
+    if target in {Target.ADJACENT_ALLY, Target.ADJACENT_ALLY_OR_SELF}:
         if has_ally:
-            options = '"ally"' if deduced == Target.ADJACENT_ALLY else '"ally" or "self"'
+            options = '"ally"' if target == Target.ADJACENT_ALLY else '"ally" or "self"'
             return {
                 "targeting": "self_or_ally",
                 "target_note": f"Targets an ally — choose {options}",
@@ -113,7 +116,7 @@ def _move_target_hint(move: Move, has_ally: bool) -> dict[str, Any]:
         }
 
     # Normal single-target foe moves
-    if deduced in _CHOOSE_FOE_TARGETS:
+    if target in _CHOOSE_FOE_TARGETS:
         return {
             "targeting": "choose_foe",
             "target_note": 'Choose target: "foe_1" or "foe_2"',

@@ -156,7 +156,10 @@ class _ChallengePlayer(_StreamingMixin, _FakeBase):
         self._battle_id = battle_id
         self.logger = logging.getLogger("test.challenge")
 
-    def get_next_team(self) -> str | None:
+    # Must mirror poke-env's real interface (a property since 0.16): a fake that
+    # invents its own name here is what let a removed poke-env method go unnoticed.
+    @property
+    def next_team(self) -> str | None:
         return None
 
 
