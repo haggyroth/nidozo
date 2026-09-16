@@ -49,6 +49,10 @@ voyager's browser, gated by a shared-secret token.
    LM_STUDIO_BASE_URL=http://<workstation>:1234/v1
    # Optional:
    # NIDOZO_RATE_LIMIT_PER_MIN=30
+   # Set this when a reverse proxy sits in front of the api container —
+   # otherwise every client is bucketed under the proxy's IP and they all
+   # share one rate-limit allowance. Use the proxy's address / Docker network.
+   # NIDOZO_TRUSTED_PROXIES=172.16.0.0/12
    # ANTHROPIC_API_KEY=...
    # OPENAI_API_KEY=...
    ```
@@ -125,7 +129,7 @@ through the authenticated API.)
 | LLM battle stuck "thinking" | `LM_STUDIO_BASE_URL` unreachable from the container (bind/firewall) |
 | "Your team was rejected" popup | A drafted/imported team violates the format's ban list (try tier `freeforall`/AG) |
 | Sprites missing but HP bars fine | `play.pokemonshowdown.com` unreachable — cosmetic only, renderer is vendored |
-| `429` on starting battles | `NIDOZO_RATE_LIMIT_PER_MIN` hit — wait, or raise/unset it |
+| `429` on starting battles | Rate limit hit (`NIDOZO_RATE_LIMIT_PER_MIN`, or the default `60`/min once a token is set) — wait, or raise/disable it. **Every client getting a `429` at once** means the key is the proxy, not the client: set `NIDOZO_TRUSTED_PROXIES` |
 | Startup log says auth "DISABLED" | `NIDOZO_API_TOKEN` not picked up — check the `.env` location/name |
 
 To reset everything (wipes the SQLite volume): `docker compose down -v`.

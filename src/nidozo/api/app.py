@@ -50,7 +50,7 @@ def create_app(db_path: Path = _DB_PATH) -> FastAPI:
 
     add_cors(app)
     add_auth(app, api_token)
-    add_rate_limit(app, get_rate_limit())
+    add_rate_limit(app, get_rate_limit(authenticated=api_token is not None))
     app.include_router(create_router(store, bus, active_tasks))
     app.include_router(create_ws_router(bus, auth_token=api_token))
     # OP-02 (#84): spectator-stream proxy for the Showdown battle-scene renderer.
