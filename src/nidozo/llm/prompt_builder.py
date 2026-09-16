@@ -4,6 +4,9 @@ PromptBuilder — loads versioned prompt templates and renders turn messages.
 Templates live at src/nidozo/llm/prompts/<version>/:
   system.txt        — static system prompt (loaded once)
   turn.txt.jinja    — Jinja2 template rendered each turn with the battle state dict
+  turn_doubles.txt.jinja
+                    — optional 2v2 variant, required for doubles battles
+                      (present in DOUBLES_PROMPT_VERSION only)
 
 Changing prompt content = bump the version directory (v1 → v2). The version
 string is stored on the builder so it can be persisted with battle records and
@@ -20,6 +23,35 @@ from jinja2 import Environment, FileSystemLoader, StrictUndefined
 from nidozo.llm.backend import Message
 
 _PROMPTS_ROOT = Path(__file__).parent / "prompts"
+
+# The prompt version that ships the doubles (2v2) turn template. Doubles is not
+# a superset of singles — serializer.py emits a different state shape for it
+# (my_active is a *list* of slot dicts, available_moves a list of lists), which
+# the singles templates cannot render. See resolve_prompt_version().
+DOUBLES_PROMPT_VERSION = "v7"
+
+# The prompt version used for the team-draft phase.
+DRAFT_PROMPT_VERSION = "v3"
+
+
+def resolve_prompt_version(
+    requested: str,
+    *,
+    doubles: bool = False,
+    draft: bool = False,
+) -> str:
+    """Return the prompt version a battle must actually run under.
+
+    Doubles and draft each pin their own template version, so ``requested`` is
+    ignored for those. Callers should go through this rather than rewriting the
+    version inline — the override is a hard requirement (doubles on a version
+    without a doubles template raises), so it belongs in one place.
+    """
+    if doubles:
+        return DOUBLES_PROMPT_VERSION
+    if draft:
+        return DRAFT_PROMPT_VERSION
+    return requested
 
 
 class PromptBuilder:
@@ -41,14 +73,19 @@ class PromptBuilder:
             lstrip_blocks=True,
         )
         self._turn_template = self._jinja_env.get_template("turn.txt.jinja")
-        # Optional doubles turn template — present only in versions that support
-        # 2v2 (v7+). When a battle state has is_doubles=True and this template
-        # exists, build_turn renders it instead of the singles template.
-        doubles_path = self._version_dir / "turn_doubles.txt.jinja"
+        # Doubles turn template — ships only in versions that support 2v2
+        # (currently just DOUBLES_PROMPT_VERSION). Required, not optional: a
+        # doubles state has a different shape and build_turn raises without it.
+        self._turn_doubles_path = self._version_dir / "turn_doubles.txt.jinja"
         self._turn_doubles_template = (
             self._jinja_env.get_template("turn_doubles.txt.jinja")
-            if doubles_path.is_file() else None
+            if self._turn_doubles_path.is_file() else None
         )
+
+    @property
+    def supports_doubles(self) -> bool:
+        """True when this version ships a doubles (2v2) turn template."""
+        return self._turn_doubles_template is not None
 
     def build_system(
         self,
@@ -75,9 +112,20 @@ class PromptBuilder:
         return Message(role="system", content=content)
 
     def build_turn(self, battle_state: dict[str, Any]) -> Message:
-        # Doubles battles render a distinct template (two active slots, target
-        # field) when the version provides one; otherwise fall back to singles.
-        if battle_state.get("is_doubles") and self._turn_doubles_template is not None:
+        # Doubles renders a distinct template (two active slots, per-slot moves
+        # and targets). Falling back to the singles template is not a graceful
+        # degradation: the shapes differ, so it either emits nonsense or — with
+        # StrictUndefined — an UndefinedError naming a template variable, which
+        # hides the real problem (the wrong version for this battle).
+        if battle_state.get("is_doubles"):
+            if self._turn_doubles_template is None:
+                raise ValueError(
+                    f"Prompt version '{self.version}' has no doubles template, so it "
+                    f"cannot render a doubles battle state. Doubles requires "
+                    f"'{DOUBLES_PROMPT_VERSION}' — use resolve_prompt_version() to "
+                    f"pick the version for a battle. Missing template: "
+                    f"{self._turn_doubles_path}"
+                )
             rendered = self._turn_doubles_template.render(**battle_state)
         else:
             rendered = self._turn_template.render(**battle_state)

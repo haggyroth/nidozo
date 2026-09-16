@@ -22,6 +22,7 @@ from poke_env.player.battle_order import (
 from nidozo.battle.action_parser import parse_action
 from nidozo.battle.heuristics import _move_target_hint, score_doubles_actions
 from nidozo.battle.serializer import serialize_battle
+from nidozo.llm.prompt_builder import DOUBLES_PROMPT_VERSION, PromptBuilder
 
 # ---------------------------------------------------------------------------
 # Mock helpers
@@ -328,7 +329,8 @@ def test_real_single_target_move_tells_model_to_choose() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_serialize_doubles_shape() -> None:
+def _doubles_state() -> dict:
+    """A fully populated doubles state, exactly as serialize_battle() emits it."""
     own = [_mock_pokemon("garchomp"), _mock_pokemon("rotom")]
     opp = [_mock_pokemon("incineroar"), _mock_pokemon("pelipper")]
     moves = [[_mock_move("earthquake")], [_mock_move("thunderbolt")]]
@@ -340,8 +342,11 @@ def test_serialize_doubles_shape() -> None:
     battle.side_conditions = {}
     battle.opponent_side_conditions = {}
     battle.fields = {}
+    return serialize_battle(battle)
 
-    state = serialize_battle(battle)
+
+def test_serialize_doubles_shape() -> None:
+    state = _doubles_state()
 
     assert state["is_doubles"] is True
     assert isinstance(state["my_active"], list) and len(state["my_active"]) == 2
@@ -365,3 +370,35 @@ def test_serialize_doubles_light_omits_decision_context() -> None:
     assert state["is_doubles"] is True
     assert state["heuristics"] is None
     assert state["available_moves"] == [[], []]
+
+
+# ---------------------------------------------------------------------------
+# Serialized state → prompt template
+#
+# The serializer's doubles shape is what the prompt templates consume, and the
+# two are coupled by hand (#302). These tests drive a real serialized state
+# through every prompt version so a version that cannot render it fails the
+# suite instead of surfacing from inside a live battle.
+# ---------------------------------------------------------------------------
+
+_PROMPT_VERSIONS = [f"v{n}" for n in range(1, 10)]
+
+
+@pytest.mark.parametrize("version", _PROMPT_VERSIONS)
+def test_doubles_state_renders_or_fails_loudly(version: str) -> None:
+    builder = PromptBuilder(version)
+    state = _doubles_state()
+
+    if version == DOUBLES_PROMPT_VERSION:
+        content = builder.build_turn(state)["content"]
+        assert "DOUBLES" in content
+        assert "SLOT 1" in content and "SLOT 2" in content
+        assert "Garchomp" in content                       # own slot 1
+        assert "Incineroar" in content                     # opponent slot 1
+        return
+
+    # Any other version must refuse rather than render a singles template
+    # against a doubles state (which raised UndefinedError before #302).
+    assert not builder.supports_doubles
+    with pytest.raises(ValueError, match="no doubles template"):
+        builder.build_turn(state)
