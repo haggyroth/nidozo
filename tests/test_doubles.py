@@ -9,8 +9,9 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
+import pytest
 from poke_env.battle import DoubleBattle
-from poke_env.battle.move import Target
+from poke_env.battle.move import Move, Target
 from poke_env.battle.move_category import MoveCategory
 from poke_env.player.battle_order import (
     DoubleBattleOrder,
@@ -36,7 +37,7 @@ def _mock_move(
 ) -> MagicMock:
     m = MagicMock()
     m.id = id_
-    m.deduced_target = target
+    m.target = target
     m.category = category
     m.base_power = base_power
     m.priority = 0
@@ -260,6 +261,66 @@ def test_score_doubles_actions_shape() -> None:
     ctx = result["battle_context"]
     assert ctx["foe_1_species"] == "incineroar"
     assert ctx["foe_2_species"] == "pelipper"
+
+
+# ---------------------------------------------------------------------------
+# Real-Move regression tests — these exercise poke-env's actual Move objects
+# ---------------------------------------------------------------------------
+#
+# The mocked `_mock_move` above sets whatever attribute it is told to, so it
+# cannot notice when poke-env renames one. That is exactly how the 0.16 upgrade
+# (which folded `Move.deduced_target` into `Move.target`) slipped through with a
+# fully green suite: `doubles.py` swallowed the resulting AttributeError and
+# every move degraded to "auto". These tests read the real attribute instead.
+
+
+def _real_move(id_: str) -> Move:
+    """A genuine poke-env Move, so a rename in poke-env fails these tests."""
+    return Move(id_, gen=9)
+
+
+@pytest.mark.parametrize(
+    ("move_id", "expected"),
+    [
+        ("earthquake", "hits_ally_too"),   # spread, also hits your ally
+        ("rockslide", "spread_foes"),      # spread, foes only
+        ("thunderbolt", "choose_foe"),     # single-target foe
+        ("helpinghand", "self_or_ally"),   # aimed at an ally
+        ("protect", "auto"),               # self-targeted
+        ("struggle", "auto"),              # the old SPECIAL_MOVES special-case
+    ],
+)
+def test_move_target_hint_from_real_move(move_id: str, expected: str) -> None:
+    hint = _move_target_hint(_real_move(move_id), has_ally=True)
+    assert hint["targeting"] == expected
+
+
+def test_real_earthquake_warns_about_hitting_ally() -> None:
+    """End-to-end: a fake spread move must still produce the ally-hit warning.
+
+    This is the user-visible regression. `score_doubles_actions` feeds
+    `target_note`/`notes` straight into the turn prompt, and v9 renders
+    `notes` — so if this warning disappears the model is no longer told that
+    Earthquake will hit its own partner.
+    """
+    moves = [[_real_move("earthquake")], [_real_move("thunderbolt")]]
+    battle = _make_doubles_battle(moves=moves)
+
+    slot_0 = score_doubles_actions(battle)["slot_0"]["move_scores"][0]
+
+    assert slot_0["targeting"] == "hits_ally_too"
+    assert "ALSO HITS ALLY" in slot_0["target_note"]
+    assert any("ALLY HIT" in note for note in slot_0["notes"])
+
+
+def test_real_single_target_move_tells_model_to_choose() -> None:
+    moves = [[_real_move("earthquake")], [_real_move("thunderbolt")]]
+    battle = _make_doubles_battle(moves=moves)
+
+    slot_1 = score_doubles_actions(battle)["slot_1"]["move_scores"][0]
+
+    assert slot_1["targeting"] == "choose_foe"
+    assert "foe_1" in slot_1["target_note"]
 
 
 # ---------------------------------------------------------------------------

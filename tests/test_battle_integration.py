@@ -36,8 +36,10 @@ import uuid
 import pytest
 from poke_env import AccountConfiguration, ServerConfiguration
 
+from nidozo.api.events import EventBus
 from nidozo.battle.bots import RandomBot
 from nidozo.battle.llm_player import LLMPlayer
+from nidozo.battle.streaming_player import StreamingRandomBot
 from nidozo.llm.backend import Message
 
 # A single battle should resolve well within this; guards against a hung server.
@@ -175,6 +177,39 @@ async def test_stub_llm_singles_battle_completes() -> None:
         backend=_FirstActionBackend(),
         prompt_version="v9",
         account_configuration=_account("nidoLsb"),
+        battle_format="gen9randombattle",
+        server_configuration=cfg,
+    )
+    await asyncio.wait_for(p1.battle_against(p2, n_battles=1), timeout=_BATTLE_TIMEOUT)
+    _assert_one_battle_finished(p1, p2)
+
+
+# ---------------------------------------------------------------------------
+# Tier 2 — streaming player path vs live Showdown
+# ---------------------------------------------------------------------------
+
+async def test_streaming_bot_battle_completes() -> None:
+    """A StreamingRandomBot plays a full battle — exercises the streaming path.
+
+    This is the production path: orchestration drives ``StreamingLLMPlayer``,
+    which shares ``_StreamingMixin._send_challenges`` with this bot. Only a real
+    battle proves that path resolves its attributes against the *installed*
+    poke-env — the unit tests fake the mixin's collaborators, so they cannot see
+    a rename. That is precisely how poke-env 0.16 removing
+    ``Player.get_next_team()`` went unnoticed while every real battle raised
+    ``AttributeError`` at challenge time.
+    """
+    cfg = _server_config()
+    bus = EventBus()
+    p1 = StreamingRandomBot(
+        event_bus=bus,
+        player_role="p1",
+        account_configuration=_account("nidoSra"),
+        battle_format="gen9randombattle",
+        server_configuration=cfg,
+    )
+    p2 = RandomBot(
+        account_configuration=_account("nidoSrb"),
         battle_format="gen9randombattle",
         server_configuration=cfg,
     )
