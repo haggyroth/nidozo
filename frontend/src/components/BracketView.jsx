@@ -198,19 +198,23 @@ function DoubleElimBracket({ state, onReplaySelected }) {
         ))}
       </div>
 
-      {/* Losers bracket */}
-      <div className="bracket-section-label bracket-section-label--losers">LOSERS BRACKET</div>
-      <div className="bracket-track bracket-track--losers">
-        {lbRounds?.map(r => (
-          <BracketRound
-            key={`lb-${r.round_num}`}
-            roundLabel={lbLabel(r)}
-            matches={r.matches}
-            seeds={seeds}
-            onReplaySelected={onReplaySelected}
-          />
-        ))}
-      </div>
+      {/* Losers bracket — a 2-player bracket has none (lb_rounds === 0) */}
+      {lbCount > 0 && (
+        <>
+          <div className="bracket-section-label bracket-section-label--losers">LOSERS BRACKET</div>
+          <div className="bracket-track bracket-track--losers">
+            {lbRounds?.map(r => (
+              <BracketRound
+                key={`lb-${r.round_num}`}
+                roundLabel={lbLabel(r)}
+                matches={r.matches}
+                seeds={seeds}
+                onReplaySelected={onReplaySelected}
+              />
+            ))}
+          </div>
+        </>
+      )}
 
       {/* Grand Final */}
       <div className="bracket-section-label bracket-section-label--gf">GRAND FINAL</div>

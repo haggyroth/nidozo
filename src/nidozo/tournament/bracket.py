@@ -413,6 +413,11 @@ def _wb_loser_destination(
 ) -> tuple[str | None, int | None]:
     """Return (loser_to match_id, slot) for a WB match.
 
+    Two players: there is no losers bracket at all (`lb_rounds == 0`), so the
+    single WB loser is the losers-bracket champion by default and goes straight
+    to slot 2 of the grand final. Without this the loser was routed to `LR1-1`,
+    a match that does not exist, so GF's slot 2 stayed empty, GF was never
+    playable and the tournament drained with no champion (#279).
     WB R1: adjacent pairs of losers fight each other in LB R1.
       match 0 loser → LR1-1 slot 1
       match 1 loser → LR1-1 slot 2
@@ -421,6 +426,8 @@ def _wb_loser_destination(
     WB round r (r>=2): losers drop to LB round 2*(r-1) as slot 2
       (slot 1 = incumbent LB survivor).
     """
+    if wb_rnd == 1 and total_wb_rounds == 1:
+        return "GF", 2
     if wb_rnd == 1:
         lb_match_num = match_idx // 2 + 1
         lb_slot = (match_idx % 2) + 1

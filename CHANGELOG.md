@@ -7,6 +7,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+- fix(tournament): a **2-player double-elimination bracket could never produce a champion** (#279). With two players there are no losers-bracket rounds at all (`lb_rounds == 2 * (wb_rounds - 1) == 0`), but the WB round-1 loser was still routed to `LR1-1` — a match that is never built. `record_result_double` guards the drop with `if lb_m:`, so it silently no-opped: the grand final's slot 2 stayed empty forever, `get_pending_matches` never returned `GF`, and the tournament drained with `champion_seed` still `None`. The loser of the only WB match *is* the losers-bracket champion, so they now go straight to `GF` slot 2 and the existing bracket-reset logic gives them their second life correctly. The frontend also stops rendering an empty "LOSERS BRACKET" heading when there is no losers bracket to show
+
 ---
 
 ## [0.46.1] — 2026-09-16

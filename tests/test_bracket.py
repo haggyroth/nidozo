@@ -243,6 +243,72 @@ class TestDoubleElimResults:
 
 
 # ---------------------------------------------------------------------------
+# Double-elimination — two players (issue #279)
+#
+# With 2 players there are no losers-bracket rounds (lb_rounds == 0), so the
+# code that dropped the WB R1 loser into "LR1-1" targeted a match that is never
+# built. `record_result_double` guards that drop with `if lb_m:`, so it silently
+# no-opped: GF's slot 2 stayed empty, get_pending_matches never returned GF, and
+# the tournament drained with champion_seed still None — a 2-player double-elim
+# could never produce a champion. The loser now goes straight to GF slot 2.
+# ---------------------------------------------------------------------------
+
+class TestDoubleElimTwoPlayers:
+    def test_two_player_de_builds_no_losers_bracket(self) -> None:
+        state = build_double_elim(_players(2))
+        assert state["format"] == "double_elim"
+        assert state["size"] == 2
+        assert state["wb_rounds"] == 1
+        assert state["lb_rounds"] == 0
+        lb = [m for m in state["match_index"].values() if m["bracket"] == "losers"]
+        assert lb == []
+
+    def test_wb_loser_drops_into_grand_final(self) -> None:
+        state = build_double_elim(_players(2))
+        wb = state["match_index"]["WR1-1"]
+        assert wb["loser_to"] == "GF"
+        assert wb["loser_slot"] == 2
+
+        record_result(state, "WR1-1", 1, battle_id=1)
+
+        gf = state["match_index"]["GF"]
+        assert gf["p1_seed"] == 1          # winners-bracket side
+        assert gf["p2_seed"] == 2          # losers-bracket side
+        assert [m["match_id"] for m in get_pending_matches(state)] == ["GF"]
+
+    def test_two_player_de_produces_a_champion(self) -> None:
+        state = build_double_elim(_players(2))
+        battle_id = 0
+        for _ in range(10):
+            if state["champion_seed"] is not None:
+                break
+            pending = get_pending_matches(state)
+            assert pending, "bracket drained with no champion (issue #279)"
+            battle_id += 1
+            record_result(state, pending[0]["match_id"], winner_slot=1, battle_id=battle_id)
+
+        assert state["champion_seed"] == 1
+        assert state["match_index"]["GFR"]["status"] == "void"
+
+    def test_two_player_de_reset_when_lb_player_wins_gf(self) -> None:
+        """Losing the WB match must not eliminate you — you get a second life."""
+        state = build_double_elim(_players(2))
+        record_result(state, "WR1-1", winner_slot=2, battle_id=1)   # seed 2 wins WB
+
+        gf = state["match_index"]["GF"]
+        assert (gf["p1_seed"], gf["p2_seed"]) == (2, 1)
+        record_result(state, "GF", winner_slot=2, battle_id=2)      # seed 1 wins GF
+
+        assert state["champion_seed"] is None
+        gfr = state["match_index"]["GFR"]
+        assert (gfr["p1_seed"], gfr["p2_seed"]) == (1, 2)
+        assert [m["match_id"] for m in get_pending_matches(state)] == ["GFR"]
+
+        record_result(state, "GFR", winner_slot=2, battle_id=3)     # seed 2 wins the reset
+        assert state["champion_seed"] == 2
+
+
+# ---------------------------------------------------------------------------
 # Double-elimination — non-power-of-two (bye stall regression, issue #55)
 # ---------------------------------------------------------------------------
 
