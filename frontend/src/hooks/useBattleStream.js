@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 
-import { wsUrl } from '../api'
+import { wsProtocols, wsUrl } from '../api'
 
 // Keep only the most recent N events to prevent unbounded memory growth
 // over long tournaments.
@@ -36,7 +36,7 @@ export function useBattleStream() {
         wsRef.current?.readyState === WebSocket.CONNECTING) return
     shouldConnect.current = true
 
-    const ws = new WebSocket(wsUrl('/ws/battles'))
+    const ws = new WebSocket(wsUrl('/ws/battles'), wsProtocols())
     wsRef.current = ws
 
     ws.onopen = () => {
