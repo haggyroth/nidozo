@@ -79,7 +79,8 @@ The `api` service reads these environment variables (pass them in the host shell
 |---|---|---|
 | `NIDOZO_API_TOKEN` | Shared-secret token. When set, **every `/api/*` request and WebSocket requires it**. When unset, the API **refuses to start** (fail-closed) unless `NIDOZO_ALLOW_INSECURE=1`. | _(unset → startup error)_ |
 | `NIDOZO_ALLOW_INSECURE` | Explicit opt-out of the fail-closed guard when the token is unset. Set to `1` only for a loopback-only / air-gapped instance. | `0` |
-| `NIDOZO_RATE_LIMIT_PER_MIN` | Max battle/tournament/season/experiment **start** requests per minute per client IP (returns `429` over the limit). `0` disables it. | `0` |
+| `NIDOZO_RATE_LIMIT_PER_MIN` | Max battle/tournament/season/experiment **start** requests per minute per client IP (returns `429` over the limit). `0` disables it. Left unset, an instance with `NIDOZO_API_TOKEN` set defaults to `60`; a local no-token instance stays unlimited. | `60` when authenticated, else `0` |
+| `NIDOZO_TRUSTED_PROXIES` | Comma-separated IPs/CIDRs of the reverse proxies in front of this instance (e.g. `172.16.0.0/12`). Only then is `X-Forwarded-For` believed, so clients behind a proxy are limited individually instead of sharing the proxy's bucket. Unset: the header is ignored entirely. | _(unset → trust nothing)_ |
 | `LM_STUDIO_BASE_URL` | OpenAI-compatible URL of your LM Studio server. | `http://localhost:1234/v1` |
 | `LM_STUDIO_MODEL` | Default LM Studio model id. | `local-model` |
 | `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` | Cloud LLM keys, used only for those providers. | _(unset)_ |

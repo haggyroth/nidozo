@@ -52,8 +52,15 @@ services:
       # loopback-only / air-gapped instance; otherwise always set the token above.
       NIDOZO_ALLOW_INSECURE: ${NIDOZO_ALLOW_INSECURE:-0}
       # Optional rate limit (requests/min per IP) on the battle-start endpoints.
-      # 0 / unset disables it. Pairs with NIDOZO_API_TOKEN for exposed instances.
-      NIDOZO_RATE_LIMIT_PER_MIN: ${NIDOZO_RATE_LIMIT_PER_MIN:-0}
+      # Left unset it defaults to 60/min once NIDOZO_API_TOKEN is set; 0 keeps an
+      # exposed instance unlimited on purpose.
+      NIDOZO_RATE_LIMIT_PER_MIN: ${NIDOZO_RATE_LIMIT_PER_MIN:-}
+      # Addresses of reverse proxies in front of this container (IPs/CIDRs).
+      # Required for per-client limiting behind a proxy: without it the client
+      # key is the proxy's own address, so every client shares one allowance
+      # and one of them can exhaust it for everyone. Unset = X-Forwarded-For is
+      # ignored, which is the safe default when the api port is directly exposed.
+      NIDOZO_TRUSTED_PROXIES: ${NIDOZO_TRUSTED_PROXIES:-}
       # LLM backends. Point LM_STUDIO_BASE_URL at the machine running LM Studio
       # (e.g. http://enterprise-e:1234/v1). Cloud keys are passed through from
       # the host env when present.
