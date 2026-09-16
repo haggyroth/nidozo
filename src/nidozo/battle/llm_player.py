@@ -15,7 +15,7 @@ from poke_env.player import Player
 from poke_env.player.battle_order import BattleOrder
 
 from nidozo.battle.action_parser import parse_action
-from nidozo.battle.serializer import serialize_battle
+from nidozo.battle.serializer import serialize_battle, species_name
 from nidozo.llm.backend import ModelBackend
 from nidozo.llm.prompt_builder import PromptBuilder
 
@@ -442,6 +442,12 @@ class LLMPlayer(Player):
         Iterates the full team rosters (active + bench) so it works identically
         for singles and doubles — no reliance on the single-vs-list shape of
         ``battle.active_pokemon``.
+
+        Keys are ``species_name(mon)``, the very string ``serialize_battle`` puts
+        in its ``"species"`` field, because ``_build_recent_events`` diffs this
+        snapshot against that state. Keying by the raw poke-env ``mon.species``
+        instead (``"rotomwash"`` against ``"Rotom-Wash"``) made every lookup miss
+        and silently disabled the whole battle-history feature (#275).
         """
         hp_snap: dict[str, float] = {}
         state_snap: dict[str, dict[str, Any]] = {}
@@ -456,9 +462,9 @@ class LLMPlayer(Player):
 
         try:
             for mon in battle.team.values():
-                _snap(mon, mon.species)
+                _snap(mon, species_name(mon))
             for mon in battle.opponent_team.values():
-                _snap(mon, f"opp_{mon.species}")
+                _snap(mon, f"opp_{species_name(mon)}")
         except Exception:  # noqa: BLE001
             pass
         self._prev_hp = hp_snap
