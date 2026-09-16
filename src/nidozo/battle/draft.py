@@ -22,6 +22,7 @@ Usage (inside the battle runner)::
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from dataclasses import dataclass
@@ -30,6 +31,7 @@ from typing import TYPE_CHECKING, Any
 from nidozo.battle.team_builder import build_team_string, get_pool_info, load_movesets
 from nidozo.battle.tiers import TIER_DISPLAY, get_pool
 from nidozo.llm.backend import Message, ModelBackend
+from nidozo.llm.timeouts import complete_within, resolve_llm_timeout
 
 if TYPE_CHECKING:
     from nidozo.api.events import EventBus
@@ -38,6 +40,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 _MAX_RETRIES = 3  # retries per pick on parse/validation failure
+_RETRY_BACKOFF_SECONDS = 0.5  # linear backoff between pick attempts (#278)
 
 
 @dataclass
@@ -134,6 +137,7 @@ async def run_draft(
     prompt_version: str = "v3",
     team_size: int = 6,
     doubles: bool = False,
+    timeout: float | None = None,
 ) -> DraftResult:
     """Run the draft for one player, picking *team_size* Pokémon.
 
@@ -149,11 +153,16 @@ async def run_draft(
         player_role:   ``"p1"`` or ``"p2"`` (for WS events).
         prompt_version: Prompt version to log (default ``"v3"``).
         team_size:     Number of Pokémon to draft (default 6).
+        timeout:       Deadline in seconds for *each* pick call (#278).  ``None``
+                       uses ``NIDOZO_LLM_TIMEOUT``; zero or negative disables it.
+                       A pick that times out is retried, then falls back.
 
     Returns:
         :class:`DraftResult` with the completed team details.
     """
     from pathlib import Path
+
+    pick_timeout = resolve_llm_timeout(timeout)
 
     # Load moveset data and compute pool
     movesets = load_movesets()
@@ -201,7 +210,10 @@ async def run_draft(
         pick_reasoning = ""
         for attempt in range(_MAX_RETRIES):
             try:
-                raw = await backend.complete(messages)
+                raw = await complete_within(
+                    backend, messages, timeout=pick_timeout,
+                    what=f"Draft pick {pick_num}/{effective_size} ({player_role})",
+                )
                 parsed = _parse_pick_response(raw, available_names)
                 if parsed is not None:
                     pick_species, pick_reasoning = parsed
@@ -215,6 +227,10 @@ async def run_draft(
                     "Draft pick %d/%d (role=%s): backend error (attempt %d/%d): %s",
                     pick_num, team_size, player_role, attempt + 1, _MAX_RETRIES, exc,
                 )
+            # Back off before retrying — hammering a backend that just timed out
+            # or errored rarely helps and keeps the whole draft stalled (#278).
+            if attempt < _MAX_RETRIES - 1:
+                await asyncio.sleep(_RETRY_BACKOFF_SECONDS * (attempt + 1))
 
         # Fallback: pick first remaining if all retries failed
         if pick_species is None:

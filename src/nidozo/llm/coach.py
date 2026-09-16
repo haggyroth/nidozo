@@ -9,6 +9,7 @@ from typing import Any
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
 
 from nidozo.llm.backend import Message, ModelBackend, Usage
+from nidozo.llm.timeouts import complete_within, resolve_llm_timeout
 
 logger = logging.getLogger(__name__)
 
@@ -27,10 +28,13 @@ class CoachAgent:
         backend: Any object satisfying the ModelBackend protocol.  To control
                  token budget, configure the backend itself (e.g. pass max_tokens
                  to the backend constructor) rather than this class.
+        timeout: Deadline in seconds for the coach call (#278).  ``None`` uses
+                 ``NIDOZO_LLM_TIMEOUT``; zero or negative disables the deadline.
     """
 
-    def __init__(self, backend: ModelBackend) -> None:
+    def __init__(self, backend: ModelBackend, timeout: float | None = None) -> None:
         self._backend = backend
+        self._timeout = resolve_llm_timeout(timeout)
 
         self._system_text = (_COACH_PROMPT_DIR / "system.txt").read_text()
         self._jinja_env = Environment(
@@ -50,6 +54,8 @@ class CoachAgent:
         """Return free-form strategic advice for the current turn.
 
         Returns None on any error — the player falls back to acting without advice.
+        The backend call is bounded by ``self._timeout`` so a stalled coach cannot
+        hold the turn open (#278).
         """
         try:
             turn_content = self._turn_template.render(**battle_state)
@@ -57,7 +63,9 @@ class CoachAgent:
                 Message(role="system", content=self._system_text),
                 Message(role="user", content=turn_content),
             ]
-            advice = await self._backend.complete(messages)
+            advice = await complete_within(
+                self._backend, messages, timeout=self._timeout, what="Coach",
+            )
             if not advice:
                 logger.debug("Coach returned empty response — skipping")
                 return None
