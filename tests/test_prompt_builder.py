@@ -1,8 +1,29 @@
 """Tests for PromptBuilder — template loading, rendering, and version handling."""
 
+import re
+
 import pytest
 
-from nidozo.llm.prompt_builder import PromptBuilder
+from nidozo.llm.prompt_builder import (
+    _PROMPTS_ROOT,
+    DOUBLES_PROMPT_VERSION,
+    DRAFT_PROMPT_VERSION,
+    PromptBuilder,
+    resolve_prompt_version,
+)
+
+_ALL_VERSIONS = [f"v{n}" for n in range(1, 10)]
+
+# Doubles states are list-shaped (my_active is a list of slot dicts), which is
+# what the singles templates cannot render. build_turn must reject a version
+# without a doubles template before it attempts to render at all, so this state
+# needs no other keys.
+_DOUBLES_STATE: dict = {
+    "is_doubles": True,
+    "turn": 1,
+    "my_active": [{"species": "garchomp", "slot": 0}],
+    "available_moves": [[], []],
+}
 
 # Minimal battle state that satisfies all template variables
 _MINIMAL_STATE: dict = {
@@ -223,3 +244,72 @@ def test_build_messages_with_each_personality(slug: str) -> None:
     persona = get_personality(slug)
     assert persona is not None
     assert persona.display_name in messages[0]["content"]
+
+
+# ---------------------------------------------------------------------------
+# Doubles capability (#302)
+#
+# A doubles state has a different shape from singles, so a version without a
+# doubles template cannot render one. It must fail loudly and name the way out
+# rather than render the singles template and surface a Jinja UndefinedError.
+# ---------------------------------------------------------------------------
+
+def test_version_list_covers_every_shipped_version() -> None:
+    """A new prompts/v<N>/ directory must be added here (and so get tested)."""
+    shipped = sorted(
+        p.name for p in _PROMPTS_ROOT.iterdir()
+        if p.is_dir() and re.fullmatch(r"v\d+", p.name)
+    )
+    assert shipped == _ALL_VERSIONS
+
+
+@pytest.mark.parametrize("version", _ALL_VERSIONS)
+def test_supports_doubles_matches_the_shipped_template(version: str) -> None:
+    template = _PROMPTS_ROOT / version / "turn_doubles.txt.jinja"
+    assert PromptBuilder(version).supports_doubles is template.is_file()
+
+
+def test_doubles_prompt_version_is_loadable_and_supports_doubles() -> None:
+    # Guards the constant itself: if the doubles template moves to another
+    # version, this fails rather than silently degrading every doubles prompt.
+    assert PromptBuilder(DOUBLES_PROMPT_VERSION).supports_doubles
+
+
+def test_draft_prompt_version_is_loadable() -> None:
+    assert PromptBuilder(DRAFT_PROMPT_VERSION).version == DRAFT_PROMPT_VERSION
+
+
+def test_doubles_state_on_a_singles_version_raises_a_clear_error() -> None:
+    builder = PromptBuilder("v9")
+    assert not builder.supports_doubles
+    with pytest.raises(ValueError) as exc:
+        builder.build_turn(_DOUBLES_STATE)
+    message = str(exc.value)
+    assert "'v9' has no doubles template" in message
+    assert DOUBLES_PROMPT_VERSION in message          # names the version that works
+    assert "turn_doubles.txt.jinja" in message        # names the missing file
+    assert "resolve_prompt_version" in message        # names the helper to use
+
+
+@pytest.mark.parametrize("version", _ALL_VERSIONS)
+def test_resolved_version_is_always_loadable(version: str) -> None:
+    """Whatever resolve_prompt_version picks must exist on disk."""
+    PromptBuilder(resolve_prompt_version(version, doubles=True))
+    PromptBuilder(resolve_prompt_version(version, draft=True))
+
+
+def test_resolve_prompt_version_honours_the_request_when_plain() -> None:
+    assert resolve_prompt_version("v9") == "v9"
+
+
+def test_resolve_prompt_version_pins_doubles() -> None:
+    assert resolve_prompt_version("v9", doubles=True) == DOUBLES_PROMPT_VERSION
+
+
+def test_resolve_prompt_version_pins_draft() -> None:
+    assert resolve_prompt_version("v9", draft=True) == DRAFT_PROMPT_VERSION
+
+
+def test_resolve_prompt_version_prefers_doubles_over_draft() -> None:
+    """A doubles draft still has to render the doubles template."""
+    assert resolve_prompt_version("v9", doubles=True, draft=True) == DOUBLES_PROMPT_VERSION

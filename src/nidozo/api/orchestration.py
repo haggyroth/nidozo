@@ -12,6 +12,7 @@ from typing import Any
 from nidozo.api.helpers import _build_backend, _build_streaming_player, _model_name
 from nidozo.api.models import StartBattleRequest, StartSeasonRequest, StartTournamentRequest
 from nidozo.battle.presets import PRESET_FORMAT, build_preset_team_string
+from nidozo.llm.prompt_builder import resolve_prompt_version
 
 logger = logging.getLogger(__name__)
 
@@ -224,9 +225,11 @@ async def run_battles(
         PRESET_FORMAT if (use_preset or use_import)
         else resolve_format(req.tier, doubles=doubles, team_size=team_size)
     )
-    # Doubles requires the v7 prompt (it carries the 2v2 turn template); draft
-    # uses v3; otherwise honour the request.
-    effective_prompt = "v7" if doubles else ("v3" if do_draft else req.prompt_version)
+    # Doubles pins the version that carries the 2v2 turn template, and draft
+    # pins its own; resolve_prompt_version holds that mapping.
+    effective_prompt = resolve_prompt_version(
+        req.prompt_version, doubles=doubles, draft=do_draft
+    )
     cfg = _showdown_cfg()
 
     for battle_id in battle_ids:
@@ -394,7 +397,9 @@ async def run_tournament(
         PRESET_FORMAT if any_preset
         else resolve_format(req.tier, doubles=doubles, team_size=team_size)
     )
-    effective_prompt = "v7" if doubles else ("v3" if do_draft else req.prompt_version)
+    effective_prompt = resolve_prompt_version(
+        req.prompt_version, doubles=doubles, draft=do_draft
+    )
     cfg = _showdown_cfg()
 
     total = len(battle_ids)
@@ -830,7 +835,9 @@ async def run_bracket_tournament(
         PRESET_FORMAT if any_preset
         else resolve_format(req.tier, doubles=doubles, team_size=team_size)
     )
-    effective_prompt = "v7" if doubles else ("v3" if do_draft else req.prompt_version)
+    effective_prompt = resolve_prompt_version(
+        req.prompt_version, doubles=doubles, draft=do_draft
+    )
     cfg = _showdown_cfg()
 
     # Build initial bracket state
@@ -1120,7 +1127,9 @@ async def run_season(
         PRESET_FORMAT if any_preset
         else resolve_format(req.tier, doubles=doubles, team_size=team_size)
     )
-    effective_prompt = "v7" if doubles else ("v3" if do_draft else req.prompt_version)
+    effective_prompt = resolve_prompt_version(
+        req.prompt_version, doubles=doubles, draft=do_draft
+    )
     cfg = _showdown_cfg()
 
     total = len(battle_ids)
