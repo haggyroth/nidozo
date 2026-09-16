@@ -125,7 +125,8 @@ through the authenticated API.)
 | `Bind for 0.0.0.0:8000 failed: port is already allocated` | Another container/process on the host already owns that port (`docker ps` to find it). Remap the host side in `docker-compose.yml` — don't stop someone else's service. Don't need to touch internal `NIDOZO_SHOWDOWN_PORT=8000`, only the published host port |
 | `docker compose up` fails after a previous failed attempt | Leftover containers stuck in `Created` state from the failed run — `docker compose down` (or `docker rm <name>`) before retrying |
 | `/healthz` is `degraded` | Showdown container not up yet, or crashed — `docker compose logs showdown` |
-| Browser data panels all 401 | Token not entered (click 🔑) or wrong token |
+| Browser data panels all 401 | Token not entered (click 🔑) or wrong token. The browser forgets it when the tab closes (it lives in `sessionStorage`, not on disk) — re-enter it after a restart |
+| Live stream connects but no events, page looks frozen | A reverse proxy in front of the API is stripping the `Sec-WebSocket-Protocol` header. The browser sends the credential there, so the handshake is refused if it's dropped — forward the header, or use `?token=` for that client |
 | LLM battle stuck "thinking" | `LM_STUDIO_BASE_URL` unreachable from the container (bind/firewall) |
 | "Your team was rejected" popup | A drafted/imported team violates the format's ban list (try tier `freeforall`/AG) |
 | Sprites missing but HP bars fine | `play.pokemonshowdown.com` unreachable — cosmetic only, renderer is vendored |
