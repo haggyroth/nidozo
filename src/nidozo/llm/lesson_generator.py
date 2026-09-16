@@ -15,6 +15,7 @@ import logging
 from typing import Any
 
 from nidozo.llm.backend import Message, ModelBackend
+from nidozo.llm.timeouts import complete_within, resolve_llm_timeout
 
 logger = logging.getLogger(__name__)
 
@@ -341,6 +342,7 @@ async def generate_lesson(
     opponent_label: str,
     turns: list[dict[str, Any]],
     analysis: dict[str, Any] | None = None,
+    timeout: float | None = None,
 ) -> str:
     """Ask the LLM to reflect on the battle and return a 2-3 sentence lesson.
 
@@ -354,6 +356,8 @@ async def generate_lesson(
         analysis:       Optional output from analyze_battle(); enriches the lesson
                         prompt with quality annotations, blunders, draft critique,
                         variance report, and win-probability context.
+        timeout:        Deadline in seconds for the lesson call (#278).  ``None``
+                        uses ``NIDOZO_LLM_TIMEOUT``; zero or negative disables it.
 
     Returns:
         A plain-text lesson string, or "" if the backend fails.
@@ -423,7 +427,10 @@ async def generate_lesson(
     ]
 
     try:
-        lesson = await backend.complete(messages)
+        lesson = await complete_within(
+            backend, messages, timeout=resolve_llm_timeout(timeout),
+            what=f"Lesson generation ({player_role})",
+        )
         lesson = lesson.strip()
         if not lesson:
             logger.warning("Lesson generator returned empty string for %s", player_role)

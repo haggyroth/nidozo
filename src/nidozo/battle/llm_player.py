@@ -63,6 +63,7 @@ def _status_label(status: str) -> str:
 # backend (a stuck local model, a network stall) blocks the turn for up to the
 # SDK default (~10 min). Override with NIDOZO_TURN_TIMEOUT (seconds); set to 0
 # to disable. Kept generous so slow-but-working local models aren't cut off.
+# The coach call that precedes it is bounded separately — see llm/timeouts.py.
 _DEFAULT_TURN_TIMEOUT: float = float(os.environ.get("NIDOZO_TURN_TIMEOUT", "90"))
 
 
@@ -149,11 +150,27 @@ class LLMPlayer(Player):
 
         state_json = json.dumps(state)
         coach_advice: str | None = None
+        _extra = {"player": self._player_role, "turn": battle.turn, "battle_id": self._battle_id}
 
         # --- Coach phase (optional) ---
         if self._coach is not None:
             await self._notify_thinking(is_coach=True, turn=battle.turn)
-            coach_advice = await self._coach.analyze(state)
+            # The coach bounds its own backend call (#278), so this wait_for is a
+            # backstop for a coach built with its deadline disabled: whatever the
+            # coach does, one stuck advisor must not hold the whole turn open.
+            try:
+                if self._turn_timeout is not None:
+                    coach_advice = await asyncio.wait_for(
+                        self._coach.analyze(state), timeout=self._turn_timeout
+                    )
+                else:
+                    coach_advice = await self._coach.analyze(state)
+            except TimeoutError:
+                logger.error(
+                    "[%s] turn %d coach timed out (%.0fs limit) — acting without advice",
+                    self._player_role, battle.turn, self._turn_timeout, extra=_extra,
+                )
+                coach_advice = None
             if coach_advice:
                 logger.debug(
                     "Coach advice for %s turn %d (%d chars)",
@@ -170,7 +187,6 @@ class LLMPlayer(Player):
             personality=self._personality,
         )
         response: str | None = None
-        _extra = {"player": self._player_role, "turn": battle.turn, "battle_id": self._battle_id}
 
         # Call the LLM with one retry. Each attempt is bounded by a per-turn
         # timeout so a hung backend can't stall the battle. The fallback reason

@@ -17,6 +17,7 @@ import logging
 from typing import Any
 
 from nidozo.llm.backend import Message, ModelBackend
+from nidozo.llm.timeouts import complete_within, resolve_llm_timeout
 
 logger = logging.getLogger(__name__)
 
@@ -97,6 +98,7 @@ async def generate_battle_narrative(
     p2_label: str,
     winner: int | None,
     total_turns: int,
+    timeout: float | None = None,
 ) -> str:
     """Generate a 4-6 sentence narrative of the completed battle.
 
@@ -107,6 +109,8 @@ async def generate_battle_narrative(
         p2_label:     Human-readable P2 identifier.
         winner:       1, 2, or None (tie).
         total_turns:  Total turns played.
+        timeout:      Deadline in seconds for the narrative call (#278).  ``None``
+                      uses ``NIDOZO_LLM_TIMEOUT``; zero or negative disables it.
 
     Returns:
         A plain-text narrative string, or "" on failure.
@@ -137,7 +141,10 @@ async def generate_battle_narrative(
     ]
 
     try:
-        result = await backend.complete(messages)
+        result = await complete_within(
+            backend, messages, timeout=resolve_llm_timeout(timeout),
+            what="Battle narrative",
+        )
         return (result or "").strip()
     except Exception as exc:
         logger.warning("Battle narrative generation failed: %s", exc)
