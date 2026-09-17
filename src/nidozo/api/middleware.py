@@ -5,11 +5,11 @@ from __future__ import annotations
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-# Origins allowed to make cross-origin requests to the API.
-CORS_ORIGINS: list[str] = [
-    "http://localhost:5173",  # Vite dev server
-    "http://localhost:5001",  # serve.py production default
-]
+# The allowlist lives in origin.py — the same list gates the WebSocket
+# handshakes, which CORS middleware never sees (#280).
+from nidozo.api.origin import CORS_ORIGINS
+
+__all__ = ["CORS_ORIGINS", "add_cors"]
 
 
 def add_cors(app: FastAPI) -> None:

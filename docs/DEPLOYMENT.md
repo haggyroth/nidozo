@@ -127,6 +127,7 @@ through the authenticated API.)
 | `/healthz` is `degraded` | Showdown container not up yet, or crashed — `docker compose logs showdown` |
 | Browser data panels all 401 | Token not entered (click 🔑) or wrong token. The browser forgets it when the tab closes (it lives in `sessionStorage`, not on disk) — re-enter it after a restart |
 | Live stream connects but no events, page looks frozen | A reverse proxy in front of the API is stripping the `Sec-WebSocket-Protocol` header. The browser sends the credential there, so the handshake is refused if it's dropped — forward the header, or use `?token=` for that client |
+| `403`/immediate disconnect on the live stream, but the page loaded fine | The WebSocket is being refused as cross-origin (#280). Serving the UI from a different host than the API means the browser's `Origin` doesn't match — add that origin to `NIDOZO_ALLOWED_ORIGINS` |
 | LLM battle stuck "thinking" | `LM_STUDIO_BASE_URL` unreachable from the container (bind/firewall) |
 | "Your team was rejected" popup | A drafted/imported team violates the format's ban list (try tier `freeforall`/AG) |
 | Sprites missing but HP bars fine | `play.pokemonshowdown.com` unreachable — cosmetic only, renderer is vendored |

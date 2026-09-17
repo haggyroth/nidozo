@@ -7,6 +7,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+- fix(api): **the WebSocket endpoints accepted connections from any origin** (#280). WebSockets are exempt from the same-origin policy and CORS middleware never sees the handshake, so a page on any site could open a socket to `/ws/battles` or `/ws/showdown/{room}` and read the live battle stream — a cross-site WebSocket hijack, and the whole of the data flow on an instance running with `NIDOZO_ALLOW_INSECURE=1` (or, with a token set, a way to ride a leaked one). Both endpoints now check `Origin` before accepting: a handshake with no `Origin` at all is allowed (every browser sends one, so that is a script or `curl`, which a hostile page cannot make connect), same-origin is allowed with no configuration, `Origin: null` — a sandboxed iframe or a `file://` page — is rejected, and anything else must be listed in the new `NIDOZO_ALLOWED_ORIGINS`. The same-origin test compares host:port rather than scheme, so a deployment behind TLS termination still works. The allowlist is now shared with the CORS middleware, which had its own copy
+
 ---
 
 ## [0.46.2] — 2026-09-16
