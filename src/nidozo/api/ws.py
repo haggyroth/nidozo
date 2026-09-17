@@ -9,6 +9,7 @@ from typing import Any
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from nidozo.api.auth import ws_auth_subprotocol, ws_authorized
+from nidozo.api.origin import origin_allowed
 
 # WebSocket close code for an unauthorized connection (1008 = policy violation).
 _CLOSE_POLICY_VIOLATION = 1008
@@ -25,6 +26,11 @@ def create_ws_router(bus: Any, auth_token: str | None = None) -> APIRouter:
 
     @router.websocket("/ws/battles")
     async def battle_stream(ws: WebSocket) -> None:
+        # Origin first: it is the only guard for a browser session whose token
+        # the user has already entered (#280).
+        if not origin_allowed(ws):
+            await ws.close(code=_CLOSE_POLICY_VIOLATION, reason="cross-origin")
+            return
         if not ws_authorized(ws, auth_token):
             await ws.close(code=_CLOSE_POLICY_VIOLATION, reason="unauthorized")
             return

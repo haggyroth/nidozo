@@ -149,6 +149,7 @@ def create_showdown_ws_router(
             or the legacy ``?token=`` query parameter.
     """
     from nidozo.api.auth import ws_auth_subprotocol, ws_authorized
+    from nidozo.api.origin import origin_allowed
 
     router = APIRouter()
     connect = connect_upstream or _default_connect
@@ -156,6 +157,12 @@ def create_showdown_ws_router(
 
     @router.websocket("/ws/showdown/{room}")
     async def showdown_stream(ws: WebSocket, room: str) -> None:
+        # Origin first: a spectate stream is readable by any page the user has
+        # open, and this endpoint's payload includes the whole battle (#280).
+        if not origin_allowed(ws):
+            await ws.close(code=_CLOSE_POLICY_VIOLATION, reason="cross-origin")
+            return
+
         if not _ROOM_RE.match(room):
             # Reject before accepting so a bad client gets a clean failure.
             await ws.close(code=_CLOSE_POLICY_VIOLATION, reason="invalid room id")
