@@ -37,6 +37,7 @@ from poke_env.ps_client import PSClient
 from nidozo.battle.bots import RandomBot
 from nidozo.battle.llm_player import LLMPlayer
 from nidozo.battle.serializer import serialize_battle
+from nidozo.errors import UserFacingError
 
 if TYPE_CHECKING:
     from nidozo.api.events import EventBus
@@ -222,7 +223,7 @@ class _StreamingMixin:
                         "Showdown rejected the team. See server logs for details."
                     ),
                 })
-                raise RuntimeError(
+                raise UserFacingError(
                     f"Battle challenge timed out after {_CHALLENGE_TIMEOUT_SECS:.0f}s — "
                     "Showdown likely rejected the submitted team. "
                     "Check the server logs for a '|popup|Your team was rejected' message."

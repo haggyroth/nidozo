@@ -10,6 +10,7 @@ import pytest
 
 from nidozo.api.events import EventBus
 from nidozo.battle.streaming_player import _StreamingMixin
+from nidozo.errors import UserFacingError
 
 
 class _FakeBase:
@@ -165,13 +166,18 @@ class _ChallengePlayer(_StreamingMixin, _FakeBase):
 
 @pytest.mark.asyncio
 async def test_send_challenges_times_out_and_reports_team_rejection(monkeypatch) -> None:
-    """A challenge that is never accepted (team rejected) raises and emits an error."""
+    """A challenge that is never accepted (team rejected) raises and emits an error.
+
+    The raise is a ``UserFacingError`` (#281): this message is written for the
+    person watching, so the runner publishes it rather than replacing it with the
+    generic failure text the event bus uses for everything else.
+    """
     monkeypatch.setattr(streaming_player, "_CHALLENGE_TIMEOUT_SECS", 0.05)
     bus = EventBus()
     q = bus.subscribe()
     player = _ChallengePlayer(bus, battle_id=5)
 
-    with pytest.raises(RuntimeError, match="team"):
+    with pytest.raises(UserFacingError, match="team"):
         await player._send_challenges("opponent", 1)
 
     # A challenge was actually sent before the wait timed out.
