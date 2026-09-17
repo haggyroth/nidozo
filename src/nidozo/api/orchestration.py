@@ -12,6 +12,7 @@ from typing import Any
 from nidozo.api.helpers import _build_backend, _build_streaming_player, _model_name
 from nidozo.api.models import StartBattleRequest, StartSeasonRequest, StartTournamentRequest
 from nidozo.battle.presets import PRESET_FORMAT, build_preset_team_string
+from nidozo.errors import public_error_message
 from nidozo.llm.prompt_builder import resolve_prompt_version
 
 logger = logging.getLogger(__name__)
@@ -370,9 +371,13 @@ async def run_battles(
                 await bus.publish({"type": "battle_cancelled", "battle_id": bid})
             raise
         except Exception as exc:
-            logger.error("Battle %d failed: %s", battle_id, exc)
+            logger.error("Battle %d failed: %s", battle_id, exc, exc_info=True)
             store.set_battle_status(battle_id, "failed")
-            await bus.publish({"type": "error", "battle_id": battle_id, "message": str(exc)})
+            await bus.publish({
+                "type": "error",
+                "battle_id": battle_id,
+                "message": public_error_message(exc),
+            })
         finally:
             active_tasks.pop(battle_id, None)
 
@@ -615,9 +620,16 @@ async def run_tournament(
             })
             raise
         except Exception as exc:
-            logger.error("Tournament %d battle %d failed: %s", tournament_id, battle_id, exc)
+            logger.error(
+                "Tournament %d battle %d failed: %s",
+                tournament_id, battle_id, exc, exc_info=True,
+            )
             store.set_battle_status(battle_id, "failed")
-            await bus.publish({"type": "error", "battle_id": battle_id, "message": str(exc)})
+            await bus.publish({
+                "type": "error",
+                "battle_id": battle_id,
+                "message": public_error_message(exc),
+            })
         finally:
             active_tasks.pop(battle_id, None)
 
@@ -1039,7 +1051,8 @@ async def run_bracket_tournament(
                     raise
                 except Exception as exc:
                     logger.error(
-                        "Bracket %d match %s failed: %s", tournament_id, match_id, exc
+                        "Bracket %d match %s failed: %s",
+                        tournament_id, match_id, exc, exc_info=True,
                     )
                     # Update in-memory bracket state so the match isn't left as
                     # "running" — that would make get_pending_matches return nothing,
@@ -1049,7 +1062,9 @@ async def run_bracket_tournament(
                     store.set_battle_status(battle_id, "failed")
                     store.update_bracket_state(tournament_id, bracket_state)
                     await bus.publish({
-                        "type": "error", "battle_id": battle_id, "message": str(exc),
+                        "type": "error",
+                        "battle_id": battle_id,
+                        "message": public_error_message(exc),
                     })
                     match_failed = True
                 finally:
@@ -1345,9 +1360,16 @@ async def run_season(
             })
             raise
         except Exception as exc:
-            logger.error("Season %d battle %d failed: %s", season_id, battle_id, exc)
+            logger.error(
+                "Season %d battle %d failed: %s",
+                season_id, battle_id, exc, exc_info=True,
+            )
             store.set_battle_status(battle_id, "failed")
-            await bus.publish({"type": "error", "battle_id": battle_id, "message": str(exc)})
+            await bus.publish({
+                "type": "error",
+                "battle_id": battle_id,
+                "message": public_error_message(exc),
+            })
         finally:
             active_tasks.pop(battle_id, None)
 
@@ -1484,9 +1506,16 @@ async def run_experiment(
             })
             raise
         except Exception as exc:
-            logger.error("Experiment %d battle %d failed: %s", experiment_id, battle_id, exc)
+            logger.error(
+                "Experiment %d battle %d failed: %s",
+                experiment_id, battle_id, exc, exc_info=True,
+            )
             store.set_battle_status(battle_id, "failed")
-            await bus.publish({"type": "error", "battle_id": battle_id, "message": str(exc)})
+            await bus.publish({
+                "type": "error",
+                "battle_id": battle_id,
+                "message": public_error_message(exc),
+            })
         finally:
             active_tasks.pop(battle_id, None)
 
