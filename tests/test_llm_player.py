@@ -421,11 +421,12 @@ async def test_choose_move_thinking_callback_exception_is_swallowed(mock_backend
 # _log_turn — no-op without store
 # ---------------------------------------------------------------------------
 
-def test_log_turn_no_op_without_store(mock_backend) -> None:
+@pytest.mark.asyncio
+async def test_log_turn_no_op_without_store(mock_backend) -> None:
     """_log_turn is silent when no store is configured."""
     player = _make_player(mock_backend)
     # Should not raise even without a store
-    player._log_turn(1, "/choose move thunderbolt", True, "response", "{}")
+    await player._log_turn(1, "/choose move thunderbolt", True, "response", "{}")
 
 
 # ---------------------------------------------------------------------------
@@ -780,7 +781,8 @@ def test_random_bot_is_subclass_of_random_player() -> None:
 # New coverage tests — missing lines
 # ---------------------------------------------------------------------------
 
-def test_log_turn_swallows_store_exception(mock_backend) -> None:
+@pytest.mark.asyncio
+async def test_log_turn_swallows_store_exception(mock_backend) -> None:
     """_log_turn silently swallows exceptions from store.log_turn()."""
     mock_store = MagicMock()
     mock_store.log_turn.side_effect = RuntimeError("DB locked")
@@ -790,7 +792,7 @@ def test_log_turn_swallows_store_exception(mock_backend) -> None:
     player._battle_id = 1
 
     # Should not raise
-    player._log_turn(5, "/choose move thunderbolt", True, "response", "{}")
+    await player._log_turn(5, "/choose move thunderbolt", True, "response", "{}")
 
 
 # ---------------------------------------------------------------------------
