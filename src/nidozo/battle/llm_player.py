@@ -68,6 +68,30 @@ def _status_label(status: str) -> str:
 # The coach call that precedes it is bounded separately — see llm/timeouts.py.
 _DEFAULT_TURN_TIMEOUT: float = float(os.environ.get("NIDOZO_TURN_TIMEOUT", "90"))
 
+# Share of the turn timeout the *retry* gets (#288). Both attempts used to run
+# on a full deadline, so retrying a timeout cost another complete wait: a dead
+# backend held the turn for twice `NIDOZO_TURN_TIMEOUT` — 180s by default —
+# while the battle stalled and the WebSocket showed nothing. The retry is a long
+# shot (a transient stall clearing, a local model finishing its load), so it
+# gets half. The first attempt keeps the full deadline, and a turn costs at most
+# 1.5x the budget. A backoff sleep would have made this worse, not better: the
+# cost is wall-clock, and sleeping between attempts only adds to it.
+_RETRY_TIMEOUT_SHARE: float = 0.5
+
+
+def _describe_limit(timeout: float | None) -> str:
+    """How to name an attempt's deadline in a log line.
+
+    ``timeout`` is None when the deadline is disabled, and ``"%.0f" % None`` is a
+    TypeError. Logging swallows formatting errors — it prints a logging-error
+    traceback to stderr and drops the record — so the failure would not propagate,
+    but the line telling you the call timed out would never be written. The coach
+    line is the reachable one: with the turn deadline disabled the coach is still
+    bounded by its own backend timeout (#278), so it can time out while
+    ``_turn_timeout`` is None.
+    """
+    return "no limit" if timeout is None else f"{timeout:.0f}s limit"
+
 
 class LLMPlayer(Player):
     """A Pokémon Showdown player whose moves are chosen by an LLM.
@@ -170,8 +194,9 @@ class LLMPlayer(Player):
                     coach_advice = await self._coach.analyze(state)
             except TimeoutError:
                 logger.error(
-                    "[%s] turn %d coach timed out (%.0fs limit) — acting without advice",
-                    self._player_role, battle.turn, self._turn_timeout, extra=_extra,
+                    "[%s] turn %d coach timed out (%s) — acting without advice",
+                    self._player_role, battle.turn,
+                    _describe_limit(self._turn_timeout), extra=_extra,
                 )
                 coach_advice = None
             if coach_advice:
@@ -192,23 +217,29 @@ class LLMPlayer(Player):
         response: str | None = None
 
         # Call the LLM with one retry. Each attempt is bounded by a per-turn
-        # timeout so a hung backend can't stall the battle. The fallback reason
-        # records *why* we fell back (backend_timeout / backend_error /
-        # empty_response / parse_failure) so analysis can tell them apart.
+        # timeout so a hung backend can't stall the battle; the retry gets a
+        # shorter one, so the two together cannot cost twice the budget (#288).
+        # The fallback reason records *why* we fell back (backend_timeout /
+        # backend_error / empty_response / parse_failure) so analysis can tell
+        # them apart.
         _t0 = time.monotonic()
         for attempt in range(2):
+            share = 1.0 if attempt == 0 else _RETRY_TIMEOUT_SHARE
+            attempt_timeout = (
+                None if self._turn_timeout is None else self._turn_timeout * share
+            )
             try:
-                if self._turn_timeout is not None:
+                if attempt_timeout is not None:
                     response = await asyncio.wait_for(
-                        self._backend.complete(messages), timeout=self._turn_timeout
+                        self._backend.complete(messages), timeout=attempt_timeout
                     )
                 else:
                     response = await self._backend.complete(messages)
             except TimeoutError:
                 logger.error(
-                    "[%s] turn %d LLM timed out (attempt %d, %.0fs limit)",
-                    self._player_role, battle.turn, attempt + 1, self._turn_timeout,
-                    extra=_extra,
+                    "[%s] turn %d LLM timed out (attempt %d, %s)",
+                    self._player_role, battle.turn, attempt + 1,
+                    _describe_limit(attempt_timeout), extra=_extra,
                 )
                 if attempt == 1:
                     await self._log_turn(battle.turn, None, False, None, state_json,
