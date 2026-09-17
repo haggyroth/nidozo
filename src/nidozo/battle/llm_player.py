@@ -19,6 +19,7 @@ from nidozo.battle.serializer import serialize_battle, species_name
 from nidozo.llm.backend import ModelBackend
 from nidozo.llm.prompt_builder import PromptBuilder
 from nidozo.llm.trace import log_response
+from nidozo.llm.versions import DEFAULT_PROMPT_VERSION
 
 if TYPE_CHECKING:
     from nidozo.db.store import BattleStore
@@ -73,8 +74,9 @@ class LLMPlayer(Player):
 
     Args:
         backend: Any object satisfying the ModelBackend protocol.
-        prompt_version: Prompt template version to use. All production callers
-            pass "v6" (the current default); "v1" is the fallback only.
+        prompt_version: Prompt template version to use. Defaults to the newest
+            template in the repo; production callers pass the version they
+            resolved (see resolve_prompt_version).
         store: Optional BattleStore for turn logging.
         battle_id: DB battle id — required when store is provided.
         player_role: "p1" or "p2" — required when store is provided.
@@ -85,7 +87,7 @@ class LLMPlayer(Player):
     def __init__(
         self,
         backend: ModelBackend,
-        prompt_version: str = "v1",
+        prompt_version: str = DEFAULT_PROMPT_VERSION,
         store: BattleStore | None = None,
         battle_id: int | None = None,
         player_role: str = "p1",
