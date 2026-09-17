@@ -13,7 +13,7 @@ from poke_env.battle import AbstractBattle, Pokemon
 from poke_env.battle.move_category import MoveCategory
 
 from nidozo.battle.heuristics.context import _active_matchup_quality
-from nidozo.battle.heuristics.damage import _effective_speed
+from nidozo.battle.heuristics.damage import _comparable_speed
 from nidozo.battle.heuristics.hazards import _HAZARD_REMOVAL_MOVES, _hazard_switch_notes
 from nidozo.battle.heuristics.type_chart import _is_grounded, _type_effectiveness_vs
 
@@ -89,16 +89,18 @@ def _score_switch(
         score["notes"].append(f"Weak to {', '.join(weak_to)}")
 
     # Speed comparison vs opponent — helps the model decide whether it gets a free
-    # hit on switch-in or eats a hit first.
+    # hit on switch-in or eats a hit first. Base-to-base on both sides (#289): the
+    # incoming mon's real stat is known and the opponent's never is, so comparing
+    # them would just move the bias to the bench. See _comparable_speed.
     try:
-        incoming_spd = _effective_speed(incoming, is_own=True)
-        opp_spd = _effective_speed(opp, is_own=False)
+        incoming_spd = _comparable_speed(incoming)
+        opp_spd = _comparable_speed(opp)
         if incoming_spd > opp_spd * 1.05:
-            score["speed_vs_opp"] = f"faster ({incoming_spd:.0f} vs ~{opp_spd:.0f})"
+            score["speed_vs_opp"] = f"faster by base speed ({incoming_spd:.0f} vs {opp_spd:.0f})"
         elif incoming_spd < opp_spd * 0.95:
-            score["speed_vs_opp"] = f"slower ({incoming_spd:.0f} vs ~{opp_spd:.0f})"
+            score["speed_vs_opp"] = f"slower by base speed ({incoming_spd:.0f} vs {opp_spd:.0f})"
         else:
-            score["speed_vs_opp"] = f"similar speed ({incoming_spd:.0f} vs ~{opp_spd:.0f})"
+            score["speed_vs_opp"] = f"similar base speed ({incoming_spd:.0f} vs {opp_spd:.0f})"
     except Exception:  # noqa: BLE001
         pass
 

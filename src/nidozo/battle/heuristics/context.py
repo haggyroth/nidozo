@@ -1,8 +1,11 @@
 """Battle context — the top-level advisory block handed to the prompt builder.
 
-Answers the questions a player asks before picking an action: who moves first,
-what phase the battle is in, how the active matchup reads, what the weather and
-statuses are doing, and whether we are about to get KO'd.
+Answers the questions a player asks before picking an action: how the two sides'
+speeds compare, what phase the battle is in, how the active matchup reads, what
+the weather and statuses are doing, and whether we are about to get KO'd.
+
+The speed comparison is base-for-base, so it reports who is faster at equal
+investment rather than who moves first — see ``_comparable_speed``.
 """
 
 from __future__ import annotations
@@ -12,7 +15,7 @@ from typing import Any
 from poke_env.battle import AbstractBattle, Pokemon
 from poke_env.battle.move_category import MoveCategory
 
-from nidozo.battle.heuristics.damage import _effective_speed, _estimate_incoming_damage
+from nidozo.battle.heuristics.damage import _comparable_speed, _estimate_incoming_damage
 from nidozo.battle.heuristics.status import _STATUS_IMPACT
 
 
@@ -82,22 +85,28 @@ def _battle_context(
         "tera_note": None,  # set when Terastallize is available and strategically relevant
     }
 
-    # Speed comparison
+    # Speed comparison. Both sides go through _comparable_speed (#289), which
+    # works from base speed — see it for why the own side's real stat cannot be
+    # one half of this comparison.
     if own is not None and opp is not None:
-        own_spd = _effective_speed(own, is_own=True)
-        opp_spd = _effective_speed(opp, is_own=False)
+        own_spd = _comparable_speed(own)
+        opp_spd = _comparable_speed(opp)
         faster = own_spd > opp_spd
         speed_note = (
-            f"You move FIRST (est. {own_spd:.0f} vs {opp_spd:.0f})"
+            f"Faster by base speed ({own_spd:.0f} vs {opp_spd:.0f})"
             if faster
             else (
-                f"You move SECOND (est. {own_spd:.0f} vs {opp_spd:.0f})"
+                f"Slower by base speed ({own_spd:.0f} vs {opp_spd:.0f})"
                 if own_spd < opp_spd
-                else f"Speed tie (est. {own_spd:.0f} vs {opp_spd:.0f}) — RNG decides order"
+                else f"Base-speed tie ({own_spd:.0f} vs {opp_spd:.0f}) — equal "
+                     "investment makes move order a coin flip"
             )
         )
         ctx["speed"] = {
-            "you_move_first": faster,
+            # Named for what it is: base speed decides this, not move order.
+            # Own investment is invisible to the comparison, and the opponent's
+            # is unknowable, so "you move first" was a claim we could not support.
+            "faster_by_base_speed": faster,
             "speed_tie": own_spd == opp_spd,
             "own_speed_estimate": round(own_spd),
             "opp_speed_estimate": round(opp_spd),

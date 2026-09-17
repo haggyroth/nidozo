@@ -659,9 +659,9 @@ class TestPromptBuilderV5:
             "force_switch": False,
             "heuristics": {
                 "battle_context": {
-                    "speed": {"you_move_first": True, "speed_tie": False,
+                    "speed": {"faster_by_base_speed": True, "speed_tie": False,
                               "own_speed_estimate": 162, "opp_speed_estimate": 45,
-                              "note": "You move FIRST (est. 162 vs 45)"},
+                              "note": "Faster by base speed (162 vs 45)"},
                     "active_matchup": "disadvantaged",
                     "phase": "early",
                     "own_remaining": 5,
@@ -682,7 +682,7 @@ class TestPromptBuilderV5:
                 "switch_scores": [
                     {"species": "blastoise", "hp_fraction": 1.0,
                      "switch_quality": 3, "quality_label": "excellent switch",
-                     "defensive_vs_opp": "neutral", "speed_vs_opp": "faster (98 vs ~45)",
+                     "defensive_vs_opp": "neutral", "speed_vs_opp": "faster by base speed (98 vs 45)",
                      "notes": ["Healthy HP (100%)"]},
                 ],
             },

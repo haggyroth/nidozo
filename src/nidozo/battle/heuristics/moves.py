@@ -14,7 +14,7 @@ from poke_env.battle.move import Move
 from poke_env.battle.move_category import MoveCategory
 
 from nidozo.battle.heuristics.damage import (
-    _effective_speed,
+    _comparable_speed,
     _stage_mult,
     _weather_damage_mod,
 )
@@ -140,16 +140,26 @@ def _score_move(
     if priority > 0:
         score["notes"].append(f"Priority +{priority} — moves before non-priority attacks regardless of speed")
 
-    # Speed note — does priority change who attacks first?
+    # Speed note — does priority change who attacks first? The comparison is
+    # base-to-base (#289); see _comparable_speed. It does not settle move order,
+    # so neither does this note.
     if priority == 0 and own is not None and opp is not None:
-        own_spd = _effective_speed(own, is_own=True)
-        opp_spd = _effective_speed(opp, is_own=False)
+        own_spd = _comparable_speed(own)
+        opp_spd = _comparable_speed(opp)
         if own_spd > opp_spd:
-            score["notes"].append("You move first this turn")
+            score["notes"].append(
+                f"Faster by base speed ({own_spd:.0f} vs {opp_spd:.0f})"
+            )
         elif own_spd < opp_spd:
-            score["notes"].append("Opponent moves first — you attack after taking damage")
+            score["notes"].append(
+                f"Slower by base speed ({own_spd:.0f} vs {opp_spd:.0f}) — "
+                "they attack first unless this move has priority"
+            )
         else:
-            score["notes"].append("Speed tie — move order is random (50/50)")
+            score["notes"].append(
+                f"Base-speed tie ({own_spd:.0f} vs {opp_spd:.0f}) — equal "
+                "investment makes move order a coin flip"
+            )
 
     # STAB
     if own is not None and move.type in own.types:

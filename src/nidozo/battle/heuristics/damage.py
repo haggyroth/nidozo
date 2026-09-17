@@ -50,14 +50,33 @@ def _weather_damage_mod(weather_name: str | None, move_type_name: str) -> float:
 # Speed
 # ---------------------------------------------------------------------------
 
-def _effective_speed(mon: Pokemon, is_own: bool) -> float:
-    """Estimate effective speed accounting for stat stages and paralysis."""
+def _comparable_speed(mon: Pokemon) -> float:
+    """Speed on a scale both sides of the battle share (#289). Stat stages and
+    paralysis applied — but from *base* speed, never ``mon.stats``.
+
+    Both sides of any comparison must come from this function, or the comparison
+    means nothing. ``mon.stats`` is populated from the battle request, which
+    Showdown sends only to a Pokémon's owner; a Pokémon met in battle reaches us
+    through ``|switch|``, which carries species, level and an HP percentage and
+    never EVs, nature or IVs. So for our own side ``mon.stats[\"spe\"]`` is the
+    real battle stat — a max-invested sweeper's 333 — while the opponent only
+    ever has their species base, about 102.
+
+    Comparing those two numbers is not a comparison. It is what this used to do,
+    and the result was a near-constant "You move first", because the own side was
+    carrying roughly 50-100 points of investment the opponent's number could not
+    include. Against any speed-invested opponent the advisory was simply wrong.
+
+    Base speed is the only quantity both sides have. The trade is explicit: this
+    answers "who is faster if both are invested the same way", not who moves
+    first. Nothing is lost from our own side by it — the model reads its exact
+    stats in the serialized state (``actual_stats``) — and speed ties become
+    meaningful again: with base stats they happen when the two species are
+    genuinely matched, whereas comparing an invested stat against a bare base
+    almost never produced one.
+    """
     try:
-        if is_own:
-            raw = (mon.stats or {}).get("spe")
-            base_spd = float(raw) if isinstance(raw, int | float) else float(mon.base_stats.get("spe", 80))
-        else:
-            base_spd = float(mon.base_stats.get("spe", 80))
+        base_spd = float(mon.base_stats.get("spe", 80))
         stage_raw = mon.boosts.get("spe", 0)
         stage = int(stage_raw) if isinstance(stage_raw, int | float) else 0
         spd = base_spd * _stage_mult(stage)

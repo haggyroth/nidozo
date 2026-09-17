@@ -223,14 +223,14 @@ class TestBattleContext:
         opp = _mock_pokemon(base_stats={"hp": 80, "atk": 80, "def": 80, "spa": 80, "spd": 80, "spe": 80})
         battle = _mock_battle(own=own, opp=opp)
         ctx = score_actions(battle)["battle_context"]
-        assert ctx["speed"]["you_move_first"] is True
+        assert ctx["speed"]["faster_by_base_speed"] is True
 
     def test_slower_own_moves_second(self) -> None:
         own = _mock_pokemon(base_stats={"hp": 80, "atk": 80, "def": 80, "spa": 80, "spd": 80, "spe": 50})
         opp = _mock_pokemon(base_stats={"hp": 80, "atk": 80, "def": 80, "spa": 80, "spd": 80, "spe": 100})
         battle = _mock_battle(own=own, opp=opp)
         ctx = score_actions(battle)["battle_context"]
-        assert ctx["speed"]["you_move_first"] is False
+        assert ctx["speed"]["faster_by_base_speed"] is False
 
     def test_paralysis_reduces_own_effective_speed(self) -> None:
         """A paralyzed mon with 120 base speed should have effective speed 60 (Gen 9: 50%),
@@ -245,7 +245,7 @@ class TestBattleContext:
         battle = _mock_battle(own=own, opp=opp)
         ctx = score_actions(battle)["battle_context"]
         # 120 * 0.50 = 60 < 80 → moves second (Gen 9 paralysis halves speed)
-        assert ctx["speed"]["you_move_first"] is False
+        assert ctx["speed"]["faster_by_base_speed"] is False
 
     def test_active_matchup_favorable(self) -> None:
         """Own STAB hits ×2, opponent STAB hits ×1 → favorable."""
@@ -349,7 +349,7 @@ class TestMoveScoringEnhancements:
         opp.damage_multiplier.return_value = 1.0
         battle = _mock_battle(available_moves=[move], own=own, opp=opp)
         ms = score_actions(battle)["move_scores"][0]
-        assert any("first" in n.lower() for n in ms["notes"])
+        assert any("faster by base speed" in n.lower() for n in ms["notes"])
 
     def test_speed_note_slower(self) -> None:
         move = _mock_move("thunderbolt", priority=0)
@@ -358,7 +358,7 @@ class TestMoveScoringEnhancements:
         opp.damage_multiplier.return_value = 1.0
         battle = _mock_battle(available_moves=[move], own=own, opp=opp)
         ms = score_actions(battle)["move_scores"][0]
-        assert any("second" in n.lower() or "opponent moves first" in n.lower() for n in ms["notes"])
+        assert any("slower by base speed" in n.lower() for n in ms["notes"])
 
     def test_burn_halves_physical_damage(self) -> None:
         """Burn should reduce estimated physical damage vs an unburned version."""
@@ -808,19 +808,152 @@ def test_current_weather_happy_path() -> None:
     assert result == "SANDSTORM"
 
 
-# --- _effective_speed exception path ---
+# --- _comparable_speed exception path ---
 
-def test_effective_speed_attribute_error_returns_fallback() -> None:
-    """_effective_speed returns 80.0 when boosts.get raises TypeError."""
-    from nidozo.battle.heuristics import _effective_speed
+def test_comparable_speed_attribute_error_returns_fallback() -> None:
+    """_comparable_speed returns 80.0 when boosts.get raises TypeError."""
+    from nidozo.battle.heuristics import _comparable_speed
 
     mon = MagicMock()
-    mon.stats = {}       # empty dict → raw is None → float(mon.base_stats.get(...))
+    mon.stats = {}       # irrelevant to this function, but present as in production
     mon.base_stats = {"spe": 80}
     # Make boosts.get raise TypeError → triggers except block
     mon.boosts = None    # None.get("spe", 0) → AttributeError → caught
-    result = _effective_speed(mon, is_own=True)
+    result = _comparable_speed(mon)
     assert result == pytest.approx(80.0)
+
+
+# ---------------------------------------------------------------------------
+# #289 — the speed comparison is base-for-base
+#
+# The own side used to be compared at its real battle stat (EVs and nature
+# applied) against the opponent's species base. _mock_pokemon defaults ``stats``
+# to {}, which sends the own side down the base-stat fallback too — so every
+# speed test written before this point compares base-to-base and *none of them
+# could see the bias*. The tests below set a real ``stats`` dict, which is what
+# production has, and that is the only way this defect is visible at all.
+# ---------------------------------------------------------------------------
+
+def _speed_only(base_speed: int) -> dict:
+    """Base stats with a chosen speed — the shape poke-env hands us."""
+    return {"hp": 80, "atk": 80, "def": 80, "spa": 80, "spd": 80, "spe": base_speed}
+
+
+def _real_stats(speed: int) -> dict:
+    """The shape of ``mon.stats`` for a Pokémon we own: computed battle stats."""
+    return {"hp": 300, "atk": 200, "def": 200, "spa": 200, "spd": 200, "spe": speed}
+
+
+def test_the_own_sides_real_stat_does_not_enter_the_comparison() -> None:
+    """The regression #289 describes: a real 333 must not be matched against a
+    bare base 102. The own side is genuinely faster on its real stats and slower
+    on base speed, and only the second answer is supportable — the opponent's
+    investment is unknowable, so the first one is an artefact of comparing two
+    different quantities.
+    """
+    own = _mock_pokemon(base_stats=_speed_only(80), stats=_real_stats(333))
+    opp = _mock_pokemon(base_stats=_speed_only(102))
+    ctx = score_actions(_mock_battle(own=own, opp=opp))["battle_context"]
+
+    assert ctx["speed"]["own_speed_estimate"] == 80      # not 333
+    assert ctx["speed"]["opp_speed_estimate"] == 102
+    assert ctx["speed"]["faster_by_base_speed"] is False
+
+
+def test_comparable_speed_ignores_the_computed_stat() -> None:
+    """A mon with a real speed stat of 333 and base 80 compares as 80."""
+    from nidozo.battle.heuristics import _comparable_speed
+
+    mon = _mock_pokemon(base_stats=_speed_only(80), stats=_real_stats(333))
+    assert _comparable_speed(mon) == pytest.approx(80.0)
+
+
+@pytest.mark.parametrize("real_speed", [4, 200, 500, None])
+def test_matching_base_speed_ties_whatever_the_real_stats_say(
+    real_speed: int | None,
+) -> None:
+    """Same species base on both sides is a tie — symmetric by construction.
+
+    The old code could not produce a tie here unless our investment happened to
+    land exactly on their base stat: 500 vs 100 read as "you move first", and 4
+    vs 100 as "you move second", for two mons that are identical at equal
+    investment.
+    """
+    own = _mock_pokemon(
+        base_stats=_speed_only(100),
+        stats=_real_stats(real_speed) if real_speed else None,
+    )
+    opp = _mock_pokemon(base_stats=_speed_only(100))
+    ctx = score_actions(_mock_battle(own=own, opp=opp))["battle_context"]
+
+    assert ctx["speed"]["speed_tie"] is True
+    assert ctx["speed"]["faster_by_base_speed"] is False
+
+
+def test_speed_stages_apply_to_both_sides() -> None:
+    """Stages and paralysis are public information — both sides keep them."""
+    own = _mock_pokemon(base_stats=_speed_only(80), boosts={"spe": 2})    # 80 × 2
+    opp = _mock_pokemon(base_stats=_speed_only(200), boosts={"spe": -2})  # 200 ÷ 2
+    ctx = score_actions(_mock_battle(own=own, opp=opp))["battle_context"]
+
+    assert ctx["speed"]["own_speed_estimate"] == 160
+    assert ctx["speed"]["opp_speed_estimate"] == 100
+    assert ctx["speed"]["faster_by_base_speed"] is True
+
+
+def test_the_opponents_paralysis_is_applied() -> None:
+    """A paralyzed opponent is halved — it is a status we can see."""
+    paralyzed = MagicMock()
+    paralyzed.name = "PAR"
+    own = _mock_pokemon(base_stats=_speed_only(80))
+    opp = _mock_pokemon(base_stats=_speed_only(120), status=paralyzed)
+    ctx = score_actions(_mock_battle(own=own, opp=opp))["battle_context"]
+
+    assert ctx["speed"]["opp_speed_estimate"] == 60
+    assert ctx["speed"]["faster_by_base_speed"] is True
+
+
+@pytest.mark.parametrize(
+    "note_path", ["battle_context", "move_scores"]
+)
+def test_the_speed_note_does_not_claim_move_order(note_path: str) -> None:
+    """The advisory stopped asserting an order it cannot know.
+
+    Base speed does not settle who moves first — investment does, and only one
+    side's investment is knowable. The old wording ("You move FIRST", "You move
+    SECOND") read as a statement about this turn.
+    """
+    own = _mock_pokemon(base_stats=_speed_only(130), stats=_real_stats(400))
+    opp = _mock_pokemon(base_stats=_speed_only(80))
+    opp.damage_multiplier.return_value = 1.0
+    move = _mock_move("thunderbolt", priority=0)
+    result = score_actions(_mock_battle(available_moves=[move], own=own, opp=opp))
+
+    notes = (
+        [result["battle_context"]["speed"]["note"]]
+        if note_path == "battle_context"
+        else result["move_scores"][0]["notes"]
+    )
+    joined = " ".join(notes)
+    assert "base speed" in joined, f"no base-speed note in {notes}"
+    assert "FIRST" not in joined and "SECOND" not in joined
+
+
+def test_an_opponent_built_from_the_protocol_has_no_usable_stats() -> None:
+    """The upstream fact this whole fix rests on.
+
+    ``Pokemon._stats`` starts as a dict of Nones and is filled only by
+    ``update_from_request`` (the battle request, sent to the Pokémon's owner) or
+    by the teambuilder. A Pokémon met in battle arrives through ``|switch|``,
+    which carries neither — so an opponent's speed stat is *never* known, and
+    "the opponent's actual stats are revealed" is not a reachable branch.
+    """
+    from poke_env.battle.pokemon import Pokemon
+
+    opp = Pokemon(gen=9, species="garchomp")
+    assert opp.stats is not None
+    assert opp.stats["spe"] is None            # present, but not a number
+    assert opp.base_stats["spe"] == 102        # what we actually have to work with
 
 
 # --- _active_matchup_quality ---
