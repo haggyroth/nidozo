@@ -18,6 +18,7 @@ from nidozo.battle.action_parser import parse_action
 from nidozo.battle.serializer import serialize_battle, species_name
 from nidozo.llm.backend import ModelBackend
 from nidozo.llm.prompt_builder import PromptBuilder
+from nidozo.llm.trace import log_response
 
 if TYPE_CHECKING:
     from nidozo.db.store import BattleStore
@@ -248,12 +249,8 @@ class LLMPlayer(Player):
                                  prompt_tokens=_pt, completion_tokens=_ct)
             return self.choose_random_move(battle)
 
-        if logger.isEnabledFor(logging.DEBUG):
-            logger.debug(
-                "[%s] turn %d raw LLM response:\n%s",
-                self._player_role, battle.turn, response,
-                extra=_extra,
-            )
+        # Summary at DEBUG; the whole body only under NIDOZO_TRACE_LLM (#284).
+        log_response(logger, f"[{self._player_role}] turn {battle.turn}", response, extra=_extra)
 
         order = parse_action(response, battle, self)
         if order is None:
