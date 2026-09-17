@@ -19,6 +19,7 @@ from nidozo.db.elo import (
     updated_glicko,
 )
 from nidozo.db.schema import migrate
+from nidozo.llm.versions import DEFAULT_PROMPT_VERSION
 
 logger = logging.getLogger(__name__)
 
@@ -107,7 +108,7 @@ class BattleStore:
         self,
         provider: str,
         model_name: str,
-        prompt_version: str = "v1",
+        prompt_version: str = DEFAULT_PROMPT_VERSION,
     ) -> int:
         """Return the model id, creating the row if it doesn't exist.
 

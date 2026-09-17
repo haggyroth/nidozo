@@ -21,17 +21,30 @@ from typing import Any
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
 
 from nidozo.llm.backend import Message
+from nidozo.llm.versions import (
+    ALL_PROMPT_VERSIONS,
+    DEFAULT_PROMPT_VERSION,
+    DOUBLES_PROMPT_VERSION,
+    DRAFT_PROMPT_VERSION,
+    PromptVersion,
+)
+
+__all__ = [
+    "ALL_PROMPT_VERSIONS",
+    "DEFAULT_PROMPT_VERSION",
+    "DOUBLES_PROMPT_VERSION",
+    "DRAFT_PROMPT_VERSION",
+    "PromptBuilder",
+    "PromptVersion",
+    "resolve_prompt_version",
+]
 
 _PROMPTS_ROOT = Path(__file__).parent / "prompts"
 
-# The prompt version that ships the doubles (2v2) turn template. Doubles is not
-# a superset of singles — serializer.py emits a different state shape for it
-# (my_active is a *list* of slot dicts, available_moves a list of lists), which
-# the singles templates cannot render. See resolve_prompt_version().
-DOUBLES_PROMPT_VERSION = "v7"
-
-# The prompt version used for the team-draft phase.
-DRAFT_PROMPT_VERSION = "v3"
+# Version identifiers live in nidozo.llm.versions (#285) — the DB layer records
+# them too, and imports them from there rather than through this module, which
+# would drag Jinja2 into schema definition. Re-exported above so existing
+# ``from nidozo.llm.prompt_builder import DOUBLES_PROMPT_VERSION`` keeps working.
 
 
 def resolve_prompt_version(
@@ -55,7 +68,7 @@ def resolve_prompt_version(
 
 
 class PromptBuilder:
-    def __init__(self, version: str = "v1") -> None:
+    def __init__(self, version: str = DEFAULT_PROMPT_VERSION) -> None:
         self.version = version
         self._version_dir = _PROMPTS_ROOT / version
 

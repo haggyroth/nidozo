@@ -6,6 +6,8 @@ import pytest
 
 from nidozo.llm.prompt_builder import (
     _PROMPTS_ROOT,
+    ALL_PROMPT_VERSIONS,
+    DEFAULT_PROMPT_VERSION,
     DOUBLES_PROMPT_VERSION,
     DRAFT_PROMPT_VERSION,
     PromptBuilder,
@@ -35,12 +37,16 @@ _MINIMAL_STATE: dict = {
     "opponent_side_conditions": [],
     "my_active": {
         "species": "pikachu",
+        "level": 100,
         "types": ["ELECTRIC"],
         "hp_fraction": 1.0,
+        "fainted": False,
         "status": None,
         "boosts": {},
         "item": "lightball",
         "ability": "static",
+        "base_stats": {"atk": 55, "def": 40, "spa": 50, "spd": 50, "spe": 90},
+        "actual_stats": None,
         "moves": {
             "thunderbolt": {
                 "id": "thunderbolt",
@@ -53,19 +59,27 @@ _MINIMAL_STATE: dict = {
             }
         },
         "effects": [],
-        "fainted": False,
+        "last_move": None,
+        "is_terastallized": False,
+        "tera_type": None,
     },
     "my_team": [],
     "opponent_active": {
         "species": "charmander",
+        "level": 100,
         "types": ["FIRE"],
         "hp_fraction": 0.75,
+        "fainted": False,
         "status": None,
         "boosts": {},
         "item": None,
         "ability": None,
+        "base_stats": {"atk": 52, "def": 43, "spa": 60, "spd": 50, "spe": 65},
         "revealed_moves": {},
-        "fainted": False,
+        "moves_revealed": 0,
+        "last_move": None,
+        "is_terastallized": False,
+        "tera_type": None,
     },
     "opponent_team": [],
     "available_moves": [
@@ -82,15 +96,41 @@ _MINIMAL_STATE: dict = {
     ],
     "available_switches": [],
     "force_switch": False,
+    # Added by #285: PromptBuilder() with no argument builds DEFAULT_PROMPT_VERSION,
+    # and the v9 template reads these. They were missing, which is why the whole
+    # fixture had quietly been rendering v1 — see
+    # test_the_minimal_state_renders_on_every_version.
+    "recent_events": [],
+    "opponent_team_size_seen": 1,
+    "opponent_threat_map": [],
+    "can_tera": False,
     "heuristics": {
+        # _battle_context pre-populates every optional key with None, so this is
+        # the shape a real minimal state carries.
+        "battle_context": {
+            "speed": None,
+            "active_matchup": None,
+            "phase": None,
+            "own_remaining": None,
+            "opp_remaining": None,
+            "weather": None,
+            "weather_note": None,
+            "own_status_impact": None,
+            "opp_status": None,
+            "opp_status_impact": None,
+            "ko_risk_note": None,
+            "tera_note": None,
+        },
         "move_scores": [
             {
                 "move_id": "thunderbolt",
                 "type_multiplier": 1.0,
                 "effectiveness_label": "neutral (1×)",
                 "estimated_damage_pct": "~30%",
+                "accuracy_adjusted_pct": "~30%",
                 "priority": 0,
                 "is_status": False,
+                "low_pp": False,
                 "notes": ["STAB"],
             }
         ],
@@ -112,10 +152,21 @@ def test_build_system_returns_system_role() -> None:
 
 
 def test_system_prompt_contains_action_format() -> None:
+    """The default system prompt states the JSON action contract (#285).
+
+    This asserted on the v1 text protocol (``ACTION: move``) long after the
+    templates moved to JSON — it kept passing only because ``PromptBuilder()``
+    silently defaulted to v1, so it was testing a prompt no battle runs.
+    """
     builder = PromptBuilder()
     system = builder.build_system()["content"]
-    assert "ACTION: move" in system
-    assert "ACTION: switch" in system
+    # The enum the model must choose from, then a worked example of each.
+    assert '"action_type": "move", "switch", or "tera_move"' in system
+    assert '"action_type":"move"' in system
+    assert '"action_type":"switch"' in system
+    assert '"action_type":"tera_move"' in system
+    # And the v1 text protocol is gone, not merely accompanied.
+    assert "ACTION: move" not in system
 
 
 def test_build_turn_returns_user_role() -> None:
@@ -142,7 +193,7 @@ def test_turn_renders_move_name_and_bp() -> None:
 def test_turn_shows_no_revealed_moves_when_empty() -> None:
     builder = PromptBuilder()
     content = builder.build_turn(_MINIMAL_STATE)["content"]
-    assert "Revealed moves: none yet" in content
+    assert "No moves revealed yet" in content
 
 
 def test_turn_shows_revealed_move_when_present() -> None:
@@ -261,6 +312,82 @@ def test_version_list_covers_every_shipped_version() -> None:
         if p.is_dir() and re.fullmatch(r"v\d+", p.name)
     )
     assert shipped == _ALL_VERSIONS
+
+
+def test_the_api_version_literal_covers_every_shipped_version() -> None:
+    """The API must accept every version that exists — and refuse nothing else."""
+    assert list(ALL_PROMPT_VERSIONS) == _ALL_VERSIONS
+
+
+def test_the_default_prompt_version_is_the_newest_singles_template() -> None:
+    """#285. ``PromptBuilder()`` must build the prompt production actually runs.
+
+    It defaulted to ``"v1"`` while the API sent ``"v9"``, so anything
+    constructed without an explicit version silently ran the oldest prompt in
+    the repo — and, as the fixture below shows, took the tests with it. Adding
+    v10 without moving this constant fails here.
+    """
+    singles = sorted(
+        (p.name for p in _PROMPTS_ROOT.iterdir()
+         if p.is_dir() and re.fullmatch(r"v\d+", p.name)
+         and (p / "turn.txt.jinja").is_file()),
+        key=lambda v: int(v[1:]),
+    )
+    assert DEFAULT_PROMPT_VERSION == singles[-1]
+
+
+def test_the_default_prompt_version_is_loadable() -> None:
+    assert PromptBuilder().version == DEFAULT_PROMPT_VERSION
+
+
+def test_the_player_defaults_to_the_default_prompt_version() -> None:
+    """The other half of the drift: LLMPlayer defaulted to v1 as well."""
+    from unittest.mock import AsyncMock, patch
+
+    from nidozo.battle.llm_player import LLMPlayer
+
+    with patch("poke_env.player.Player.__init__", return_value=None):
+        player = LLMPlayer(backend=AsyncMock())
+
+    assert player._prompt_builder.version == DEFAULT_PROMPT_VERSION
+
+
+def test_the_store_defaults_to_the_default_prompt_version() -> None:
+    from nidozo.db.store import BattleStore
+
+    store = BattleStore(":memory:")
+    model_id = store.get_or_create_model("openai", "gpt-test")
+    row = store._conn.execute(
+        "SELECT prompt_version FROM models WHERE id=?", (model_id,)
+    ).fetchone()
+    assert row[0] == DEFAULT_PROMPT_VERSION
+
+
+def test_the_schema_has_no_prompt_version_column_default() -> None:
+    """#285. A column default is a stale version waiting to be stamped on a row.
+
+    Every INSERT passes ``prompt_version`` explicitly, so the defaults were
+    unreachable — 'v1'/'v2'/'v6' sat in the schema text naming versions nothing
+    ran. Dropping them means a forgotten value fails at insert.
+    """
+    from nidozo.db.schema import _DDL_TABLES
+
+    for line in _DDL_TABLES.splitlines():
+        if "prompt_version" in line:
+            assert "DEFAULT" not in line, line
+
+
+@pytest.mark.parametrize("version", _ALL_VERSIONS)
+def test_the_minimal_state_renders_on_every_version(version: str) -> None:
+    """The fixture must keep pace with the templates, or it silently stops testing.
+
+    ``_MINIMAL_STATE`` still satisfied v1 long after the default moved on, so
+    every test built on it was exercising a prompt no battle runs — and the only
+    symptom was the fixture quietly going stale. Rendering it through each
+    version under ``StrictUndefined`` makes that drift fail here instead.
+    """
+    content = PromptBuilder(version).build_turn(_MINIMAL_STATE)["content"]
+    assert "Turn 1" in content
 
 
 @pytest.mark.parametrize("version", _ALL_VERSIONS)

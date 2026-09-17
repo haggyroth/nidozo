@@ -6,13 +6,14 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, model_validator
 
+from nidozo.llm.versions import DEFAULT_PROMPT_VERSION, PromptVersion
+
 # Closed enums shared across requests. Invalid values are rejected at the API
 # boundary (422) instead of silently degrading deep in a background task — e.g.
 # an unknown provider used to fall through to LM Studio, an unknown tier to AG.
 Provider = Literal["random", "anthropic", "openai", "lmstudio", "human"]
 # Coaches must be a real LLM backend — "random" has no coach implementation.
 CoachProvider = Literal["anthropic", "openai", "lmstudio"]
-PromptVersion = Literal["v1", "v2", "v3", "v4", "v5", "v6", "v7", "v8", "v9"]
 # Exactly the tiers the backend supports (is_valid_tier / _TIER_POOLS + random).
 Tier = Literal["random", "ou", "ubers", "uu", "lc", "freeforall"]
 TournamentFormat = Literal["round_robin", "single_elim", "double_elim"]
@@ -31,7 +32,7 @@ class StartBattleRequest(BaseModel):
     p1_model: str | None = None
     p2_model: str | None = None
     model: str | None = None
-    prompt_version: PromptVersion = "v9"
+    prompt_version: PromptVersion = DEFAULT_PROMPT_VERSION
     n_battles: int = Field(1, ge=1, le=50)
     tier: Tier = "random"
     draft: bool = False    # If True and tier != "random", run LLM draft phase first
@@ -93,7 +94,7 @@ class PlayerSpec(BaseModel):
 class StartTournamentRequest(BaseModel):
     players: list[PlayerSpec] = Field(..., min_length=2, max_length=12)
     rounds: int = Field(1, ge=1, le=10)
-    prompt_version: PromptVersion = "v9"
+    prompt_version: PromptVersion = DEFAULT_PROMPT_VERSION
     tier: Tier = "random"
     draft: bool = False    # If True and tier != "random", run LLM draft phase before each battle
     tournament_format: TournamentFormat = "round_robin"
@@ -113,7 +114,7 @@ class StartSeasonRequest(BaseModel):
     name: str = Field(..., min_length=1, max_length=100)
     players: list[PlayerSpec] = Field(..., min_length=2, max_length=12)
     rounds: int = Field(1, ge=1, le=10)
-    prompt_version: PromptVersion = "v9"
+    prompt_version: PromptVersion = DEFAULT_PROMPT_VERSION
     tier: Tier = "random"
     draft: bool = False
     doubles: bool = False
@@ -136,7 +137,7 @@ class ExperimentVariant(BaseModel):
     """One side of a bake-off: a specific provider + model + prompt version."""
     provider: ExperimentProvider
     model: str | None = None
-    prompt_version: PromptVersion = "v9"
+    prompt_version: PromptVersion = DEFAULT_PROMPT_VERSION
 
 
 class StartExperimentRequest(BaseModel):

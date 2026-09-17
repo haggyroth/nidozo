@@ -7,6 +7,15 @@ logger = logging.getLogger(__name__)
 
 SCHEMA_VERSION = 20
 
+# `prompt_version` columns carry no DEFAULT on purpose (#285). They used to
+# default to a hardcoded version string — 'v1' on `models`, 'v2' on
+# `tournaments`, 'v6' on `seasons` — none of which matched the version the app
+# actually runs (see nidozo.llm.versions). Every INSERT passes the value
+# explicitly, so the defaults were unreachable: they only ever served to record
+# a stale version in the schema text and mislead whoever read it. Dropping them
+# makes a forgotten value fail at insert instead of silently stamping an old
+# prompt version onto a row.
+
 # Table definitions only — safe to run against any DB version via IF NOT EXISTS.
 # Indexes are kept separate because they may reference columns (e.g. tournament_id)
 # that do not yet exist in old databases.  Those columns are added by the
@@ -24,7 +33,7 @@ CREATE TABLE IF NOT EXISTS models (
     id             INTEGER PRIMARY KEY,
     provider       TEXT    NOT NULL,  -- "anthropic" | "openai" | "lmstudio" | "random"
     model_name     TEXT    NOT NULL,
-    prompt_version TEXT    NOT NULL DEFAULT 'v1',
+    prompt_version TEXT    NOT NULL,
     created_at     TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
 );
 
@@ -45,7 +54,7 @@ CREATE TABLE IF NOT EXISTS tournaments (
     id                INTEGER PRIMARY KEY,
     players           TEXT    NOT NULL,  -- JSON array of {provider, model_name}
     rounds            INTEGER NOT NULL DEFAULT 1,
-    prompt_version    TEXT    NOT NULL DEFAULT 'v2',
+    prompt_version    TEXT    NOT NULL,
     total_battles     INTEGER NOT NULL DEFAULT 0,
     tier              TEXT    NOT NULL DEFAULT 'random',  -- 'random' | 'ou' | 'ubers' | ...
     status            TEXT    NOT NULL DEFAULT 'running',  -- running|completed|cancelled
@@ -139,7 +148,7 @@ CREATE TABLE IF NOT EXISTS seasons (
     format          TEXT    NOT NULL DEFAULT 'gen9randombattle',
     participants    TEXT    NOT NULL,  -- JSON [{provider, model_name}]
     rounds          INTEGER NOT NULL DEFAULT 1,
-    prompt_version  TEXT    NOT NULL DEFAULT 'v6',
+    prompt_version  TEXT    NOT NULL,
     total_battles   INTEGER NOT NULL DEFAULT 0,
     status          TEXT    NOT NULL DEFAULT 'pending',  -- pending|running|completed|cancelled
     created_at      TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
@@ -183,7 +192,7 @@ CREATE TABLE IF NOT EXISTS draft_sessions (
     tier            TEXT    NOT NULL,
     pool_size       INTEGER NOT NULL,
     picked          TEXT    NOT NULL,   -- JSON list of picks in order
-    prompt_version  TEXT    NOT NULL DEFAULT 'v3',
+    prompt_version  TEXT    NOT NULL,
     reasoning       TEXT,               -- concatenated reasoning from all picks
     created_at      TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
 );
@@ -251,7 +260,7 @@ def migrate(conn: sqlite3.Connection) -> None:
                     id             INTEGER PRIMARY KEY,
                     players        TEXT    NOT NULL,
                     rounds         INTEGER NOT NULL DEFAULT 1,
-                    prompt_version TEXT    NOT NULL DEFAULT 'v2',
+                    prompt_version TEXT    NOT NULL,
                     total_battles  INTEGER NOT NULL DEFAULT 0,
                     status         TEXT    NOT NULL DEFAULT 'running',
                     created_at     TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
@@ -320,7 +329,7 @@ def migrate(conn: sqlite3.Connection) -> None:
                 tier            TEXT    NOT NULL,
                 pool_size       INTEGER NOT NULL,
                 picked          TEXT    NOT NULL,
-                prompt_version  TEXT    NOT NULL DEFAULT 'v3',
+                prompt_version  TEXT    NOT NULL,
                 reasoning       TEXT,
                 created_at      TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
             );
@@ -389,7 +398,7 @@ def migrate(conn: sqlite3.Connection) -> None:
                 format          TEXT    NOT NULL DEFAULT 'gen9randombattle',
                 participants    TEXT    NOT NULL,
                 rounds          INTEGER NOT NULL DEFAULT 1,
-                prompt_version  TEXT    NOT NULL DEFAULT 'v6',
+                prompt_version  TEXT    NOT NULL,
                 total_battles   INTEGER NOT NULL DEFAULT 0,
                 status          TEXT    NOT NULL DEFAULT 'pending',
                 created_at      TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
