@@ -5,7 +5,7 @@ import sqlite3
 
 logger = logging.getLogger(__name__)
 
-SCHEMA_VERSION = 20
+SCHEMA_VERSION = 21
 
 # `prompt_version` columns carry no DEFAULT on purpose (#285). They used to
 # default to a hardcoded version string — 'v1' on `models`, 'v2' on
@@ -207,6 +207,12 @@ CREATE INDEX IF NOT EXISTS idx_battles_tournament ON battles(tournament_id);
 CREATE INDEX IF NOT EXISTS idx_battles_p1         ON battles(p1_model_id);
 CREATE INDEX IF NOT EXISTS idx_battles_p2         ON battles(p2_model_id);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_elohist_battle ON elo_history(battle_id, model_id);
+-- Per-model ELO history (#286). idx_elohist_battle leads with battle_id, and
+-- SQLite can only seek a *prefix* of a composite index, so the `WHERE
+-- model_id = ?` behind GET /api/models/{id}/stats could not use it and walked
+-- every row in the table. battle_id is carried as the second column so the
+-- index also supplies the join key back to battles.
+CREATE INDEX IF NOT EXISTS idx_elohist_model      ON elo_history(model_id, battle_id);
 CREATE INDEX IF NOT EXISTS idx_lessons_model      ON lessons(model_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_battles_season     ON battles(season_id);
 CREATE INDEX IF NOT EXISTS idx_battles_experiment ON battles(experiment_id);
@@ -572,4 +578,17 @@ def migrate(conn: sqlite3.Connection) -> None:
             except sqlite3.OperationalError:
                 pass  # column already exists
         conn.execute("UPDATE schema_version SET version=20")
+        conn.commit()
+
+    if version < 21:
+        # #286: index the ELO-history lookup by model. Adding it to the v4 index
+        # block would have reached nobody — _DDL_INDEXES and those blocks only
+        # run for a database that is *behind* that version, and every deployed
+        # database is already past v4 — so elo_history would keep full-scanning
+        # forever on the get_model_stats path.
+        conn.executescript("""
+            CREATE INDEX IF NOT EXISTS idx_elohist_model
+                ON elo_history(model_id, battle_id);
+        """)
+        conn.execute("UPDATE schema_version SET version=21")
         conn.commit()

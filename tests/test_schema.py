@@ -985,3 +985,145 @@ def test_fresh_install_has_glicko_columns() -> None:
 
     rating_cols = {r["name"] for r in conn.execute("PRAGMA table_info(elo_ratings)")}
     assert {"rating", "rd", "volatility", "games"} <= rating_cols
+
+
+# ---------------------------------------------------------------------------
+# v21 — per-model ELO history index (#286)
+#
+# Indexing elo_history by model_id only helps if SQLite actually *uses* the
+# index, so these assert on EXPLAIN QUERY PLAN rather than on the index merely
+# existing. A test that only checked sqlite_master would pass against an index
+# the planner ignores.
+# ---------------------------------------------------------------------------
+
+#: The ELO-history subquery from BattleStore.get_model_stats
+#: (src/nidozo/db/store.py). This is the query the index exists for; if its
+#: shape changes, this copy has to follow.
+_STATS_ELO_HISTORY_SQL = """
+    SELECT battle_id, rating_before, rating_after, delta, finished_at
+    FROM (
+        SELECT eh.battle_id, eh.rating_before, eh.rating_after,
+               eh.delta, b.finished_at
+        FROM elo_history eh
+        JOIN battles b ON b.id = eh.battle_id
+        WHERE eh.model_id = ?
+        ORDER BY b.finished_at DESC
+        LIMIT 30
+    )
+    ORDER BY finished_at ASC
+"""
+
+
+def _plan(conn: sqlite3.Connection, sql: str, params: tuple) -> str:
+    """The query plan SQLite says it will run, as one string."""
+    rows = conn.execute("EXPLAIN QUERY PLAN " + sql, params).fetchall()
+    return " | ".join(r["detail"] for r in rows)
+
+
+def _pre_elohist_model_conn() -> sqlite3.Connection:
+    """A v20 database: elo_history indexed by battle, never by model.
+
+    That is the shipped shape — idx_elohist_battle leads with battle_id, and
+    SQLite can only seek a prefix of a composite index, so `WHERE model_id = ?`
+    had nothing to seek and read the whole table.
+    """
+    conn = _fresh_conn()
+    conn.executescript("""
+        CREATE TABLE schema_version (version INTEGER NOT NULL);
+        INSERT INTO schema_version VALUES (20);
+        CREATE TABLE models (
+            id INTEGER PRIMARY KEY,
+            provider TEXT NOT NULL,
+            model_name TEXT NOT NULL,
+            prompt_version TEXT NOT NULL DEFAULT 'v1'
+        );
+        CREATE TABLE battles (
+            id          INTEGER PRIMARY KEY,
+            finished_at TEXT,
+            p1_model_id INTEGER,
+            p2_model_id INTEGER
+        );
+        CREATE TABLE elo_history (
+            id            INTEGER PRIMARY KEY,
+            battle_id     INTEGER NOT NULL,
+            model_id      INTEGER NOT NULL,
+            rating_before REAL    NOT NULL,
+            rating_after  REAL    NOT NULL,
+            delta         REAL    NOT NULL,
+            UNIQUE(battle_id, model_id)
+        );
+        CREATE UNIQUE INDEX idx_elohist_battle ON elo_history(battle_id, model_id);
+    """)
+    conn.executemany(
+        "INSERT INTO models (id, provider, model_name) VALUES (?, 'local', ?)",
+        [(m, f"model-{m}") for m in range(1, 6)],
+    )
+    conn.executemany(
+        "INSERT INTO battles (id, finished_at) VALUES (?, ?)",
+        [(b, f"2026-01-01T00:{b % 60:02d}:00Z") for b in range(1, 601)],
+    )
+    conn.executemany(
+        "INSERT INTO elo_history"
+        " (battle_id, model_id, rating_before, rating_after, delta)"
+        " VALUES (?, ?, 1000.0, 1010.0, 10.0)",
+        [(b, (b % 5) + 1) for b in range(1, 601)],
+    )
+    conn.commit()
+    return conn
+
+
+def test_migrate_v20_adds_the_model_history_index() -> None:
+    """Without this block the index would reach fresh installs only.
+
+    _DDL_INDEXES is applied by the fresh-install branch and by the version
+    blocks below it, so an _DDL_INDEXES-only change silently does nothing for
+    every database that already exists.
+    """
+    conn = _pre_elohist_model_conn()
+    assert "idx_elohist_model" not in _index_names(conn)
+
+    migrate(conn)
+
+    assert "idx_elohist_model" in _index_names(conn)
+    assert _version(conn) == SCHEMA_VERSION
+
+
+def test_migrate_v20_turns_the_model_history_scan_into_an_index_seek() -> None:
+    """The point of #286: the stats query must stop reading all of elo_history.
+
+    Both halves are asserted, so this cannot pass against an index the planner
+    ignores — the "before" plan is the negative control.
+    """
+    conn = _pre_elohist_model_conn()
+    before = _plan(conn, _STATS_ELO_HISTORY_SQL, (1,))
+    assert "SCAN eh" in before, before
+    assert "idx_elohist_model" not in before, before
+
+    migrate(conn)
+
+    after = _plan(conn, _STATS_ELO_HISTORY_SQL, (1,))
+    assert "SEARCH eh USING INDEX idx_elohist_model" in after, after
+    assert "SCAN eh" not in after, after
+    conn.close()
+
+
+def test_fresh_install_has_the_model_history_index() -> None:
+    conn = _fresh_conn()
+    migrate(conn)
+
+    assert "idx_elohist_model" in _index_names(conn)
+    plan = _plan(conn, _STATS_ELO_HISTORY_SQL, (1,))
+    assert "idx_elohist_model" in plan, plan
+    conn.close()
+
+
+def test_migrate_v20_model_index_already_exists_no_error() -> None:
+    """Re-running the v21 block over an already-migrated DB is a no-op."""
+    conn = _pre_elohist_model_conn()
+    migrate(conn)
+    conn.execute("UPDATE schema_version SET version=20")  # force the block to re-run
+    migrate(conn)
+
+    assert _version(conn) == SCHEMA_VERSION
+    assert "idx_elohist_model" in _index_names(conn)
+    conn.close()
