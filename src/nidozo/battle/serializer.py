@@ -215,6 +215,27 @@ def _serialize_doubles_battle(battle: DoubleBattle, *, light: bool = False) -> d
 # Own Pokémon — full information
 # ---------------------------------------------------------------------------
 
+def _hp_fraction(mon: Pokemon) -> float:
+    """The HP fraction to expose, at the precision the observer actually has.
+
+    An opponent's HP is already coarse before this function sees it. Showdown
+    reports it to everyone on the battle stream as ``Math.ceil(100 * hp /
+    maxhp)`` out of 100 — capped at 99 for a damaged Pokémon — so the fraction
+    poke-env hands us is a whole percent (``sim/pokemon.ts``, ``getHealth``);
+    the exact ``hp/maxhp`` is sent only to the Pokémon's owner, in the battle
+    request. Three decimals is therefore an exact no-op for an opponent (#287):
+    the model reads the same whole percent the Showdown client draws its HP bar
+    from, and rounding to two decimals instead would not change a character of
+    the prompt. An *own* Pokémon is different — poke-env parses the request's
+    exact HP — so there the three decimals are load-bearing.
+
+    ``round`` returns an int when given one, and poke-env's
+    ``current_hp_fraction`` returns int ``0`` for a fainted Pokémon, so the
+    result is coerced: the field is a float either way, as callers assume.
+    """
+    return float(round(mon.current_hp_fraction, 3))
+
+
 def _serialize_own_pokemon(mon: Pokemon | None) -> dict[str, Any] | None:
     if mon is None:
         return None
@@ -231,7 +252,7 @@ def _serialize_own_pokemon(mon: Pokemon | None) -> dict[str, Any] | None:
         "level": mon.level,
         # types already reflects Tera type when Terastallized (poke-env handles this).
         "types": [t.name for t in mon.types],
-        "hp_fraction": round(mon.current_hp_fraction, 3),
+        "hp_fraction": _hp_fraction(mon),
         "fainted": mon.fainted,
         "status": mon.status.name if mon.status else None,
         "boosts": {k: v for k, v in mon.boosts.items() if v != 0},
@@ -270,7 +291,7 @@ def _serialize_opponent_pokemon(mon: Pokemon | None) -> dict[str, Any] | None:
         "level": mon.level,
         # types already reflects Tera type when Terastallized (poke-env handles this).
         "types": [t.name for t in mon.types],
-        "hp_fraction": round(mon.current_hp_fraction, 3),
+        "hp_fraction": _hp_fraction(mon),
         "fainted": mon.fainted,
         "status": mon.status.name if mon.status else None,
         "boosts": {k: v for k, v in mon.boosts.items() if v != 0},

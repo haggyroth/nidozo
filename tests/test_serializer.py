@@ -10,6 +10,9 @@ We use mocks to construct precise battle states without needing a live server.
 
 from unittest.mock import MagicMock, PropertyMock, patch
 
+import pytest
+from poke_env.battle.pokemon import Pokemon
+
 from nidozo.battle.serializer import (
     _serialize_opponent_pokemon,
     _serialize_own_pokemon,
@@ -179,6 +182,92 @@ def test_opponent_pokemon_revealed_item_appears() -> None:
 
 def test_opponent_pokemon_none_returns_none() -> None:
     assert _serialize_opponent_pokemon(None) is None
+
+
+# ---------------------------------------------------------------------------
+# Opponent HP precision (#287)
+#
+# These drive the *real* poke-env Pokémon and the real ``set_hp_status`` parser
+# rather than the mock helpers above: the claim under test is about what
+# poke-env makes of the HP field Showdown sends, and a mock that sets
+# ``current_hp_fraction`` directly would agree with whatever the test asserted.
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize("pct", [1, 7, 20, 43, 50, 51, 99])
+def test_the_opponents_hp_is_a_whole_percent(pct: int) -> None:
+    """#287: an opponent's HP is already coarse when the serializer sees it.
+
+    Showdown reports it to everyone on the stream as ``Math.ceil(100 * hp /
+    maxhp)`` out of 100, so ``current_hp_fraction`` is ``pct / 100`` and the
+    serializer's three-decimal rounding is an exact no-op — there is no
+    sub-percent precision here to expose.
+    """
+    mon = Pokemon(gen=9, species="charmander")
+    mon.set_hp_status(f"{pct}/100")
+
+    assert _serialize_opponent_pokemon(mon)["hp_fraction"] == pct / 100
+
+
+@pytest.mark.parametrize("pct", [1, 7, 20, 43, 50, 51, 99])
+def test_the_model_reads_the_opponents_hp_as_a_whole_percent(pct: int) -> None:
+    """The half #287 is actually about: what reaches the model's prompt.
+
+    Every shipped template renders ``(hp_fraction * 100) | round(1)``, so this
+    applies that to the serialized value. A whole number means the model reads
+    the same percentage the Showdown client draws its HP bar from.
+    """
+    mon = Pokemon(gen=9, species="charmander")
+    mon.set_hp_status(f"{pct}/100")
+    hp_fraction = _serialize_opponent_pokemon(mon)["hp_fraction"]
+
+    assert round(hp_fraction * 100, 1) == float(pct)
+
+
+def test_the_opponents_hp_rounding_cannot_change_the_value() -> None:
+    """#287's proposed remediation — round the opponent to 2 decimals — is a no-op.
+
+    Recorded as a test because it is the whole answer to the finding: for every
+    value an opponent can carry, two decimals and three decimals are the same
+    float. Coarsening it would change no prompt, no ``state_json`` row, and no
+    ELO comparison — so the precision the audit measured is the protocol's, not
+    the serializer's.
+    """
+    for pct in range(100):
+        assert round(pct / 100, 3) == round(pct / 100, 2) == pct / 100
+
+
+def test_the_opponents_hp_precision_is_decided_upstream_not_here() -> None:
+    """The serializer is a pass-through — it neither adds nor removes precision.
+
+    Which is why #287 has nothing to fix in this file. An opponent arrives at
+    whole-percent granularity because Showdown reports ``Math.ceil(100 * hp /
+    maxhp)`` to everyone but the owner; the exact ``hp/maxhp`` form below is what
+    this code would carry if that ever changed, and *that* — not the rounding —
+    is the change that would need a decision.
+    """
+    exact = Pokemon(gen=9, species="charmander")
+    exact.set_hp_status("217/300")
+
+    assert _serialize_opponent_pokemon(exact)["hp_fraction"] == 0.723
+
+
+def test_a_fainted_pokemons_hp_fraction_is_a_float() -> None:
+    """poke-env returns int ``0`` for a fainted mon; the field is a float.
+
+    ``round`` passes an int straight through, so ``hp_fraction`` used to be
+    ``0`` for a fainted Pokémon and ``0.43`` for a damaged one — the same field
+    with two types, in every ``state_json`` row that recorded a faint.
+    """
+    mon = Pokemon(gen=9, species="charmander")
+    mon.set_hp_status("0 fnt")
+
+    for result in (
+        _serialize_opponent_pokemon(mon),
+        _serialize_own_pokemon(mon),
+    ):
+        assert result is not None
+        assert result["hp_fraction"] == 0.0
+        assert isinstance(result["hp_fraction"], float)
 
 
 # ---------------------------------------------------------------------------
