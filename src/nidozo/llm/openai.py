@@ -7,6 +7,7 @@ from typing import Any
 import openai
 
 from nidozo.llm.backend import Message, Usage
+from nidozo.llm.trace import log_prompt, log_response
 
 logger = logging.getLogger(__name__)
 
@@ -87,11 +88,8 @@ class OpenAIBackend:
             # or text (json_object → 400); OpenAI cloud enforces the shape.
             kwargs["response_format"] = _ACTION_JSON_SCHEMA
 
-        if logger.isEnabledFor(logging.DEBUG):
-            prompt_text = "\n---\n".join(
-                f"[{m['role']}]\n{m.get('content', '')}" for m in messages
-            )
-            logger.debug("LLM prompt to %s:\n%s", self._model, prompt_text)
+        # Summary at DEBUG; the whole body only under NIDOZO_TRACE_LLM (#284).
+        log_prompt(logger, self._model, messages)
 
         t0 = time.monotonic()
         response = await self._client.chat.completions.create(**kwargs)
@@ -143,7 +141,7 @@ class OpenAIBackend:
                 self._model,
                 finish,
             )
-        elif logger.isEnabledFor(logging.DEBUG):
-            logger.debug("LLM response from %s:\n%s", self._model, content)
+        else:
+            log_response(logger, self._model, content)
 
         return content
