@@ -23,6 +23,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+from collections.abc import Callable
 from difflib import get_close_matches
 from typing import Any
 
@@ -79,6 +80,59 @@ def _strip_keyword_prefix(identifier: str) -> str:
     return identifier
 
 
+def _match_in_list(
+    identifier: str,
+    items: list[Any],
+    key: Callable[[Any], str],
+    *,
+    label: str,
+) -> Any | None:
+    """Resolve one identifier against one list of candidates (#291).
+
+    This is the ladder every action surface shares — numeric slot, then
+    normalised exact name, then a fuzzy name match. It lives in one place
+    because the four callers (singles move/switch, doubles move/switch) ask the
+    same question, and a fix applied to one of them used to leave the other
+    three behind.
+
+    ``key`` names a candidate (a move's ``id``, a Pokémon's ``species``) and
+    ``label`` names the candidate set for the log lines ("move",
+    "doubles slot 1 switch"). The logging is here for the same reason the
+    matching is: the doubles resolvers used to report nothing at all, so a
+    slot whose action failed to resolve was silently downgraded to a pass
+    (``_parse_doubles_json`` fills the gap) with no line written at any level.
+
+    Returns the matched item, or None when nothing matched.
+    """
+    identifier = _strip_keyword_prefix(identifier)
+
+    # Numeric slot — extract leading digits so trailing markdown ("2**") works.
+    m = re.match(r"(\d+)", identifier)
+    if m:
+        slot = int(m.group(1))
+        idx = slot - 1
+        if 0 <= idx < len(items):
+            return items[idx]
+        logger.warning("%s: slot %d out of range (have %d)", label, slot, len(items))
+        return None
+
+    norm = _normalize(identifier)
+    norm_to_item = {_normalize(key(item)): item for item in items}
+    if norm in norm_to_item:
+        return norm_to_item[norm]
+
+    # Fuzzy fallback: tolerates typos ("thunderolt" → "thunderbolt", "agron" →
+    # "aggron") and spacing ("ice beam" → "icebeam").
+    close = get_close_matches(norm, norm_to_item.keys(), n=1, cutoff=_FUZZY_CUTOFF)
+    if close:
+        matched = norm_to_item[close[0]]
+        logger.debug("fuzzy-matched %s: %r → %r", label, identifier, key(matched))
+        return matched
+
+    logger.debug("%s: %r not found (have %s)", label, identifier, sorted(norm_to_item))
+    return None
+
+
 def _resolve_move(
     identifier: str,
     battle: AbstractBattle,
@@ -92,40 +146,16 @@ def _resolve_move(
         logger.warning("ACTION: move requested but no moves available")
         return None
 
-    identifier = _strip_keyword_prefix(identifier)
-
     # Guard: only pass terastallize=True when the battle permits it.
     # If the player requests tera_move but can't Tera, fall back to a normal move.
     if terastallize and not getattr(battle, "can_tera", False):
         logger.debug("ACTION: tera_move requested but battle.can_tera is False — using normal move")
         terastallize = False
 
-    # Try numeric slot — extract leading digits to handle trailing markdown (e.g. "2**")
-    m = re.match(r"(\d+)", identifier)
-    if m:
-        slot = int(m.group(1))
-        idx = slot - 1
-        if 0 <= idx < len(moves):
-            return player.create_order(moves[idx], terastallize=terastallize)
-        logger.warning("ACTION: move slot %d out of range (have %d)", slot, len(moves))
+    chosen = _match_in_list(identifier, moves, lambda m: m.id, label="move")
+    if chosen is None:
         return None
-
-    # Try move name match (normalized — exact first, then fuzzy)
-    norm = _normalize(identifier)
-    norm_to_move = {_normalize(m.id): m for m in moves}
-
-    if norm in norm_to_move:
-        return player.create_order(norm_to_move[norm], terastallize=terastallize)
-
-    # Fuzzy fallback: tolerate typos like "thunderolt" → "thunderbolt", "icebeam" → "ice beam"
-    close = get_close_matches(norm, norm_to_move.keys(), n=1, cutoff=_FUZZY_CUTOFF)
-    if close:
-        matched_id = norm_to_move[close[0]].id
-        logger.debug("ACTION: fuzzy-matched move %r → %r", identifier, matched_id)
-        return player.create_order(norm_to_move[close[0]], terastallize=terastallize)
-
-    logger.debug("ACTION: move name %r not found in available moves", identifier)
-    return None
+    return player.create_order(chosen, terastallize=terastallize)
 
 
 def _resolve_switch(
@@ -139,36 +169,10 @@ def _resolve_switch(
         logger.warning("ACTION: switch requested but no switches available")
         return None
 
-    identifier = _strip_keyword_prefix(identifier)
-
-    # Try numeric slot — extract leading digits to handle trailing markdown (e.g. "2**")
-    m = re.match(r"(\d+)", identifier)
-    if m:
-        slot = int(m.group(1))
-        idx = slot - 1
-        if 0 <= idx < len(switches):
-            return player.create_order(switches[idx])
-        logger.warning("ACTION: switch slot %d out of range (have %d)", slot, len(switches))
+    chosen = _match_in_list(identifier, switches, lambda p: p.species, label="switch")
+    if chosen is None:
         return None
-
-    # Try species name match (normalized — exact first, then fuzzy)
-    norm = _normalize(identifier)
-    norm_to_mon = {_normalize(mon.species): mon for mon in switches}
-
-    if norm in norm_to_mon:
-        return player.create_order(norm_to_mon[norm])
-
-    # Fuzzy fallback: tolerate typos like "agron" → "aggron", "deoxysspeed" → "deoxyssp"
-    close = get_close_matches(norm, norm_to_mon.keys(), n=1, cutoff=_FUZZY_CUTOFF)
-    if close:
-        matched_species = norm_to_mon[close[0]].species
-        logger.debug(
-            "ACTION: fuzzy-matched switch %r → %r", identifier, matched_species
-        )
-        return player.create_order(norm_to_mon[close[0]])
-
-    logger.debug("ACTION: switch name %r not found in available switches", identifier)
-    return None
+    return player.create_order(chosen)
 
 
 # ---------------------------------------------------------------------------
@@ -222,17 +226,16 @@ def _resolve_move_doubles(
         logger.warning("Doubles: slot %d has no available moves", slot_idx)
         return None
 
-    identifier = _strip_keyword_prefix(identifier)
-
     # Guard terastallize against the per-slot can_tera flag.
     can_tera = getattr(battle, "can_tera", [False, False])
     if terastallize and not (slot_idx < len(can_tera) and can_tera[slot_idx]):
         logger.debug("Doubles: tera_move requested but slot %d can't Tera", slot_idx)
         terastallize = False
 
-    chosen = _match_move_in_list(identifier, moves)
+    chosen = _match_in_list(
+        identifier, moves, lambda m: m.id, label=f"doubles slot {slot_idx} move"
+    )
     if chosen is None:
-        logger.debug("Doubles: move %r not found for slot %d", identifier, slot_idx)
         return None
 
     active = battle.active_pokemon
@@ -288,25 +291,6 @@ def _default_target(valid_targets: list[int]) -> int:
     return valid_targets[0] if valid_targets else 0
 
 
-def _match_move_in_list(identifier: str, moves: list[Any]) -> Any | None:
-    """Resolve a move identifier (slot number or name) within a single slot's list."""
-    m = re.match(r"(\d+)", identifier)
-    if m:
-        idx = int(m.group(1)) - 1
-        if 0 <= idx < len(moves):
-            return moves[idx]
-        return None
-
-    norm = _normalize(identifier)
-    norm_to_move = {_normalize(mv.id): mv for mv in moves}
-    if norm in norm_to_move:
-        return norm_to_move[norm]
-    close = get_close_matches(norm, norm_to_move.keys(), n=1, cutoff=_FUZZY_CUTOFF)
-    if close:
-        return norm_to_move[close[0]]
-    return None
-
-
 def _resolve_switch_doubles(
     identifier: str,
     slot_idx: int,
@@ -322,23 +306,12 @@ def _resolve_switch_doubles(
         logger.warning("Doubles: slot %d has no available switches", slot_idx)
         return None
 
-    identifier = _strip_keyword_prefix(identifier)
-
-    m = re.match(r"(\d+)", identifier)
-    if m:
-        idx = int(m.group(1)) - 1
-        if 0 <= idx < len(switches):
-            return player.create_order(switches[idx])
+    chosen = _match_in_list(
+        identifier, switches, lambda p: p.species, label=f"doubles slot {slot_idx} switch"
+    )
+    if chosen is None:
         return None
-
-    norm = _normalize(identifier)
-    norm_to_mon = {_normalize(mon.species): mon for mon in switches}
-    if norm in norm_to_mon:
-        return player.create_order(norm_to_mon[norm])
-    close = get_close_matches(norm, norm_to_mon.keys(), n=1, cutoff=_FUZZY_CUTOFF)
-    if close:
-        return player.create_order(norm_to_mon[close[0]])
-    return None
+    return player.create_order(chosen)
 
 
 def _resolve_slot_action(

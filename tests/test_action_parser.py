@@ -1,8 +1,18 @@
 """Tests for ActionParser — valid formats, edge cases, and fallback behaviour."""
 
+import logging
 from unittest.mock import MagicMock
 
-from nidozo.battle.action_parser import parse_action
+import pytest
+from poke_env.battle import DoubleBattle
+
+from nidozo.battle.action_parser import (
+    _resolve_move,
+    _resolve_move_doubles,
+    _resolve_switch,
+    _resolve_switch_doubles,
+    parse_action,
+)
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -799,3 +809,139 @@ class TestFuzzyMoveMatching:
 
         assert result is not None
         player.create_order.assert_called_once_with(moves[1], terastallize=False)
+
+
+# ---------------------------------------------------------------------------
+# Shared identifier resolution (#291)
+# ---------------------------------------------------------------------------
+
+# One candidate list, used as both the singles move list and doubles slot 0's.
+_RESOLUTION_MOVES = [
+    _mock_move("thunderbolt"),
+    _mock_move("icebeam"),
+    _mock_move("protect"),
+    _mock_move("flamethrower"),
+]
+_RESOLUTION_MONS = [
+    _mock_pokemon("Garchomp"),
+    _mock_pokemon("Rotom-Wash"),
+    _mock_pokemon("Kingambit"),
+]
+
+# Every shape the models actually emit, plus the ones they shouldn't. Both
+# singles and doubles must answer each of these identically.
+_RESOLUTION_CASES = [
+    "1", "2", "3", "4", "5", "0", "01", "9", "1**",   # slot numbers
+    "thunderbolt", "ThunderBolt", "thunder bolt",      # names
+    "thunderolt", "ice beam", "protect",               # typos / spacing
+    "move 2", "switch 3",                              # stray keyword prefix
+    "earthquake", "zzzz", "",                          # no match
+]
+
+
+def _identity_player() -> MagicMock:
+    """Player whose create_order hands back exactly what it was given.
+
+    Lets a test compare the *matched object* across resolution paths rather
+    than the order each path happens to build around it.
+    """
+    player = MagicMock()
+    player.create_order.side_effect = lambda obj, **_: obj
+    return player
+
+
+def _resolution_doubles_battle() -> MagicMock:
+    battle = MagicMock(spec=DoubleBattle)
+    battle.available_moves = [_RESOLUTION_MOVES, [_mock_move("suckerpunch")]]
+    battle.available_switches = [_RESOLUTION_MONS, [_mock_pokemon("Amoonguss")]]
+    battle.can_tera = [False, False]
+    battle.active_pokemon = [_mock_pokemon("Rotom-Wash"), _mock_pokemon("Amoonguss")]
+    battle.get_possible_showdown_targets.return_value = [0, 1, 2]
+    return battle
+
+
+@pytest.mark.parametrize("identifier", _RESOLUTION_CASES)
+def test_the_singles_and_doubles_move_resolvers_agree(identifier: str) -> None:
+    """Singles and doubles are one ladder, not two (#291).
+
+    This is the guard against the hazard the duplication created: a correction
+    applied to the singles resolver only. Both sides resolve the same
+    identifier against the same list and must land on the same move.
+    """
+    player = _identity_player()
+    singles = _resolve_move(identifier, _make_battle(moves=_RESOLUTION_MOVES), player)
+    doubles = _resolve_move_doubles(
+        identifier, None, 0, _resolution_doubles_battle(), player
+    )
+    assert singles is doubles
+
+
+@pytest.mark.parametrize("identifier", _RESOLUTION_CASES)
+def test_the_singles_and_doubles_switch_resolvers_agree(identifier: str) -> None:
+    """Same guard for switches — the second copy-pasted pair (#291)."""
+    player = _identity_player()
+    singles = _resolve_switch(
+        identifier, _make_battle(switches=_RESOLUTION_MONS), player
+    )
+    doubles = _resolve_switch_doubles(
+        identifier, 0, _resolution_doubles_battle(), player
+    )
+    assert singles is doubles
+
+
+def test_the_resolvers_read_the_same_fuzzy_cutoff() -> None:
+    """A typo one side corrects, the other corrects too — same threshold."""
+    player = _identity_player()
+    singles = _resolve_move(
+        "thunderolt", _make_battle(moves=_RESOLUTION_MOVES), player
+    )
+    doubles = _resolve_move_doubles(
+        "thunderolt", None, 0, _resolution_doubles_battle(), player
+    )
+    assert singles is not None
+    assert singles is doubles
+
+
+def test_a_doubles_slot_that_fails_to_resolve_says_so(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """A failed doubles slot becomes a pass — the log is the only signal (#291).
+
+    ``_parse_doubles_json`` fills an unresolved slot with a pass so the other
+    slot's action still goes through, which means that Pokémon does nothing
+    for the turn while ``parse_action`` still returns a valid order. The
+    doubles resolvers logged *nothing* at any level when that happened, so the
+    turn was silently half-empty. Both resolvers now report through the shared
+    matcher, and the label names the slot that failed.
+    """
+    player = _make_player()
+    response = (
+        '{"reasoning":"x","actions":['
+        '{"action_type":"move","identifier":"thunderbolt"},'
+        '{"action_type":"switch","identifier":"zzzznotamon"}]}'
+    )
+    with caplog.at_level(logging.DEBUG, logger="nidozo.battle.action_parser"):
+        order = parse_action(response, _resolution_doubles_battle(), player)
+
+    # The battle still proceeds — slot 0 acted, slot 1 passes.
+    assert order is not None
+    assert "zzzznotamon" in caplog.text
+    assert "doubles slot 1 switch" in caplog.text
+
+
+def test_a_doubles_slot_number_out_of_range_warns_like_singles(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Doubles now warns where it used to stay silent (#291)."""
+    player = _identity_player()
+    with caplog.at_level(logging.WARNING, logger="nidozo.battle.action_parser"):
+        assert _resolve_move_doubles(
+            "9", None, 1, _resolution_doubles_battle(), player
+        ) is None
+        assert _resolve_move(
+            "9", _make_battle(moves=_RESOLUTION_MOVES), player
+        ) is None
+
+    warnings = [r.getMessage() for r in caplog.records if r.levelno == logging.WARNING]
+    assert any("doubles slot 1 move" in w and "out of range" in w for w in warnings)
+    assert any(w.startswith("move: slot 9 out of range") for w in warnings)
