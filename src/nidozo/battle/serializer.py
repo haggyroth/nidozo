@@ -250,7 +250,13 @@ def _serialize_own_pokemon(mon: Pokemon | None) -> dict[str, Any] | None:
     return {
         "species": species_name(mon),
         "level": mon.level,
-        # types already reflects Tera type when Terastallized (poke-env handles this).
+        # types already reflects the Tera type when Terastallized — poke-env's
+        # `types` is a list built from `type_1`/`type_2`, and `type_1` returns
+        # `_terastallized_type` once `_terastallized` is set
+        # (`poke_env/battle/pokemon.py`), so this and `tera_type` below agree.
+        # The Tera type *replaces* the typing, so a Terastallized mon serializes
+        # as its single new type. Pinned by tests so a poke-env bump that changes
+        # this fails loudly rather than silently misreporting a mon's type.
         "types": [t.name for t in mon.types],
         "hp_fraction": _hp_fraction(mon),
         "fainted": mon.fainted,
@@ -289,7 +295,8 @@ def _serialize_opponent_pokemon(mon: Pokemon | None) -> dict[str, Any] | None:
     return {
         "species": species_name(mon),
         "level": mon.level,
-        # types already reflects Tera type when Terastallized (poke-env handles this).
+        # types already reflects the Tera type when Terastallized (poke-env builds
+        # it from type_1/type_2) — see _serialize_own_pokemon for the detail.
         "types": [t.name for t in mon.types],
         "hp_fraction": _hp_fraction(mon),
         "fainted": mon.fainted,
