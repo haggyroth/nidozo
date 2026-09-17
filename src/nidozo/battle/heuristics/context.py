@@ -14,6 +14,8 @@ from typing import Any
 
 from poke_env.battle import AbstractBattle, Pokemon
 from poke_env.battle.move_category import MoveCategory
+from poke_env.battle.pokemon_type import PokemonType
+from poke_env.data.gen_data import GenData
 
 from nidozo.battle.heuristics.damage import _comparable_speed, _estimate_incoming_damage
 from nidozo.battle.heuristics.status import _STATUS_IMPACT
@@ -195,30 +197,50 @@ def _battle_context(
             tera_type = getattr(own, "tera_type", None)
             if tera_type is not None:
                 tera_name = tera_type.name
-                # Determine STAB bonus: Tera same-type = 2× STAB; new type = 1.5× STAB
-                base_types = {getattr(own, "_type_1", None), getattr(own, "_type_2", None)} - {None}
-                same_type = tera_type in base_types
+                # Determine STAB bonus: Tera same-type = 2× STAB; new type = 1.5× STAB.
+                #
+                # Showdown's rule (sim/battle-actions.ts): stab = 2 when
+                # `pokemon.terastallized === type && pokemon.getTypes(false, true)
+                # .includes(type)` — the *pre-Tera* types. We can read those publicly:
+                # this block only runs while `battle.can_tera` is true, so nothing on
+                # our side has Terastallized yet and `own.types` is still the pre-Tera
+                # list. The old code reached for poke-env's private `_type_1`/`_type_2`,
+                # which are the *species* types: they miss a type change (Soak, Burn
+                # Up, Roost) that `own.types` carries and Showdown's `getTypes` honours,
+                # and they were read with a None default, so a rename in a poke-env
+                # bump would have silently reclassified every Tera as a new type.
+                same_type = tera_name in {t.name for t in own.types}
                 stab_note = "same as base typing (2× STAB bonus)" if same_type else "new type (1.5× STAB on matching moves)"
                 # Defensive benefit: check if Tera type changes the matchup vs current opponent
                 if opp is not None:
-                    # Use a lightweight proxy: would the Tera type resist the opponent's best move?
-                    from poke_env.battle.move_category import MoveCategory as _MC
-                    opp_moves = list(opp.moves.values())
-                    opp_damaging = [m for m in opp_moves if m.category != _MC.STATUS and m.base_power > 0]
+                    opp_damaging = [
+                        m for m in opp.moves.values()
+                        if m.category != MoveCategory.STATUS and m.base_power > 0
+                    ]
                     if opp_damaging:
-                        # Mock a temporary check using poke-env's type chart
-                        from poke_env.data.gen_data import GenData as _GD
-                        _gen = _GD.from_gen(9)
-                        tera_name_lower = tera_name.lower()
-                        type_chart = _gen.type_chart
-                        def _defending_mult(atk_type_name: str) -> float:
-                            row = type_chart.get(atk_type_name.upper(), {})
-                            return float(row.get(tera_name_lower.upper(), 1.0))
+                        # How hard the opponent's known moves hit a Pokémon of the Tera
+                        # type alone — Terastallizing replaces the typing. poke-env's own
+                        # `PokemonType.damage_multiplier` rather than indexing the chart by
+                        # hand (#290): the chart is keyed `{defender: {attacker: mult}}`
+                        # (`pokemon_type.py`, `type_chart[type_1.name][self.name]`, where
+                        # `self` is the attacker), and the hand-indexed version here had
+                        # the two backwards, so every Tera read its defensive value exactly
+                        # inverted — Fire moves against a Water Tera were reported as "still
+                        # weak", and Ground against a Flying Tera as neutral rather than
+                        # immune, because a missing key falls back to 1.0.
+                        tera_pt = PokemonType.from_name(tera_name)
+                        type_chart = GenData.from_gen(9).type_chart
                         worst_mult = max(
-                            (_defending_mult(m.type.name) for m in opp_damaging if hasattr(m, "type")),
+                            (
+                                m.type.damage_multiplier(tera_pt, type_chart=type_chart)
+                                for m in opp_damaging
+                                if getattr(m, "type", None) is not None
+                            ),
                             default=1.0,
                         )
-                        if worst_mult <= 0.5:
+                        if worst_mult == 0.0:
+                            def_note = f"immune to opponent's known moves as {tera_name}"
+                        elif worst_mult <= 0.5:
                             def_note = f"resists opponent's known moves as {tera_name}"
                         elif worst_mult >= 2.0:
                             def_note = f"still weak to opponent's moves as {tera_name} — no defensive benefit"

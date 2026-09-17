@@ -3,6 +3,7 @@
 from unittest.mock import MagicMock, PropertyMock
 
 import pytest
+from poke_env.battle.pokemon import Pokemon
 
 from nidozo.battle.heuristics import _effectiveness_label, score_actions
 
@@ -1379,3 +1380,146 @@ class TestSwitchDefensiveVsOpp:
         ss = score_actions(battle)["switch_scores"][0]
         assert ss["speed_vs_opp"] is not None
         assert "faster" in ss["speed_vs_opp"] or "slower" in ss["speed_vs_opp"] or "similar" in ss["speed_vs_opp"]
+
+
+# ---------------------------------------------------------------------------
+# #290 — the Tera advisory
+#
+# The audit read the serializer's comment ("types already reflects Tera type
+# when Terastallized") as false and proposed emitting the effective types via
+# mon.type_1/mon.type_2. It is true, and the remediation is a no-op: poke-env's
+# `types` *is* built from those two properties, and type_1 returns the Tera type
+# once terastallized. These tests drive real poke-env Pokémon — terastallize()
+# and start_effect("TypeChange", ...) are the library's own entry points — so
+# they pin what poke-env actually does rather than restating it.
+# ---------------------------------------------------------------------------
+
+def _own_with_tera(tera: str, species: str = "charizard") -> Pokemon:
+    """A real own-side Pokémon whose Tera type is known and still unused.
+
+    This is the production shape behind ``battle.can_tera``: the Tera type comes
+    from the teambuilder, so it is set while ``is_terastallized`` is still False.
+    """
+    from poke_env.teambuilder.teambuilder_pokemon import TeambuilderPokemon
+
+    return Pokemon(
+        gen=9,
+        teambuilder=TeambuilderPokemon(
+            species=species, tera_type=tera,
+            moves=["flamethrower", "earthquake"], level=100,
+        ),
+    )
+
+
+def _opp_with_moves(species: str, moves: list[str]) -> Pokemon:
+    """A real opposing Pokémon with a known moveset — real Move objects, real types."""
+    from poke_env.teambuilder.teambuilder_pokemon import TeambuilderPokemon
+
+    return Pokemon(
+        gen=9, teambuilder=TeambuilderPokemon(species=species, moves=moves, level=100)
+    )
+
+
+def _tera_note(own: Pokemon, opp: Pokemon) -> str:
+    """The Tera advisory line for this matchup."""
+    from nidozo.battle.heuristics import _battle_context
+
+    battle = _mock_battle(own=own, opp=opp)
+    return _battle_context(own, opp, battle, None)["tera_note"]
+
+
+def test_a_terastallized_pokemons_types_are_the_tera_type() -> None:
+    """poke-env's `types` reflects the Tera type — the serializer comment is right.
+
+    `types` is `[type_1, type_2?]`, and `type_1` returns `_terastallized_type`
+    once `_terastallized` is set, so "emit the effective types via
+    type_1/type_2" would produce exactly what the serializer already emits.
+    """
+    from poke_env.battle.pokemon_type import PokemonType
+
+    mon = Pokemon(gen=9, species="charizard")
+    assert [t.name for t in mon.types] == ["FIRE", "FLYING"]
+
+    mon.terastallize("steel")
+
+    assert [t.name for t in mon.types] == ["STEEL"]
+    assert mon.type_1.name == "STEEL"
+    assert mon.type_2 is None
+    assert mon.is_terastallized is True
+    assert mon.tera_type.name == "STEEL"
+    # And the effectiveness follows the new type, not the old one: Steel takes
+    # neutral from Water where Fire/Flying would have taken 2×.
+    assert mon.damage_multiplier(PokemonType.from_name("water")) == 1
+
+
+def test_the_serializer_reports_the_tera_type_in_types() -> None:
+    """The two fields the audit says contradict each other agree.
+
+    This is the whole of #290's impact claim: `types` (the type-identity field)
+    against `is_terastallized`/`tera_type`. Checked on both serialization paths.
+    """
+    from nidozo.battle.serializer import (
+        _serialize_opponent_pokemon,
+        _serialize_own_pokemon,
+    )
+
+    mon = Pokemon(gen=9, species="charizard")
+    mon.terastallize("steel")
+
+    for serialize in (_serialize_own_pokemon, _serialize_opponent_pokemon):
+        out = serialize(mon)
+        assert out["is_terastallized"] is True
+        assert out["tera_type"] == "STEEL"
+        assert out["types"] == ["STEEL"], f"{serialize.__name__} disagrees with tera_type"
+
+
+@pytest.mark.parametrize(
+    "tera,move,expected",
+    [
+        ("water", "flamethrower", "resists"),        # Fire into Water = 0.5
+        ("flying", "earthquake", "immune"),          # Ground into Flying = 0
+        ("grass", "flamethrower", "still weak"),     # Fire into Grass = 2
+        ("steel", "earthquake", "still weak"),       # Ground into Steel = 2
+    ],
+)
+def test_the_tera_defensive_note_reads_the_type_chart_the_right_way(
+    tera: str, move: str, expected: str
+) -> None:
+    """The defensive half of the Tera note had the type chart backwards.
+
+    poke-env keys it `{defender: {attacker: mult}}` — `type_chart[type_1.name]
+    [self.name]`, where `self` is the attacking type — and the note indexed it by
+    hand with the two swapped, so every matchup was reported inverted. The
+    immunity cases are the worst of it: `GROUND -> FLYING` read as 1.0 rather
+    than 0, because a swapped lookup misses the key and falls back to neutral.
+    """
+    own = _own_with_tera(tera)
+    opp = _opp_with_moves("garchomp", [move])
+
+    assert expected in _tera_note(own, opp)
+
+
+def test_the_same_type_tera_bonus_follows_showdown_not_poke_env() -> None:
+    """A type-changed mon is asked about its *current* types, as Showdown does.
+
+    Showdown grants 2× STAB when `getTypes(false, true).includes(type)` — the
+    pre-Tera types, type changes included (`sim/battle-actions.ts`). The old code
+    read poke-env's private `_type_1`/`_type_2`, which are the *species* types, so
+    a Grass-typed Charizard Terastallizing to Grass was called a "new type".
+    poke-env's own `stab_multiplier` uses the looser `_type_1/_type_2 ∪
+    _temporary_types`, which would keep calling the original Flying type a
+    same-type Tera after the type change; Showdown would not, and Showdown is the
+    authority here.
+    """
+    own = _own_with_tera("grass")
+    own.start_effect("TypeChange", "Grass")   # e.g. Soak-adjacent type change
+    opp = _opp_with_moves("garchomp", ["earthquake"])
+
+    assert [t.name for t in own.types] == ["GRASS"]
+    assert "same as base typing (2× STAB bonus)" in _tera_note(own, opp)
+
+    # The species types are no longer the answer: Flying has been replaced, so a
+    # Tera back into Flying is a *new* type even though it is in _type_2.
+    own2 = _own_with_tera("flying")
+    own2.start_effect("TypeChange", "Grass")
+    assert "new type (1.5× STAB" in _tera_note(own2, _opp_with_moves("garchomp", ["earthquake"]))
