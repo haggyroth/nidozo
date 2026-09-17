@@ -369,25 +369,29 @@ async def test_terminate_cancels_pending(monkeypatch):
 # _log_turn
 # ---------------------------------------------------------------------------
 
-def test_log_turn_writes_to_store():
+@pytest.mark.asyncio
+async def test_log_turn_writes_to_store():
     bus = EventBus()
     store = MagicMock()
     player = _make_human_player(bus, battle_id=11, store=store)
-    player._log_turn(1, "move 1", True, "raw", state_json="{}")
+    await player._log_turn(1, "move 1", True, "raw", state_json="{}")
     store.log_turn.assert_called_once()
     assert store.log_turn.call_args.kwargs["player_role"] == "p1"
 
 
-def test_log_turn_swallows_store_errors():
+@pytest.mark.asyncio
+async def test_log_turn_swallows_store_errors():
     bus = EventBus()
     store = MagicMock()
     store.log_turn.side_effect = RuntimeError("db down")
     player = _make_human_player(bus, battle_id=12, store=store)
     # Must not raise despite the store error.
-    player._log_turn(1, "move 1", True, "raw")
+    await player._log_turn(1, "move 1", True, "raw")
 
 
-def test_log_turn_noop_without_store():
+@pytest.mark.asyncio
+async def test_log_turn_noop_without_store():
     bus = EventBus()
     player = _make_human_player(bus, battle_id=13, store=None)
-    player._log_turn(1, "move 1", True, "raw")  # no store → early return, no raise
+    # no store → early return, no raise
+    await player._log_turn(1, "move 1", True, "raw")

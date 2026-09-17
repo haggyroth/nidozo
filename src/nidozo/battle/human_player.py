@@ -104,7 +104,7 @@ class HumanPlayer(Player):
         # Bare fallback — StreamingHumanPlayer overrides this entirely.
         return self.choose_random_move(battle)
 
-    def _log_turn(
+    async def _log_turn(
         self,
         turn_number: int,
         action_chosen: str | None,
@@ -113,10 +113,17 @@ class HumanPlayer(Player):
         state_json: str | None = None,
         fallback_reason: str | None = None,
     ) -> None:
+        """Persist this turn's log row (#282).
+
+        Awaitable because ``BattleStore.log_turn`` is blocking sqlite3 — the
+        write goes to a worker thread so it cannot stall the event loop, which
+        here is also the loop awaiting the human's move.
+        """
         if self._store is None or self._battle_id is None:
             return
         try:
-            self._store.log_turn(
+            await asyncio.to_thread(
+                self._store.log_turn,
                 battle_id=self._battle_id,
                 turn_number=turn_number,
                 player_role=self._player_role,
@@ -178,7 +185,7 @@ class StreamingHumanPlayer(_StreamingMixin, HumanPlayer):
                 self._human_timeout,
             )
             _pending.pop((self._battle_id, self._player_role), None)
-            self._log_turn(
+            await self._log_turn(
                 battle.turn,
                 None,
                 False,
@@ -201,7 +208,7 @@ class StreamingHumanPlayer(_StreamingMixin, HumanPlayer):
                 battle.turn,
                 action[:80] if action else "",
             )
-            self._log_turn(
+            await self._log_turn(
                 battle.turn,
                 None,
                 False,
@@ -217,7 +224,7 @@ class StreamingHumanPlayer(_StreamingMixin, HumanPlayer):
             return order
 
         action_label = getattr(parsed, "message", str(parsed))
-        self._log_turn(battle.turn, action_label, True, action, state_json)
+        await self._log_turn(battle.turn, action_label, True, action, state_json)
         await self._bus.publish(_turn_event(battle, action_label, self._player_role, state))
         return parsed
 

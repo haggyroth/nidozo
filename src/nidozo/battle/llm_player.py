@@ -208,8 +208,8 @@ class LLMPlayer(Player):
                     extra=_extra,
                 )
                 if attempt == 1:
-                    self._log_turn(battle.turn, None, False, None, state_json, coach_advice,
-                                   fallback_reason="backend_timeout")
+                    await self._log_turn(battle.turn, None, False, None, state_json,
+                                         coach_advice, fallback_reason="backend_timeout")
                     return self.choose_random_move(battle)
                 continue
             except Exception as exc:
@@ -219,8 +219,8 @@ class LLMPlayer(Player):
                     extra=_extra,
                 )
                 if attempt == 1:
-                    self._log_turn(battle.turn, None, False, None, state_json, coach_advice,
-                                   fallback_reason="backend_error")
+                    await self._log_turn(battle.turn, None, False, None, state_json,
+                                         coach_advice, fallback_reason="backend_error")
                     return self.choose_random_move(battle)
                 continue
 
@@ -243,9 +243,9 @@ class LLMPlayer(Player):
                 extra=_extra,
             )
             _pt, _ct = self._gather_usage()
-            self._log_turn(battle.turn, None, False, "", state_json, coach_advice,
-                           fallback_reason="empty_response",
-                           prompt_tokens=_pt, completion_tokens=_ct)
+            await self._log_turn(battle.turn, None, False, "", state_json, coach_advice,
+                                 fallback_reason="empty_response",
+                                 prompt_tokens=_pt, completion_tokens=_ct)
             return self.choose_random_move(battle)
 
         if logger.isEnabledFor(logging.DEBUG):
@@ -263,9 +263,9 @@ class LLMPlayer(Player):
                 extra=_extra,
             )
             _pt, _ct = self._gather_usage()
-            self._log_turn(battle.turn, None, False, response, state_json, coach_advice,
-                           fallback_reason="parse_failure",
-                           prompt_tokens=_pt, completion_tokens=_ct)
+            await self._log_turn(battle.turn, None, False, response, state_json, coach_advice,
+                                 fallback_reason="parse_failure",
+                                 prompt_tokens=_pt, completion_tokens=_ct)
             return self.choose_random_move(battle)
 
         action_label = getattr(order, "message", str(order))
@@ -275,8 +275,8 @@ class LLMPlayer(Player):
             extra={**_extra, "action": action_label, "elapsed_s": round(_elapsed, 2)},
         )
         _pt, _ct = self._gather_usage()
-        self._log_turn(battle.turn, action_label, True, response, state_json, coach_advice,
-                       prompt_tokens=_pt, completion_tokens=_ct)
+        await self._log_turn(battle.turn, action_label, True, response, state_json, coach_advice,
+                             prompt_tokens=_pt, completion_tokens=_ct)
         # Store for next turn's battle history summary
         self._last_action_display = self._action_display(response)
         return order
@@ -522,7 +522,7 @@ class LLMPlayer(Player):
                 seen = True
         return (prompt, completion) if seen else (None, None)
 
-    def _log_turn(
+    async def _log_turn(
         self,
         turn_number: int,
         action_chosen: str | None,
@@ -534,10 +534,21 @@ class LLMPlayer(Player):
         prompt_tokens: int | None = None,
         completion_tokens: int | None = None,
     ) -> None:
+        """Persist this turn's log row (#282).
+
+        Awaitable because ``BattleStore.log_turn`` is blocking sqlite3: the row
+        carries the whole ``state_json`` snapshot and the raw LLM response, so
+        the INSERT plus its ``commit()`` are the heaviest store write in a
+        battle. On the event loop that write stalls the WS stream and every
+        other in-flight battle, so it goes to a worker thread. ``to_thread``
+        hands the call to whichever worker is free; the store's per-thread
+        connections make that safe.
+        """
         if self._store is None or self._battle_id is None:
             return
         try:
-            self._store.log_turn(
+            await asyncio.to_thread(
+                self._store.log_turn,
                 battle_id=self._battle_id,
                 turn_number=turn_number,
                 player_role=self._player_role,
