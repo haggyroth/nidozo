@@ -52,6 +52,11 @@ class BattleStore:
     at the file level.  Multi-step mutations (e.g. finish_battle + ELO update)
     are wrapped in ``with self._conn:`` for atomic commit/rollback.
 
+    Every method here blocks.  From a coroutine, call them with
+    ``await asyncio.to_thread(...)`` — the per-thread connections make the
+    worker thread safe — or from a plain ``def`` route handler, which FastAPI
+    already runs in the threadpool (#282).
+
     Args:
         db_path: Path to the SQLite file. Created if it doesn't exist.
     """

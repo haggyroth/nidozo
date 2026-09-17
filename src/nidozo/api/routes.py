@@ -8,6 +8,7 @@ import logging
 import os
 import socket
 import uuid
+from collections.abc import Callable
 from typing import Any
 
 import httpx
@@ -40,6 +41,22 @@ logger = logging.getLogger(__name__)
 
 _SHOWDOWN_HOST = os.environ.get("NIDOZO_SHOWDOWN_HOST", "localhost")
 _SHOWDOWN_PORT = int(os.environ.get("NIDOZO_SHOWDOWN_PORT", "8000"))
+
+
+async def _store_off_loop[T](fn: Callable[..., T], /, *args: Any) -> T:
+    """Run a blocking ``BattleStore`` call on a worker thread (#282).
+
+    ``BattleStore`` is synchronous sqlite3 by design — its per-thread
+    connections exist precisely so a worker thread can use it safely. Calling
+    one directly from a coroutine runs the query *and* its ``commit()`` on the
+    event loop, which stalls every other request, WebSocket stream, and
+    in-flight battle until the disk write returns.
+
+    Handlers with no ``await`` of their own are plain ``def`` instead, which
+    FastAPI already runs in the threadpool; this helper is for the ones that
+    must stay async because they publish on the bus.
+    """
+    return await asyncio.to_thread(fn, *args)
 
 
 def create_router(
@@ -173,9 +190,12 @@ def create_router(
         if task and not task.done():
             task.cancel()
 
-        cancelled = store.cancel_battle(battle_id)
+        # BattleStore is blocking sqlite3 — see _store_off_loop. This handler
+        # cannot be sync (it publishes on the bus below), so the store work goes
+        # to a worker thread instead.
+        cancelled = await _store_off_loop(store.cancel_battle, battle_id)
         if not cancelled:
-            battle = store.get_battle(battle_id)
+            battle = await _store_off_loop(store.get_battle, battle_id)
             if not battle:
                 raise HTTPException(status_code=404, detail="Battle not found")
             return {"ok": False, "message": f"Battle already {battle['status']}"}
@@ -328,10 +348,10 @@ def create_router(
 
     @router.post("/api/tournaments/{tournament_id}/cancel")
     async def cancel_tournament(tournament_id: int) -> dict[str, Any]:
-        t = store.get_tournament(tournament_id)
+        t = await _store_off_loop(store.get_tournament, tournament_id)
         if not t:
             raise HTTPException(status_code=404, detail="Tournament not found")
-        cancelled = store.cancel_tournament(tournament_id)
+        cancelled = await _store_off_loop(store.cancel_tournament, tournament_id)
         if cancelled:
             await bus.publish({
                 "type": "tournament_cancelled",
@@ -402,8 +422,11 @@ def create_router(
     # Start a single battle
     # -------------------------------------------------------------------
 
+    # Sync on purpose (#282): the store writes below are blocking sqlite3, and a
+    # plain ``def`` handler runs in FastAPI's threadpool rather than on the event
+    # loop. Making this ``async def`` would put those writes back on the loop.
     @router.post("/api/battles/start", response_model=StartBattleResponse)
-    async def start_battle(
+    def start_battle(
         req: StartBattleRequest,
         background_tasks: BackgroundTasks,
     ) -> StartBattleResponse:
@@ -455,8 +478,10 @@ def create_router(
     # Start a tournament
     # -------------------------------------------------------------------
 
+    # Sync on purpose (#282) — same reason as start_battle: blocking store
+    # writes belong in the threadpool, not on the event loop.
     @router.post("/api/tournament/start", response_model=StartTournamentResponse)
-    async def start_tournament(
+    def start_tournament(
         req: StartTournamentRequest,
         background_tasks: BackgroundTasks,
     ) -> StartTournamentResponse:
@@ -566,8 +591,10 @@ def create_router(
     # Seasons
     # -------------------------------------------------------------------
 
+    # Sync on purpose (#282) — same reason as start_battle: blocking store
+    # writes belong in the threadpool, not on the event loop.
     @router.post("/api/seasons/start", response_model=StartSeasonResponse)
-    async def start_season(
+    def start_season(
         req: StartSeasonRequest,
         background_tasks: BackgroundTasks,
     ) -> StartSeasonResponse:
@@ -669,9 +696,9 @@ def create_router(
 
     @router.post("/api/seasons/{season_id}/cancel")
     async def cancel_season(season_id: int) -> dict[str, Any]:
-        if store.get_season(season_id) is None:
+        if await _store_off_loop(store.get_season, season_id) is None:
             raise HTTPException(status_code=404, detail="Season not found")
-        cancelled = store.cancel_season(season_id)
+        cancelled = await _store_off_loop(store.cancel_season, season_id)
         if not cancelled:
             raise HTTPException(
                 status_code=409, detail="Season is already finished or cannot be cancelled"
@@ -687,8 +714,10 @@ def create_router(
     # Experiments (bake-offs, #226)
     # -------------------------------------------------------------------
 
+    # Sync on purpose (#282) — same reason as start_battle: blocking store
+    # writes belong in the threadpool, not on the event loop.
     @router.post("/api/experiments/start", response_model=StartExperimentResponse)
-    async def start_experiment(
+    def start_experiment(
         req: StartExperimentRequest,
         background_tasks: BackgroundTasks,
     ) -> StartExperimentResponse:
@@ -771,9 +800,9 @@ def create_router(
 
     @router.post("/api/experiments/{experiment_id}/cancel")
     async def cancel_experiment(experiment_id: int) -> dict[str, Any]:
-        if store.get_experiment(experiment_id) is None:
+        if await _store_off_loop(store.get_experiment, experiment_id) is None:
             raise HTTPException(status_code=404, detail="Experiment not found")
-        cancelled = store.cancel_experiment(experiment_id)
+        cancelled = await _store_off_loop(store.cancel_experiment, experiment_id)
         if not cancelled:
             raise HTTPException(
                 status_code=409, detail="Experiment is already finished or cannot be cancelled"
