@@ -9,6 +9,8 @@ All tests run without a live Showdown server:
 from __future__ import annotations
 
 import asyncio
+import logging
+import time
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -378,6 +380,139 @@ async def test_turn_timeout_can_be_disabled(mock_battle, fake_order) -> None:
          patch("nidozo.battle.llm_player.parse_action", return_value=fake_order):
         result = await player.choose_move(mock_battle)
     assert result is fake_order
+
+
+# ---------------------------------------------------------------------------
+# choose_move — retry deadline (#288)
+#
+# The retry used to run on a full deadline, so a dead backend held the turn for
+# twice NIDOZO_TURN_TIMEOUT. These assert the *deadlines handed to wait_for*
+# rather than the wall-clock, so they are deterministic.
+# ---------------------------------------------------------------------------
+
+async def _attempt_timeouts(
+    player, battle, *, hang: bool = False
+) -> list[float | None]:
+    """The ``timeout=`` each retry attempt ran under, in order.
+
+    ``hang=True`` swaps in a backend that never returns, so the deadlines are
+    genuinely reached and the elapsed time is real. The default backend returns
+    an empty response promptly, which exercises the same retry loop without
+    making every test pay the deadlines it is asserting on.
+    """
+    recorded: list[float | None] = []
+    real_wait_for = asyncio.wait_for
+
+    async def _spy(awaitable, timeout=None):
+        recorded.append(timeout)
+        return await real_wait_for(awaitable, timeout=timeout)
+
+    async def _hang(_messages) -> str:
+        await asyncio.sleep(3600)   # never returns; wait_for cancels it
+        return ""
+
+    async def _empty(_messages) -> str:
+        await asyncio.sleep(0)      # returns promptly, taking the empty path
+        return ""
+
+    player._backend.complete = _hang if hang else _empty
+    with patch("nidozo.battle.llm_player.asyncio.wait_for", _spy), \
+         patch("nidozo.battle.llm_player.serialize_battle", return_value={}):
+        await player.choose_move(battle)
+    return recorded
+
+
+@pytest.mark.asyncio
+async def test_the_retry_gets_a_shorter_deadline_than_the_first_attempt(
+    mock_battle,
+) -> None:
+    """#288: the two attempts must not both run on the full turn timeout."""
+    player = _make_player(AsyncMock(), turn_timeout=10.0)
+
+    assert await _attempt_timeouts(player, mock_battle) == [10.0, 5.0]
+
+
+@pytest.mark.asyncio
+async def test_the_first_attempt_still_gets_the_full_turn_timeout(
+    mock_battle,
+) -> None:
+    """The working path is unchanged — only the retry is shortened."""
+    player = _make_player(AsyncMock(), turn_timeout=90.0)
+
+    first, _second = await _attempt_timeouts(player, mock_battle)
+
+    assert first == player._turn_timeout == 90.0
+
+
+@pytest.mark.asyncio
+async def test_two_hung_attempts_cost_less_than_twice_the_budget(mock_battle) -> None:
+    """The bound the issue is actually about: total wall-clock for a dead backend.
+
+    The backend hangs, so both deadlines are really spent — this is the only test
+    here that measures time rather than the deadline handed to ``wait_for``.
+    """
+    player = _make_player(AsyncMock(), turn_timeout=0.2)
+
+    started = time.monotonic()
+    await _attempt_timeouts(player, mock_battle, hang=True)
+    elapsed = time.monotonic() - started
+
+    # Two full deadlines would be 0.4s; the fix targets 0.3s. The margin allows
+    # for scheduler slop without admitting a regression to the old behaviour.
+    assert elapsed < 0.36, f"two attempts took {elapsed:.3f}s"
+
+
+@pytest.mark.asyncio
+async def test_a_disabled_deadline_never_reaches_wait_for(mock_battle) -> None:
+    """turn_timeout=0 leaves both attempts unbounded — no deadline to halve.
+
+    An empty recording means ``wait_for`` was never called, so neither attempt
+    ran under a timeout at all.
+    """
+    player = _make_player(AsyncMock(), turn_timeout=0)
+
+    assert await _attempt_timeouts(player, mock_battle) == []
+
+
+def test_describe_limit_handles_a_disabled_deadline() -> None:
+    """The old log line formatted None with %.0f, which is a TypeError.
+
+    Logging catches formatting errors, so the failure stayed silent: the line
+    naming the deadline was dropped and a logging-error traceback took its place.
+    """
+    from nidozo.battle.llm_player import _describe_limit
+
+    assert _describe_limit(None) == "no limit"
+    assert _describe_limit(45.0) == "45s limit"
+
+
+@pytest.mark.asyncio
+async def test_a_coach_timeout_with_the_deadline_disabled_still_logs(
+    mock_battle, mock_backend, fake_order, caplog,
+) -> None:
+    """The reachable None case, through the call site that formats it.
+
+    turn_timeout=0 disables the *player's* backstop around the coach, but the
+    coach still bounds its own backend call (#278) — so it can time out while
+    ``_turn_timeout`` is None. That line then had nothing for ``%.0f`` to format:
+    the record was dropped and the only notice that the advisor timed out was
+    lost. Asserting on the rendered output rather than on the helper alone,
+    because the defect was at the call site.
+    """
+    async def _slow_coach(_state):
+        raise TimeoutError
+
+    coach = MagicMock()
+    coach.analyze = _slow_coach
+    player = _make_player(mock_backend, turn_timeout=0, coach=coach)
+    assert player._turn_timeout is None
+
+    with caplog.at_level(logging.ERROR, logger="nidozo.battle.llm_player"), \
+         patch("nidozo.battle.llm_player.serialize_battle", return_value={}), \
+         patch("nidozo.battle.llm_player.parse_action", return_value=fake_order):
+        await player.choose_move(mock_battle)
+
+    assert "coach timed out (no limit)" in caplog.text
 
 
 # ---------------------------------------------------------------------------
