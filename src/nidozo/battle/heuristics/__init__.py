@@ -43,7 +43,7 @@ from nidozo.battle.heuristics.context import (
 from nidozo.battle.heuristics.damage import (
     _STAGE_MULT,
     _WEATHER_MODS,
-    _effective_speed,
+    _comparable_speed,
     _estimate_incoming_damage,
     _stage_mult,
     _weather_damage_mod,
@@ -93,7 +93,7 @@ __all__ = [
     "_annotate_status_move",
     "_battle_context",
     "_current_weather",
-    "_effective_speed",
+    "_comparable_speed",
     "_effectiveness_label",
     "_estimate_incoming_damage",
     "_hazard_switch_notes",
