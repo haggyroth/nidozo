@@ -4,7 +4,7 @@ version = "0.46.2"
 description = "LLM vs LLM Pokémon battle arena powered by Pokémon Showdown and poke-env"
 requires-python = ">=3.12"
 dependencies = [
-    "poke-env>=0.16.1,<0.17",   # 0.16 folded Move.deduced_target into Move.target; removed Player.get_next_team()
+    "poke-env>=0.16.1,<0.18",   # 0.16 folded Move.deduced_target into Move.target; removed Player.get_next_team()
     "anthropic>=0.113.0",
     "openai>=2.44.0",
     "jinja2>=3.1.0",
@@ -19,7 +19,7 @@ dev = [
     "pytest-asyncio>=0.24",
     "pytest-cov>=7.1",
     "httpx2>=2.5.0",        # silences the starlette TestClient deprecation warning
-    "ruff==0.16.10",        # linting — CI installs and runs this exact version
+    "ruff==0.17.6",        # linting — CI installs and runs this exact version
     "mypy>=2.1.0",
 ]
 
